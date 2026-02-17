@@ -397,6 +397,196 @@ test.describe('Tool dispatch timeout', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Server-side DISPATCH_TIMEOUT_MS (30s)
+// ---------------------------------------------------------------------------
+
+test.describe('Server-side dispatch timeout', () => {
+  test('DISPATCH_TIMEOUT_MS fires when extension response never reaches server', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    // This test takes ~30s — the full DISPATCH_TIMEOUT_MS duration
+    test.slow();
+
+    const page = await setupToolTest(mcpServer, testServer, extensionContext, mcpClient);
+
+    // Verify the tool works normally before the timeout test
+    const okOutput = await callToolExpectSuccess(mcpClient, mcpServer, 'e2e-test_echo', { message: 'pre-timeout' });
+    expect(okOutput.message).toBe('pre-timeout');
+
+    // Fire the tool call. The extension receives tool.dispatch and begins
+    // executing the adapter. We immediately replace the extension's WS with
+    // a fake client. The old WS is closed by the server, but since
+    // state.extensionWs now points to the fake WS, the close handler does
+    // NOT reject pending dispatches (the `state.extensionWs === ws` check
+    // fails for the old WS). The extension's adapter finishes executing and
+    // tries to send the result, but the WS is closed so the response never
+    // reaches the server. The server's 30s DISPATCH_TIMEOUT_MS fires.
+    //
+    // We use a raw HTTP fetch with a 45s timeout (longer than the 30s
+    // DISPATCH_TIMEOUT_MS) because the standard mcpClient has a 30s fetch
+    // timeout that would race with the dispatch timeout.
+
+    // Initialize a fresh MCP session for the long-timeout call
+    const mcpUrl = `http://localhost:${mcpServer.port}/mcp`;
+    let sessionId: string | null = null;
+
+    const mcpRequest = async (body: unknown, timeoutMs: number): Promise<Record<string, unknown>> => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+      };
+      if (sessionId) headers['mcp-session-id'] = sessionId;
+
+      const res = await fetch(mcpUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`MCP request failed (${res.status}): ${text}`);
+      }
+      const sid = res.headers.get('mcp-session-id');
+      if (sid) sessionId = sid;
+
+      const contentType = res.headers.get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        return (await res.json()) as Record<string, unknown>;
+      }
+
+      // SSE response — extract JSON-RPC messages
+      const text = await res.text();
+      const dataLines = text
+        .split('\n')
+        .filter(line => line.startsWith('data:'))
+        .map(line => line.slice('data:'.length).trim());
+
+      const messages: Record<string, unknown>[] = [];
+      for (const raw of dataLines) {
+        try {
+          messages.push(JSON.parse(raw) as Record<string, unknown>);
+        } catch {
+          // skip non-JSON
+        }
+      }
+
+      const reqId = (body as Record<string, unknown>).id;
+      if (reqId !== undefined) {
+        const match = messages.find(m => m.id === reqId && ('result' in m || 'error' in m));
+        if (match) return match;
+      }
+
+      const lastResponse = [...messages].reverse().find(m => 'result' in m || 'error' in m);
+      if (lastResponse) return lastResponse;
+      return messages[messages.length - 1] as Record<string, unknown>;
+    };
+
+    // Initialize the custom session
+    await mcpRequest(
+      {
+        jsonrpc: '2.0',
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: {},
+          clientInfo: { name: 'e2e-timeout-test-client', version: '0.0.1' },
+        },
+        id: 1,
+      },
+      10_000,
+    );
+
+    await mcpRequest({ jsonrpc: '2.0', method: 'notifications/initialized' }, 5_000);
+
+    // Get the authenticated WS URL
+    const wsUrl = await fetchWsUrl(mcpServer.port);
+
+    // Set the test server to a 60s delay so the adapter is blocked waiting for
+    // the HTTP response when we replace the WebSocket. Without this, the echo
+    // tool returns instantly and the extension sends the response before we can
+    // disconnect it.
+    await testServer.setSlow(60_000);
+
+    // Fire the tool call (non-blocking) with a 45s timeout, then immediately
+    // steal the extension's WS so the response can never reach the server.
+    const start = Date.now();
+    const toolCallPromise = mcpRequest(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { name: 'e2e-test_echo', arguments: { message: 'should-timeout' } },
+        id: 2,
+      },
+      45_000,
+    );
+
+    // Wait briefly for the dispatch to be sent over the WS before replacing it
+    await new Promise(r => setTimeout(r, 500));
+
+    // Replace the extension's WebSocket with a fake client.
+    // The server closes the old WS (triggering a close event), but since
+    // state.extensionWs is now the fake WS, the close handler doesn't reject
+    // pending dispatches. The extension's response has nowhere to go.
+    mcpServer.logs.length = 0;
+    const fakeWs = new WebSocket(wsUrl);
+    await new Promise<void>((resolve, reject) => {
+      fakeWs.onopen = () => resolve();
+      fakeWs.onerror = () => reject(new Error('Fake WebSocket connect failed'));
+      setTimeout(() => reject(new Error('Fake WebSocket connect timeout')), 5_000);
+    });
+
+    await waitForLog(mcpServer, 'Closing previous extension WebSocket', 5_000);
+
+    // Wait for the server's DISPATCH_TIMEOUT_MS (30s) to fire
+    const response = await toolCallPromise;
+    const elapsed = Date.now() - start;
+
+    // Verify the server returned a dispatch timeout error
+    const result = response.result as { content: Array<{ type: string; text: string }>; isError?: boolean } | undefined;
+    const error = response.error as { code: number; message: string } | undefined;
+
+    if (result) {
+      // Timeout came through as a tool result with isError: true
+      expect(result.isError).toBe(true);
+      const text = result.content.map(c => c.text).join('');
+      expect(text.toLowerCase()).toContain('timed out');
+    } else if (error) {
+      // Timeout came through as a JSON-RPC error
+      expect(error.message.toLowerCase()).toContain('timed out');
+    } else {
+      throw new Error(`Unexpected response: ${JSON.stringify(response)}`);
+    }
+
+    // The timeout should take approximately 30s (DISPATCH_TIMEOUT_MS)
+    expect(elapsed).toBeGreaterThan(25_000);
+    expect(elapsed).toBeLessThan(40_000);
+
+    // Clean up: reset slow mode, close the fake WS, wait for the real
+    // extension to reconnect, then verify subsequent tool calls work.
+    await testServer.setSlow(0);
+    fakeWs.close();
+    await waitForExtensionConnected(mcpServer, 45_000);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const afterTimeoutResult = await waitForToolResult(
+      mcpClient,
+      'e2e-test_echo',
+      { message: 'after-timeout' },
+      { isError: false },
+      15_000,
+    );
+    const afterTimeoutOutput = parseToolResult(afterTimeoutResult.content);
+    expect(afterTimeoutOutput.message).toBe('after-timeout');
+
+    await page.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Tool input validation
 // ---------------------------------------------------------------------------
 

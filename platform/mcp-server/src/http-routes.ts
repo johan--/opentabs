@@ -259,18 +259,26 @@ const createHandleFetch =
 const createHandleWsOpen =
   (state: ServerState) =>
   (ws: WsHandle): void => {
-    // Close any previous extension connection (only one allowed)
-    if (state.extensionWs && state.extensionWs !== ws) {
+    const previousWs = state.extensionWs;
+
+    // Assign the new WS BEFORE closing the previous one. Bun fires the
+    // close handler synchronously during ws.close(), so if extensionWs
+    // still pointed at the old WS the close handler would see
+    // `state.extensionWs === ws` (true) and reject all pending dispatches
+    // with "Extension disconnected" — even though a new connection is
+    // already taking over.
+    log.info('Extension WebSocket connected');
+    state.extensionWs = ws;
+
+    if (previousWs && previousWs !== ws) {
       log.info('Closing previous extension WebSocket (replaced by new connection)');
       try {
-        state.extensionWs.close(1000, 'Replaced by new connection');
+        previousWs.close(1000, 'Replaced by new connection');
       } catch {
         // Already closed
       }
     }
 
-    log.info('Extension WebSocket connected');
-    state.extensionWs = ws;
     void sendSyncFull(state);
   };
 
