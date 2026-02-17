@@ -28,7 +28,6 @@ const SIDE_PANEL_METHODS = new Set([
   'tool.invocationEnd',
   'plugins.changed',
   'plugins.state',
-  'plugin.updated',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -344,25 +343,10 @@ const handlePluginUpdate = async (params: Record<string, unknown>): Promise<void
     },
   });
 
-  // Push the updated plugin state directly to the side panel so it updates
-  // immediately without a fetchConfigState() round-trip.
+  // Notify the side panel so it refreshes its plugin list without user interaction
   forwardToSidePanel({
     type: 'sp:serverMessage',
-    data: {
-      jsonrpc: '2.0',
-      method: 'plugin.updated',
-      params: {
-        plugin: {
-          name: meta.name,
-          displayName: meta.displayName ?? meta.name,
-          version: meta.version,
-          trustTier: meta.trustTier,
-          tabState: newState.state,
-          urlPatterns: meta.urlPatterns,
-          tools: meta.tools,
-        },
-      },
-    },
+    data: { jsonrpc: '2.0', method: 'plugins.changed' },
   });
 };
 
