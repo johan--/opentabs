@@ -356,9 +356,8 @@ fixtureTest.describe('IIFE injection — plugin.uninstall flow', () => {
         id: 'test-uninstall-invalid-2',
       });
 
-      // Wait a moment for any async processing, then verify adapter is still present
-      await new Promise(r => setTimeout(r, 1_000));
-
+      // Verify adapter is still present — tool dispatch success (below) is the
+      // strongest proof, but checking the in-page state confirms no teardown ran.
       const adapterAfter = await page.evaluate(() => {
         const ot = (globalThis as Record<string, unknown>).__openTabs as
           | { adapters?: Record<string, unknown> }
