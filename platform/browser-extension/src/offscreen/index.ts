@@ -318,6 +318,10 @@ chrome.runtime.onMessage.addListener((message: InternalMessage, _sender, sendRes
             clearTimeout(reconnectTimeoutId);
             reconnectTimeoutId = null;
             void connect();
+          } else {
+            // No active connection and no pending reconnect (backoff exhausted
+            // or no connection was ever established) — connect immediately.
+            void connect();
           }
         }
         sendResponse({ ok: true });
