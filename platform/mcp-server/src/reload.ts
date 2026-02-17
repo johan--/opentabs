@@ -16,7 +16,7 @@ import { loadConfig, getConfigDir } from './config.js';
 import { discoverPlugins } from './discovery.js';
 import { ensureExtensionInstalled } from './extension-install.js';
 import { sendSyncFull, sendPluginUpdate } from './extension-protocol.js';
-import { startFileWatching, stopFileWatching } from './file-watcher.js';
+import { startConfigWatching, startFileWatching, stopFileWatching } from './file-watcher.js';
 import { sweepStaleSessions } from './http-routes.js';
 import { log } from './logger.js';
 import { registerMcpHandlers, rebuildToolLookups, notifyToolListChanged } from './mcp-setup.js';
@@ -104,6 +104,11 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
         );
       });
     },
+    onConfigChanged: () => {
+      void performConfigReload(state, sessionServers, transports).catch((err: unknown) => {
+        log.error(`Config watcher reload failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    },
   };
 
   try {
@@ -183,6 +188,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
   // File watching — always restart regardless of success/failure so
   // watchers are never left in a stopped state after a partial reload.
   startFileWatching(state, fileWatcherCallbacks);
+  startConfigWatching(state, fileWatcherCallbacks);
 
   // Re-sync extension if connected
   if (state.extensionWs) {

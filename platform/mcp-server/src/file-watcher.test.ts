@@ -10,6 +10,7 @@ import type { RegisteredPlugin, ServerState } from './state.js';
 const noopCallbacks = {
   onManifestChanged: () => {},
   onIifeChanged: () => {},
+  onConfigChanged: () => {},
 };
 
 /** Create a minimal registered plugin with the given overrides */

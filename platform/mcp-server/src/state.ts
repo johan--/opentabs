@@ -132,6 +132,8 @@ export interface ServerState {
    *  Debounce callbacks capture the current generation and bail out if it has changed,
    *  preventing stale closures from the previous module evaluation from executing. */
   fileWatcherGeneration: number;
+  /** FSWatcher for ~/.opentabs/ directory, detecting config.json changes */
+  configWatcher: FSWatcher | null;
 }
 
 /** Increment when changing the type of an existing ServerState field */
@@ -159,6 +161,7 @@ export const createState = (): ServerState => ({
   sweepTimerId: null,
   startedAt: Date.now(),
   fileWatcherGeneration: 0,
+  configWatcher: null,
 });
 
 /** Get the next JSON-RPC request ID, wrapping to avoid unsafe integer range */

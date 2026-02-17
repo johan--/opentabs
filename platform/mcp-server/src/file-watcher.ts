@@ -20,6 +20,7 @@
  *   which would orphan the old handles.
  */
 
+import { getConfigDir } from './config.js';
 import { log } from './logger.js';
 import { parseManifest } from './manifest-schema.js';
 import { validateUrlPattern } from '@opentabs-dev/shared';
@@ -34,6 +35,8 @@ interface FileWatcherCallbacks {
   onManifestChanged: (pluginName: string) => void;
   /** Send plugin.update to extension with new IIFE */
   onIifeChanged: (pluginName: string, iife: string) => void;
+  /** Called when ~/.opentabs/config.json changes on disk */
+  onConfigChanged: () => void;
 }
 
 /**
@@ -263,6 +266,51 @@ const watchPlugin = (
 };
 
 /**
+ * Start watching the config directory for changes to config.json.
+ * Uses directory-level watching (not file-level) because on macOS, file-level
+ * fs.watch() via kqueue fails to deliver events after a close + recreate cycle.
+ * The debounce pattern matches plugin file watchers — uses fileWatcherTimers
+ * with a 'config' key and checks fileWatcherGeneration to discard stale callbacks.
+ */
+const startConfigWatching = (state: ServerState, callbacks: FileWatcherCallbacks): void => {
+  // Close any existing config watcher
+  if (state.configWatcher) {
+    state.configWatcher.close();
+    state.configWatcher = null;
+  }
+
+  const configDir = getConfigDir();
+  const gen = state.fileWatcherGeneration;
+
+  try {
+    state.configWatcher = watch(configDir, (_eventType, filename) => {
+      if (filename !== 'config.json') return;
+
+      const key = 'config';
+      const existing = state.fileWatcherTimers.get(key);
+      if (existing) clearTimeout(existing);
+
+      state.fileWatcherTimers.set(
+        key,
+        setTimeout(() => {
+          state.fileWatcherTimers.delete(key);
+          if (state.fileWatcherGeneration !== gen) return;
+          log.info('Config watcher: config.json changed — triggering reload');
+          callbacks.onConfigChanged();
+        }, 200),
+      );
+    });
+
+    log.info(`Config watcher: Watching ${configDir} for config.json changes`);
+  } catch (err) {
+    log.warn(
+      `Config watcher: Could not watch config dir at ${configDir}:`,
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+};
+
+/**
  * Start file watching for all local plugins.
  * Uses the sourcePath stored on each local RegisteredPlugin.
  * Only watches local plugins — not npm-installed packages.
@@ -305,6 +353,12 @@ const stopFileWatching = (state: ServerState): void => {
   }
   state.fileWatcherEntries.length = 0;
 
+  // Close config watcher
+  if (state.configWatcher) {
+    state.configWatcher.close();
+    state.configWatcher = null;
+  }
+
   for (const timer of state.fileWatcherTimers.values()) {
     clearTimeout(timer);
   }
@@ -312,4 +366,4 @@ const stopFileWatching = (state: ServerState): void => {
 };
 
 export type { FileWatcherCallbacks };
-export { startFileWatching, stopFileWatching };
+export { startConfigWatching, startFileWatching, stopFileWatching };
