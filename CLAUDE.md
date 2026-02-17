@@ -151,26 +151,28 @@ The root tooling (`bun run build`, `bun run lint`, etc.) does NOT cover plugins.
 
 The platform packages `@opentabs-dev/shared`, `@opentabs-dev/plugin-sdk`, and `@opentabs-dev/cli` are published as private packages to the npm registry under the `@opentabs-dev` org.
 
-**Authentication**: npm requires two tokens — a session token (from `npm login`) for reading private packages, and a granular access token (from npmjs.com) for publishing without OTP.
+**Authentication**: npm requires two separate tokens:
 
-**Publishing workflow** (packages must be published in dependency order):
+- **Session token** (`~/.npmrc`): Created by `npm login --scope=@opentabs-dev`. Used for reading/installing private packages. Expires after 2 hours.
+- **Granular token** (`~/.npmrc.publish`): Created at npmjs.com/settings/tokens/create with Read+Write + Bypass 2FA. Used for publishing without OTP prompts.
+
+**Setup (one-time)**:
 
 ```bash
-# 1. Build all platform packages
-bun run build
+# 1. Create session token for reading
+npm login --scope=@opentabs-dev
 
-# 2. Bump versions in platform/shared, platform/plugin-sdk, platform/cli
-# 3. Publish (use granular token for publishing)
-#    Temporarily swap ~/.npmrc to use the granular token:
-cp ~/.npmrc ~/.npmrc.session
-echo '//registry.npmjs.org/:_authToken=<GRANULAR_TOKEN>' > ~/.npmrc
-npm publish --access restricted -w platform/shared
-npm publish --access restricted -w platform/plugin-sdk
-npm publish --access restricted -w platform/cli
-cp ~/.npmrc.session ~/.npmrc && rm ~/.npmrc.session
+# 2. Create publish token file with your granular access token
+echo '//registry.npmjs.org/:_authToken=<GRANULAR_TOKEN>' > ~/.npmrc.publish
+chmod 600 ~/.npmrc.publish
+```
 
-# 4. Update plugin dependencies to new versions
-# 5. Rebuild plugins: cd plugins/<name> && bun install && bun run build
+**Publishing** (uses `scripts/publish.sh` which handles token switching automatically):
+
+```bash
+./scripts/publish.sh 0.0.3
+# Then update plugin deps and rebuild:
+# cd plugins/<name> && bun install && bun run build
 ```
 
 ---
