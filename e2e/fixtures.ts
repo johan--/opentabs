@@ -607,39 +607,44 @@ const createExtensionCopy = (
   const extensionDir = path.join(tmpBase, 'extension');
   const userDataDir = path.join(tmpBase, 'user-data');
 
-  // Copy extension directory, excluding build artifacts and source files
-  // that are not needed at runtime (speeds up test setup).
-  fs.cpSync(EXTENSION_DIR, extensionDir, {
-    recursive: true,
-    filter: (source: string) => !/[\\/](node_modules|src|\.tsbuildinfo)[\\/]?$/.test(source),
-  });
+  try {
+    // Copy extension directory, excluding build artifacts and source files
+    // that are not needed at runtime (speeds up test setup).
+    fs.cpSync(EXTENSION_DIR, extensionDir, {
+      recursive: true,
+      filter: (source: string) => !/[\\/](node_modules|src|\.tsbuildinfo)[\\/]?$/.test(source),
+    });
 
-  // Replace the default MCP server URL in BOTH the offscreen document and
-  // the background script. The offscreen.js has DEFAULT_MCP_SERVER_URL and
-  // background.js has the fallback URL in the offscreen:getUrl handler.
-  // Both must be patched so the extension connects to this test's port.
-  const testUrl = `ws://localhost:${mcpPort}/ws`;
+    // Replace the default MCP server URL in BOTH the offscreen document and
+    // the background script. The offscreen.js has DEFAULT_MCP_SERVER_URL and
+    // background.js has the fallback URL in the offscreen:getUrl handler.
+    // Both must be patched so the extension connects to this test's port.
+    const testUrl = `ws://localhost:${mcpPort}/ws`;
 
-  const offscreenPath = path.join(extensionDir, 'dist/offscreen/index.js');
-  const offscreenCode = fs.readFileSync(offscreenPath, 'utf-8');
-  const patchedOffscreen = offscreenCode.replace(/ws:\/\/localhost:9515\/ws/g, testUrl);
-  if (patchedOffscreen === offscreenCode) {
-    throw new Error(`Failed to patch offscreen.js — could not find "ws://localhost:9515/ws" in ${offscreenPath}`);
+    const offscreenPath = path.join(extensionDir, 'dist/offscreen/index.js');
+    const offscreenCode = fs.readFileSync(offscreenPath, 'utf-8');
+    const patchedOffscreen = offscreenCode.replace(/ws:\/\/localhost:9515\/ws/g, testUrl);
+    if (patchedOffscreen === offscreenCode) {
+      throw new Error(`Failed to patch offscreen.js — could not find "ws://localhost:9515/ws" in ${offscreenPath}`);
+    }
+    fs.writeFileSync(offscreenPath, patchedOffscreen, 'utf-8');
+
+    const backgroundPath = path.join(extensionDir, 'dist/background.js');
+    const backgroundCode = fs.readFileSync(backgroundPath, 'utf-8');
+    const patchedBackground = backgroundCode.replace(/ws:\/\/localhost:9515\/ws/g, testUrl);
+    if (patchedBackground === backgroundCode) {
+      throw new Error(`Failed to patch background.js — could not find "ws://localhost:9515/ws" in ${backgroundPath}`);
+    }
+    fs.writeFileSync(backgroundPath, patchedBackground, 'utf-8');
+
+    // Create adapters/ directory for plugin adapter IIFEs
+    fs.mkdirSync(path.join(extensionDir, 'adapters'), { recursive: true });
+
+    fs.mkdirSync(userDataDir, { recursive: true });
+  } catch (error) {
+    fs.rmSync(tmpBase, { recursive: true, force: true });
+    throw error;
   }
-  fs.writeFileSync(offscreenPath, patchedOffscreen, 'utf-8');
-
-  const backgroundPath = path.join(extensionDir, 'dist/background.js');
-  const backgroundCode = fs.readFileSync(backgroundPath, 'utf-8');
-  const patchedBackground = backgroundCode.replace(/ws:\/\/localhost:9515\/ws/g, testUrl);
-  if (patchedBackground === backgroundCode) {
-    throw new Error(`Failed to patch background.js — could not find "ws://localhost:9515/ws" in ${backgroundPath}`);
-  }
-  fs.writeFileSync(backgroundPath, patchedBackground, 'utf-8');
-
-  // Create adapters/ directory for plugin adapter IIFEs
-  fs.mkdirSync(path.join(extensionDir, 'adapters'), { recursive: true });
-
-  fs.mkdirSync(userDataDir, { recursive: true });
 
   return { extensionDir, userDataDir };
 };
