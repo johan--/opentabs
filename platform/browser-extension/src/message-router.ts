@@ -22,7 +22,12 @@ type MessageHandler = (params: Record<string, unknown>, id?: string | number) =>
  * (contains all plugin metadata) and tool.dispatch (contains tool input) to
  * the side panel, which only needs tab state changes and invocation animations.
  */
-const SIDE_PANEL_METHODS = new Set(['tab.stateChanged', 'tool.invocationStart', 'tool.invocationEnd']);
+const SIDE_PANEL_METHODS = new Set([
+  'tab.stateChanged',
+  'tool.invocationStart',
+  'tool.invocationEnd',
+  'plugins.changed',
+]);
 
 // ---------------------------------------------------------------------------
 // Payload validation — defense-in-depth for data that arrives over WebSocket
@@ -279,6 +284,12 @@ const handleSyncFull = async (params: Record<string, unknown>): Promise<void> =>
   // Send tab.syncAll AFTER all plugins are stored and injected to avoid the
   // race condition where tab.syncAll runs before plugins are in storage.
   await sendTabSyncAll();
+
+  // Notify the side panel so it refreshes its plugin list without user interaction
+  forwardToSidePanel({
+    type: 'sp:serverMessage',
+    data: { jsonrpc: '2.0', method: 'plugins.changed' },
+  });
 };
 
 const handlePluginUpdate = async (params: Record<string, unknown>): Promise<void> => {
@@ -305,6 +316,12 @@ const handlePluginUpdate = async (params: Record<string, unknown>): Promise<void
       tabId: newState.tabId,
       url: newState.url,
     },
+  });
+
+  // Notify the side panel so it refreshes its plugin list without user interaction
+  forwardToSidePanel({
+    type: 'sp:serverMessage',
+    data: { jsonrpc: '2.0', method: 'plugins.changed' },
   });
 };
 

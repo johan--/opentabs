@@ -72,6 +72,13 @@ const App = () => {
 
         // Handle notifications (messages with method, no id)
 
+        // plugins.changed notification — refetch the full plugin list
+        if (data.method === 'plugins.changed') {
+          loadPluginsRef.current();
+          sendResponse({ ok: true });
+          return true;
+        }
+
         // tab.stateChanged notification
         if (data.method === 'tab.stateChanged' && data.params) {
           const params = data.params as Record<string, unknown>;
