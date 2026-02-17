@@ -1,0 +1,284 @@
+/**
+ * Side panel plugin list and tool toggle E2E tests.
+ *
+ * Verifies:
+ *   1. Plugin cards display correct name, version, and tab state
+ *   2. Clicking a tool toggle sends config.setToolEnabled to the MCP server
+ *   3. MCP server receives the tool config change and updates its state
+ *   4. Side panel reflects the updated tool enabled/disabled state
+ *
+ * These tests open the side panel as a regular chrome-extension:// page
+ * (Playwright cannot open the real Chrome side panel API) and exercise
+ * the full background → MCP server communication path for tool toggles.
+ */
+
+import {
+  test,
+  expect,
+  startMcpServer,
+  startTestServer,
+  createMcpClient,
+  cleanupTestConfigDir,
+  writeTestConfig,
+  readPluginToolNames,
+  launchExtensionContext,
+  E2E_TEST_PLUGIN_DIR,
+} from './fixtures.js';
+import { waitForExtensionConnected, waitForLog } from './helpers.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import type { BrowserContext, Page } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the extension ID from the background service worker URL.
+ * The service worker URL follows the pattern: chrome-extension://<id>/dist/background.js
+ */
+const getExtensionId = async (context: BrowserContext): Promise<string> => {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    for (const sw of context.serviceWorkers()) {
+      const m = sw.url().match(/chrome-extension:\/\/([^/]+)/);
+      if (m?.[1]) return m[1];
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  throw new Error('Could not find extension service worker within 10s');
+};
+
+/**
+ * Open the side panel as a regular extension page in the browser context.
+ */
+const openSidePanel = async (context: BrowserContext): Promise<Page> => {
+  const extId = await getExtensionId(context);
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extId}/side-panel/side-panel.html`, {
+    waitUntil: 'load',
+    timeout: 10_000,
+  });
+  return page;
+};
+
+/**
+ * Set up the adapter symlink between the MCP server's config dir and the
+ * extension's adapters directory.
+ */
+const setupAdapterSymlink = (configDir: string, extensionDir: string): void => {
+  const serverAdaptersParent = path.join(configDir, 'extension');
+  fs.mkdirSync(serverAdaptersParent, { recursive: true });
+  const serverAdaptersDir = path.join(serverAdaptersParent, 'adapters');
+  const extensionAdaptersDir = path.join(extensionDir, 'adapters');
+  fs.mkdirSync(extensionAdaptersDir, { recursive: true });
+  fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
+  fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+};
+
+/**
+ * Read the e2e-test plugin version from its manifest.
+ */
+const readPluginVersion = (): string => {
+  const manifestPath = path.join(E2E_TEST_PLUGIN_DIR, 'opentabs-plugin.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as { version: string };
+  return manifest.version;
+};
+
+// ---------------------------------------------------------------------------
+// Plugin list rendering — name, version, tab state
+// ---------------------------------------------------------------------------
+
+test.describe('Side panel — plugin list rendering', () => {
+  test('plugin card displays correct name, version, and tab state after connecting', async () => {
+    const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
+    const prefixedToolNames = readPluginToolNames();
+    const tools: Record<string, boolean> = {};
+    for (const t of prefixedToolNames) {
+      tools[t] = true;
+    }
+
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-render-'));
+    writeTestConfig(configDir, { plugins: [absPluginPath], tools });
+
+    const server = await startMcpServer(configDir, true);
+    const testServer = await startTestServer();
+    const { context, cleanupDir, extensionDir } = await launchExtensionContext(server.port);
+    setupAdapterSymlink(configDir, extensionDir);
+
+    try {
+      await waitForExtensionConnected(server);
+      await waitForLog(server, 'tab.syncAll received', 15_000);
+
+      // Open side panel
+      const sidePanelPage = await openSidePanel(context);
+
+      // Verify plugin card shows display name
+      await expect(sidePanelPage.getByText('E2E Test')).toBeVisible({ timeout: 30_000 });
+
+      // Verify version is displayed
+      const expectedVersion = readPluginVersion();
+      await expect(sidePanelPage.getByText(`v${expectedVersion}`)).toBeVisible({ timeout: 5_000 });
+
+      // With no matching tab open, tab state should be 'closed' (red dot)
+      const pluginCard = sidePanelPage.locator('button[aria-expanded]').first();
+      await expect(pluginCard.locator('.bg-red-400')).toBeVisible({ timeout: 5_000 });
+
+      // Open a matching tab → tab state transitions to 'ready' (green dot)
+      const appTab = await context.newPage();
+      await appTab.goto(testServer.url, { waitUntil: 'load' });
+
+      // Wait for server to report ready state for the plugin
+      await expect
+        .poll(
+          async () => {
+            const res = await fetch(`http://localhost:${server.port}/health`);
+            const body = (await res.json()) as {
+              pluginDetails?: Array<{ name: string; tabState: string }>;
+            };
+            return body.pluginDetails?.find(p => p.name === 'e2e-test')?.tabState;
+          },
+          { timeout: 30_000, message: 'Server tab state for e2e-test did not become ready' },
+        )
+        .toBe('ready');
+
+      // Reload side panel to pick up latest state
+      await sidePanelPage.reload({ waitUntil: 'load' });
+      await expect(sidePanelPage.getByText('E2E Test')).toBeVisible({ timeout: 15_000 });
+
+      // Verify the green dot (ready state)
+      const refreshedCard = sidePanelPage.locator('button[aria-expanded]').first();
+      await expect(refreshedCard.locator('.bg-emerald-400')).toBeVisible({ timeout: 15_000 });
+
+      await sidePanelPage.close();
+      await appTab.close();
+    } finally {
+      await context.close();
+      await server.kill();
+      await testServer.kill();
+      fs.rmSync(cleanupDir, { recursive: true, force: true });
+      cleanupTestConfigDir(configDir);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tool toggle — config.setToolEnabled flow
+// ---------------------------------------------------------------------------
+
+test.describe('Side panel — tool toggle', () => {
+  test('toggling a tool sends config.setToolEnabled and MCP server updates state', async () => {
+    const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
+    const prefixedToolNames = readPluginToolNames();
+    const tools: Record<string, boolean> = {};
+    for (const t of prefixedToolNames) {
+      tools[t] = true;
+    }
+
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-toggle-'));
+    writeTestConfig(configDir, { plugins: [absPluginPath], tools });
+
+    const server = await startMcpServer(configDir, true);
+    const mcpClient = createMcpClient(server.port);
+    const { context, cleanupDir, extensionDir } = await launchExtensionContext(server.port);
+    setupAdapterSymlink(configDir, extensionDir);
+
+    try {
+      await waitForExtensionConnected(server);
+      await waitForLog(server, 'tab.syncAll received', 15_000);
+      await mcpClient.initialize();
+
+      // Open side panel
+      const sidePanelPage = await openSidePanel(context);
+      await expect(sidePanelPage.getByText('E2E Test')).toBeVisible({ timeout: 30_000 });
+
+      // Expand the plugin card to reveal tool rows
+      const pluginCard = sidePanelPage.locator('button[aria-expanded]').first();
+      await pluginCard.click();
+
+      // Verify tool rows are visible
+      await expect(sidePanelPage.getByText('echo', { exact: true })).toBeVisible({ timeout: 5_000 });
+
+      // Find the toggle for the 'echo' tool.
+      // Each ToolRow has an aria-label "Toggle <name> tool" on its switch button.
+      const echoToggle = sidePanelPage.locator('button[role="switch"][aria-label="Toggle echo tool"]');
+      await expect(echoToggle).toBeVisible({ timeout: 5_000 });
+
+      // Verify initial state: all tools are enabled (aria-checked="true")
+      await expect(echoToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5_000 });
+
+      // Click the toggle to disable the echo tool
+      await echoToggle.click();
+
+      // Verify the toggle UI immediately reflects disabled state
+      await expect(echoToggle).toHaveAttribute('aria-checked', 'false', { timeout: 5_000 });
+
+      // Verify the MCP server received the tool config change.
+      // Poll config.getState through the side panel bridge (the MCP server
+      // is the source of truth). We verify by reading the persisted config
+      // file, which is updated by the onToolConfigPersist callback.
+      await expect
+        .poll(
+          () => {
+            const configPath = path.join(configDir, 'config.json');
+            const raw = fs.readFileSync(configPath, 'utf-8');
+            const config = JSON.parse(raw) as { tools: Record<string, boolean> };
+            return config.tools['e2e-test_echo'];
+          },
+          { timeout: 15_000, message: 'MCP server did not persist echo tool as disabled' },
+        )
+        .toBe(false);
+
+      // Verify via MCP client that the tool is now disabled in tools/list.
+      // When a tool is disabled, it should not appear in the MCP tools/list.
+      await expect
+        .poll(
+          async () => {
+            const toolList = await mcpClient.listTools();
+            return toolList.some(t => t.name === 'e2e-test_echo');
+          },
+          { timeout: 15_000, message: 'e2e-test_echo should not appear in tools/list after being disabled' },
+        )
+        .toBe(false);
+
+      // Re-enable the echo tool by clicking the toggle again
+      await echoToggle.click();
+
+      // Verify the toggle UI reflects enabled state
+      await expect(echoToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5_000 });
+
+      // Verify the MCP server persisted the re-enabled state
+      await expect
+        .poll(
+          () => {
+            const configPath = path.join(configDir, 'config.json');
+            const raw = fs.readFileSync(configPath, 'utf-8');
+            const config = JSON.parse(raw) as { tools: Record<string, boolean> };
+            return config.tools['e2e-test_echo'];
+          },
+          { timeout: 15_000, message: 'MCP server did not persist echo tool as re-enabled' },
+        )
+        .toBe(true);
+
+      // Verify the tool reappears in MCP tools/list
+      await expect
+        .poll(
+          async () => {
+            const toolList = await mcpClient.listTools();
+            return toolList.some(t => t.name === 'e2e-test_echo');
+          },
+          { timeout: 15_000, message: 'e2e-test_echo should reappear in tools/list after being re-enabled' },
+        )
+        .toBe(true);
+
+      await sidePanelPage.close();
+    } finally {
+      await mcpClient.close();
+      await context.close();
+      await server.kill();
+      fs.rmSync(cleanupDir, { recursive: true, force: true });
+      cleanupTestConfigDir(configDir);
+    }
+  });
+});
