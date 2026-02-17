@@ -137,19 +137,18 @@ progress_file_for() {
 }
 
 # Archive a ~done PRD and its progress file.
+# The ~done suffix is preserved in both the folder name and the PRD file
+# so the completed state is visible in the archive history.
 archive_run() {
   local prd_file="$1"
   local progress_file="$2"
   local base
   base=$(basename "$prd_file" .json)
-  local cleaned
-  cleaned=$(clean_name "$base")
-  local archive_folder="$ARCHIVE_DIR/$cleaned"
+  local archive_folder="$ARCHIVE_DIR/$base"
 
   mkdir -p "$archive_folder"
 
-  # Rename back to clean name when archiving
-  [ -f "$prd_file" ] && mv "$prd_file" "$archive_folder/${cleaned}.json"
+  [ -f "$prd_file" ] && mv "$prd_file" "$archive_folder/${base}.json"
 
   if [ -f "$progress_file" ]; then
     mv "$progress_file" "$archive_folder/progress.txt"
