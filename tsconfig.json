@@ -18,6 +18,7 @@
     { "path": "platform/mcp-server" },
     { "path": "platform/mcp-server/tsconfig.test.json" },
     { "path": "platform/plugin-sdk" },
+    { "path": "platform/plugin-sdk/tsconfig.test.json" },
     { "path": "platform/cli" },
     { "path": "platform/cli/tsconfig.test.json" },
     { "path": "platform/browser-extension" },
