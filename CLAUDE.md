@@ -80,7 +80,7 @@ opentabs/
 │   └── e2e-test/                  # Test plugin for E2E tests
 ├── e2e/                           # Playwright E2E tests
 │   ├── fixtures.ts                # Test fixtures (MCP server, extension, test server)
-│   ├── full-e2e.e2e.ts            # Full-stack tool dispatch tests
+│   ├── tool-dispatch.e2e.ts       # Full-stack tool dispatch tests
 │   ├── lifecycle.e2e.ts           # Hot reload and reconnection tests
 │   └── test-server.ts             # Controllable test web server
 ├── eslint.config.ts               # ESLint flat config
