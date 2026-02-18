@@ -1529,3 +1529,227 @@ test.describe('Browser tools — cookie URL validation', () => {
     expect(result.content.toLowerCase()).toContain('url');
   });
 });
+
+// ---------------------------------------------------------------------------
+// browser_enable_network_capture / browser_get_network_requests / browser_disable_network_capture
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — network capture lifecycle', () => {
+  test('enable → navigate → get requests → disable', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openTestServerTab(mcpClient, testServer);
+
+    // 1. Enable network capture
+    const enableResult = await mcpClient.callTool('browser_enable_network_capture', { tabId });
+    expect(enableResult.isError).toBe(false);
+    const enableData = parseToolResult(enableResult.content);
+    expect(enableData.enabled).toBe(true);
+
+    // 2. Navigate to trigger network requests
+    const navResult = await mcpClient.callTool('browser_navigate_tab', {
+      tabId,
+      url: testServer.url + '/interactive',
+    });
+    expect(navResult.isError).toBe(false);
+
+    // Wait for requests to be captured
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // 3. Get captured requests
+    const getResult = await mcpClient.callTool('browser_get_network_requests', { tabId });
+    expect(getResult.isError).toBe(false);
+
+    const reqData = parseToolResult(getResult.content);
+    const requests = reqData.requests as Array<Record<string, unknown>>;
+    expect(requests.length).toBeGreaterThan(0);
+
+    // Verify request shape
+    const firstReq = requests[0];
+    if (!firstReq) throw new Error('Expected at least one captured request');
+    expect(typeof firstReq.url).toBe('string');
+    expect(typeof firstReq.method).toBe('string');
+
+    // 4. Disable capture
+    const disableResult = await mcpClient.callTool('browser_disable_network_capture', { tabId });
+    expect(disableResult.isError).toBe(false);
+    const disableData = parseToolResult(disableResult.content);
+    expect(disableData.disabled).toBe(true);
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('get_network_requests with clear=true empties the buffer', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openTestServerTab(mcpClient, testServer);
+
+    // Enable and navigate
+    await mcpClient.callTool('browser_enable_network_capture', { tabId });
+    await mcpClient.callTool('browser_navigate_tab', {
+      tabId,
+      url: testServer.url + '/interactive',
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Get with clear=true
+    const getResult1 = await mcpClient.callTool('browser_get_network_requests', { tabId, clear: true });
+    expect(getResult1.isError).toBe(false);
+    const data1 = parseToolResult(getResult1.content);
+    expect((data1.requests as Array<unknown>).length).toBeGreaterThan(0);
+
+    // Get again — buffer should be empty
+    const getResult2 = await mcpClient.callTool('browser_get_network_requests', { tabId });
+    expect(getResult2.isError).toBe(false);
+    const data2 = parseToolResult(getResult2.content);
+    expect((data2.requests as Array<unknown>).length).toBe(0);
+
+    // Clean up
+    await mcpClient.callTool('browser_disable_network_capture', { tabId });
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('urlFilter only captures matching requests', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openTestServerTab(mcpClient, testServer);
+
+    // Enable capture with a URL filter
+    await mcpClient.callTool('browser_enable_network_capture', {
+      tabId,
+      urlFilter: '/interactive',
+    });
+
+    // Navigate to /interactive — this request should be captured
+    await mcpClient.callTool('browser_navigate_tab', {
+      tabId,
+      url: testServer.url + '/interactive',
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const getResult = await mcpClient.callTool('browser_get_network_requests', { tabId });
+    expect(getResult.isError).toBe(false);
+    const data = parseToolResult(getResult.content);
+    const requests = data.requests as Array<Record<string, unknown>>;
+
+    // All captured requests should contain '/interactive' in the URL
+    for (const req of requests) {
+      expect((req.url as string).includes('/interactive')).toBe(true);
+    }
+
+    // Clean up
+    await mcpClient.callTool('browser_disable_network_capture', { tabId });
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('enable network capture on non-existent tab returns error', async ({
+    mcpServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+
+    const result = await mcpClient.callTool('browser_enable_network_capture', { tabId: 999999 });
+    expect(result.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// browser_get_console_logs / browser_clear_console_logs
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — console log capture', () => {
+  test('captures console.log and console.error output', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openTestServerTab(mcpClient, testServer);
+
+    // Enable network capture (which also enables Runtime for console capture)
+    await mcpClient.callTool('browser_enable_network_capture', { tabId });
+
+    // Execute console.log and console.error
+    await mcpClient.callTool('browser_execute_script', {
+      tabId,
+      code: 'console.log("e2e-test-message"); console.error("e2e-test-error")',
+    });
+
+    // Wait for console events to be captured
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Get console logs
+    const getResult = await mcpClient.callTool('browser_get_console_logs', { tabId });
+    expect(getResult.isError).toBe(false);
+
+    const data = parseToolResult(getResult.content);
+    const logs = data.logs as Array<Record<string, unknown>>;
+    expect(logs.length).toBeGreaterThanOrEqual(2);
+
+    const logMessages = logs.map(l => l.message as string);
+    expect(logMessages.some(m => m.includes('e2e-test-message'))).toBe(true);
+    expect(logMessages.some(m => m.includes('e2e-test-error'))).toBe(true);
+
+    // Verify log levels
+    const logEntry = logs.find(l => (l.message as string).includes('e2e-test-message'));
+    const errorEntry = logs.find(l => (l.message as string).includes('e2e-test-error'));
+    expect(logEntry).toBeDefined();
+    expect(errorEntry).toBeDefined();
+    if (!logEntry || !errorEntry) throw new Error('Expected log entries not found');
+    expect(logEntry.level).toBe('log');
+    expect(errorEntry.level).toBe('error');
+
+    // Clean up
+    await mcpClient.callTool('browser_disable_network_capture', { tabId });
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('clear_console_logs empties the log buffer', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openTestServerTab(mcpClient, testServer);
+
+    // Enable capture and produce some logs
+    await mcpClient.callTool('browser_enable_network_capture', { tabId });
+    await mcpClient.callTool('browser_execute_script', {
+      tabId,
+      code: 'console.log("clear-test")',
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Clear logs
+    const clearResult = await mcpClient.callTool('browser_clear_console_logs', { tabId });
+    expect(clearResult.isError).toBe(false);
+    const clearData = parseToolResult(clearResult.content);
+    expect(clearData.cleared).toBe(true);
+
+    // Verify buffer is empty
+    const getResult = await mcpClient.callTool('browser_get_console_logs', { tabId });
+    expect(getResult.isError).toBe(false);
+    const data = parseToolResult(getResult.content);
+    const logs = data.logs as Array<unknown>;
+    expect(logs.length).toBe(0);
+
+    // Clean up
+    await mcpClient.callTool('browser_disable_network_capture', { tabId });
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+});
