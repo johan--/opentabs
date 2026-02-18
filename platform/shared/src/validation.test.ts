@@ -1,4 +1,4 @@
-import { isBlockedUrlScheme, validatePluginName, validateUrlPattern } from './index.js';
+import { EXTENSION_COPY_EXCLUDE_PATTERN, isBlockedUrlScheme, validatePluginName, validateUrlPattern } from './index.js';
 import { describe, expect, test } from 'bun:test';
 
 describe('validateUrlPattern', () => {
@@ -363,6 +363,80 @@ describe('isBlockedUrlScheme', () => {
 
     test('missing scheme is blocked', () => {
       expect(isBlockedUrlScheme('://example.com')).toBe(true);
+    });
+  });
+});
+
+describe('EXTENSION_COPY_EXCLUDE_PATTERN', () => {
+  const pattern = EXTENSION_COPY_EXCLUDE_PATTERN;
+
+  describe('directory-segment exclusions (node_modules, src, .git)', () => {
+    test('matches node_modules at root', () => {
+      expect(pattern.test('node_modules')).toBe(true);
+    });
+
+    test('matches node_modules/foo', () => {
+      expect(pattern.test('node_modules/foo')).toBe(true);
+    });
+
+    test('matches src at root', () => {
+      expect(pattern.test('src')).toBe(true);
+    });
+
+    test('matches src/background.ts', () => {
+      expect(pattern.test('src/background.ts')).toBe(true);
+    });
+
+    test('matches .git at root', () => {
+      expect(pattern.test('.git')).toBe(true);
+    });
+
+    test('matches .git/objects', () => {
+      expect(pattern.test('.git/objects')).toBe(true);
+    });
+  });
+
+  describe('tsconfig exclusions (require path separator prefix)', () => {
+    test('matches tsconfig.json in subdirectory', () => {
+      expect(pattern.test('sub/tsconfig.json')).toBe(true);
+    });
+
+    test('matches tsconfig.base.json in subdirectory', () => {
+      expect(pattern.test('sub/tsconfig.base.json')).toBe(true);
+    });
+
+    test('matches tsconfig.test.json in subdirectory', () => {
+      expect(pattern.test('sub/tsconfig.test.json')).toBe(true);
+    });
+  });
+
+  describe('paths that should NOT be excluded', () => {
+    test('does not match dist', () => {
+      expect(pattern.test('dist')).toBe(false);
+    });
+
+    test('does not match dist/background.js', () => {
+      expect(pattern.test('dist/background.js')).toBe(false);
+    });
+
+    test('does not match manifest.json', () => {
+      expect(pattern.test('manifest.json')).toBe(false);
+    });
+
+    test('does not match icons', () => {
+      expect(pattern.test('icons')).toBe(false);
+    });
+
+    test('does not match icons/icon-128.png', () => {
+      expect(pattern.test('icons/icon-128.png')).toBe(false);
+    });
+
+    test('does not match side-panel', () => {
+      expect(pattern.test('side-panel')).toBe(false);
+    });
+
+    test('does not match side-panel/index.html', () => {
+      expect(pattern.test('side-panel/index.html')).toBe(false);
     });
   });
 });
