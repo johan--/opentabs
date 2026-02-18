@@ -1436,6 +1436,91 @@ export const handleBrowserScroll = async (params: Record<string, unknown>, id: s
   }
 };
 
+export const handleBrowserHoverElement = async (
+  params: Record<string, unknown>,
+  id: string | number,
+): Promise<void> => {
+  try {
+    const tabId = params.tabId;
+    if (typeof tabId !== 'number') {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32602, message: 'Missing or invalid tabId parameter' }, id });
+      return;
+    }
+    const selector = params.selector;
+    if (typeof selector !== 'string' || selector.length === 0) {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32602, message: 'Missing or invalid selector parameter' }, id });
+      return;
+    }
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: (sel: string) => {
+        const el = document.querySelector(sel);
+        if (!el) return { error: `Element not found: ${sel}` };
+
+        const rect = (el as HTMLElement).getBoundingClientRect();
+        const clientX = rect.left + rect.width / 2;
+        const clientY = rect.top + rect.height / 2;
+
+        const pointerOpts = {
+          clientX,
+          clientY,
+          pointerId: 1,
+          pointerType: 'mouse' as const,
+        };
+
+        const mouseOpts = { clientX, clientY };
+
+        // Full hover event sequence matching real browser behavior
+        el.dispatchEvent(new PointerEvent('pointerenter', { bubbles: false, ...pointerOpts }));
+        el.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, ...pointerOpts }));
+        el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, ...mouseOpts }));
+        el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, ...mouseOpts }));
+        el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, ...pointerOpts }));
+        el.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ...mouseOpts }));
+
+        return {
+          hovered: true,
+          tagName: el.tagName.toLowerCase(),
+          text: (el.textContent || '').trim().slice(0, 200),
+          bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        };
+      },
+      args: [selector],
+    });
+
+    const result = results[0]?.result as
+      | {
+          error?: string;
+          hovered?: boolean;
+          tagName?: string;
+          text?: string;
+          bounds?: { x: number; y: number; width: number; height: number };
+        }
+      | undefined;
+    if (!result) {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32603, message: 'No result from script execution' }, id });
+      return;
+    }
+    if (result.error) {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32602, message: result.error }, id });
+      return;
+    }
+    sendToServer({
+      jsonrpc: '2.0',
+      result: { hovered: result.hovered, tagName: result.tagName, text: result.text, bounds: result.bounds },
+      id,
+    });
+  } catch (err) {
+    sendToServer({
+      jsonrpc: '2.0',
+      error: { code: -32603, message: sanitizeErrorMessage(err instanceof Error ? err.message : String(err)) },
+      id,
+    });
+  }
+};
+
 export const handleBrowserListResources = async (
   params: Record<string, unknown>,
   id: string | number,

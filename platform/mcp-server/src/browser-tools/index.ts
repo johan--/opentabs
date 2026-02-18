@@ -18,6 +18,7 @@ import { getResourceContent } from './get-resource-content.js';
 import { getStorage } from './get-storage.js';
 import { getTabContent } from './get-tab-content.js';
 import { getTabInfo } from './get-tab-info.js';
+import { hoverElement } from './hover-element.js';
 import { listResources } from './list-resources.js';
 import { listTabs } from './list-tabs.js';
 import { navigateTab } from './navigate-tab.js';
@@ -63,6 +64,7 @@ const browserTools: BrowserToolDefinition[] = [
   getResourceContent,
   pressKey,
   scroll,
+  hoverElement,
 ];
 
 export { browserTools };

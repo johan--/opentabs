@@ -94,6 +94,9 @@ const mockHandleBrowserPressKey = mock(
 const mockHandleBrowserScroll = mock(
   asyncNoop as (params: Record<string, unknown>, id: string | number) => Promise<void>,
 );
+const mockHandleBrowserHoverElement = mock(
+  asyncNoop as (params: Record<string, unknown>, id: string | number) => Promise<void>,
+);
 
 await mock.module('./messaging.js', () => ({
   sendToServer: mockSendToServer,
@@ -133,6 +136,7 @@ await mock.module('./browser-commands.js', () => ({
   handleBrowserGetResourceContent: mockHandleBrowserGetResourceContent,
   handleBrowserPressKey: mockHandleBrowserPressKey,
   handleBrowserScroll: mockHandleBrowserScroll,
+  handleBrowserHoverElement: mockHandleBrowserHoverElement,
 }));
 
 // Chrome API stubs for modules that are NOT mocked (plugin-storage, iife-injection,
@@ -499,6 +503,7 @@ const resetRoutingMocks = (): void => {
   mockHandleBrowserListResources.mockReset();
   mockHandleBrowserGetResourceContent.mockReset();
   mockHandleBrowserScroll.mockReset();
+  mockHandleBrowserHoverElement.mockReset();
 };
 
 describe('handleServerMessage', () => {
@@ -527,6 +532,7 @@ describe('handleServerMessage', () => {
     mockHandleBrowserListResources.mockResolvedValue(undefined);
     mockHandleBrowserGetResourceContent.mockResolvedValue(undefined);
     mockHandleBrowserScroll.mockResolvedValue(undefined);
+    mockHandleBrowserHoverElement.mockResolvedValue(undefined);
   });
 
   describe('sync.full routing', () => {
@@ -959,6 +965,17 @@ describe('handleServerMessage', () => {
 
       expect(mockHandleBrowserScroll).toHaveBeenCalledTimes(1);
       expect(mockHandleBrowserScroll).toHaveBeenCalledWith({ tabId: 10, direction: 'down' }, 46);
+    });
+
+    test('dispatches browser.hoverElement to handleBrowserHoverElement', () => {
+      handleServerMessage({
+        method: 'browser.hoverElement',
+        id: 47,
+        params: { tabId: 10, selector: '#hover-target' },
+      });
+
+      expect(mockHandleBrowserHoverElement).toHaveBeenCalledTimes(1);
+      expect(mockHandleBrowserHoverElement).toHaveBeenCalledWith({ tabId: 10, selector: '#hover-target' }, 47);
     });
   });
 

@@ -17,6 +17,7 @@ import {
   handleBrowserGetResourceContent,
   handleBrowserListResources,
   handleBrowserListTabs,
+  handleBrowserHoverElement,
   handleBrowserPressKey,
   handleBrowserScroll,
   handleBrowserNavigateTab,
@@ -469,6 +470,16 @@ const methodHandlers = new Map<string, MessageHandler>([
       if (id !== undefined) {
         handleBrowserScroll(params, id).catch((err: unknown) =>
           console.warn('[opentabs] browser.scroll handler failed:', err),
+        );
+      }
+    },
+  ],
+  [
+    'browser.hoverElement',
+    (params, id) => {
+      if (id !== undefined) {
+        handleBrowserHoverElement(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.hoverElement handler failed:', err),
         );
       }
     },

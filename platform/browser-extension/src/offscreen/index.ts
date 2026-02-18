@@ -65,6 +65,7 @@ const ALLOWED_METHODS = new Set([
   'browser.getResourceContent',
   'browser.pressKey',
   'browser.scroll',
+  'browser.hoverElement',
   'extension.reload',
 ]);
 
