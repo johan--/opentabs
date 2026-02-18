@@ -7,7 +7,7 @@ type SidePanelMessage = SpConnectionStateMessage | SpRelayMessage;
 export const sendToServer = (data: unknown): void => {
   const method = (data as { method?: string }).method ?? 'unknown';
   chrome.runtime.sendMessage({ type: 'ws:send', data } satisfies InternalMessage).catch((err: unknown) => {
-    console.warn(`[OpenTabs] sendToServer failed for "${method}":`, err);
+    console.warn(`[opentabs] sendToServer failed for "${method}":`, err);
   });
 };
 
@@ -15,6 +15,6 @@ export const sendToServer = (data: unknown): void => {
 export const forwardToSidePanel = (message: SidePanelMessage): void => {
   const type = message.type;
   chrome.runtime.sendMessage(message).catch((err: unknown) => {
-    console.warn(`[OpenTabs] forwardToSidePanel failed for "${type}":`, err);
+    console.warn(`[opentabs] forwardToSidePanel failed for "${type}":`, err);
   });
 };

@@ -99,7 +99,7 @@ const getAllPluginMeta = async (): Promise<Record<string, PluginMeta>> => {
     if (isValidPluginMeta(value)) {
       validated[key] = value;
     } else {
-      console.warn(`[plugin-storage] Skipping corrupted plugin meta entry: ${key}`);
+      console.warn(`[opentabs] Skipping corrupted plugin meta entry: ${key}`);
     }
   }
   metaCache = validated;

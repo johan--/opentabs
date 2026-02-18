@@ -212,7 +212,7 @@ export const injectPluginIntoMatchingTabs = async (
                 try {
                   adapter.teardown();
                 } catch (e) {
-                  console.warn('[OpenTabs] teardown error:', e);
+                  console.warn('[opentabs] teardown error:', e);
                 }
               }
             },
@@ -326,7 +326,7 @@ export const cleanupAdaptersInMatchingTabs = async (pluginName: string, urlPatte
                 try {
                   adapter.teardown();
                 } catch (e) {
-                  console.warn('[OpenTabs] teardown error:', e);
+                  console.warn('[opentabs] teardown error:', e);
                 }
               }
               Reflect.deleteProperty(adapters, pName);

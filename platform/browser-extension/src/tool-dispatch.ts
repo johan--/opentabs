@@ -32,7 +32,7 @@ const injectToolInvocationLog = async (
       target: { tabId },
       world: 'MAIN',
       func: (pName: string, tName: string, lnk: string) => {
-        console.warn(`[OpenTabs] ${pName}.${tName} invoked — ${lnk}`);
+        console.warn(`[opentabs] ${pName}.${tName} invoked — ${lnk}`);
       },
       args: [pluginName, toolName, link],
     });
