@@ -1346,3 +1346,186 @@ test.describe('browser_query_elements', () => {
     await mcpClient.callTool('browser_close_tab', { tabId });
   });
 });
+
+// ---------------------------------------------------------------------------
+// browser_get_cookies / browser_set_cookie / browser_delete_cookies
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — cookie lifecycle', () => {
+  test('set → get → delete → verify gone', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+
+    // 1. Set a cookie
+    const setResult = await mcpClient.callTool('browser_set_cookie', {
+      url: testServer.url,
+      name: '__opentabs_e2e',
+      value: 'test123',
+    });
+    expect(setResult.isError).toBe(false);
+
+    // 2. Read it back
+    const getResult = await mcpClient.callTool('browser_get_cookies', {
+      url: testServer.url,
+      name: '__opentabs_e2e',
+    });
+    expect(getResult.isError).toBe(false);
+
+    const cookies = parseToolResult(getResult.content).cookies as Array<Record<string, unknown>>;
+    expect(cookies.length).toBe(1);
+    const cookie = cookies[0];
+    if (!cookie) throw new Error('Expected cookie not found');
+    expect(cookie.name).toBe('__opentabs_e2e');
+    expect(cookie.value).toBe('test123');
+
+    // 3. Delete it
+    const deleteResult = await mcpClient.callTool('browser_delete_cookies', {
+      url: testServer.url,
+      name: '__opentabs_e2e',
+    });
+    expect(deleteResult.isError).toBe(false);
+    const deleteData = parseToolResult(deleteResult.content);
+    expect(deleteData.deleted).toBe(true);
+
+    // 4. Verify it's gone
+    const getResult2 = await mcpClient.callTool('browser_get_cookies', {
+      url: testServer.url,
+      name: '__opentabs_e2e',
+    });
+    expect(getResult2.isError).toBe(false);
+    const cookies2 = parseToolResult(getResult2.content).cookies as Array<Record<string, unknown>>;
+    expect(cookies2.length).toBe(0);
+  });
+
+  test('get cookies with name filter returns only matching cookie', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+
+    // Set two cookies
+    await mcpClient.callTool('browser_set_cookie', {
+      url: testServer.url,
+      name: '__opentabs_e2e_a',
+      value: 'alpha',
+    });
+    await mcpClient.callTool('browser_set_cookie', {
+      url: testServer.url,
+      name: '__opentabs_e2e_b',
+      value: 'beta',
+    });
+
+    // Get only cookie 'a'
+    const getResult = await mcpClient.callTool('browser_get_cookies', {
+      url: testServer.url,
+      name: '__opentabs_e2e_a',
+    });
+    expect(getResult.isError).toBe(false);
+
+    const cookies = parseToolResult(getResult.content).cookies as Array<Record<string, unknown>>;
+    expect(cookies.length).toBe(1);
+    const cookieA = cookies[0];
+    if (!cookieA) throw new Error('Expected cookie not found');
+    expect(cookieA.name).toBe('__opentabs_e2e_a');
+    expect(cookieA.value).toBe('alpha');
+
+    // Clean up both cookies
+    await mcpClient.callTool('browser_delete_cookies', {
+      url: testServer.url,
+      name: '__opentabs_e2e_a',
+    });
+    await mcpClient.callTool('browser_delete_cookies', {
+      url: testServer.url,
+      name: '__opentabs_e2e_b',
+    });
+  });
+});
+
+test.describe('Browser tools — cookie URL validation', () => {
+  test('browser_get_cookies rejects javascript: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_get_cookies', {
+      url: 'javascript:alert(1)',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_set_cookie rejects javascript: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_set_cookie', {
+      url: 'javascript:alert(1)',
+      name: 'test',
+      value: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_delete_cookies rejects javascript: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_delete_cookies', {
+      url: 'javascript:alert(1)',
+      name: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_get_cookies rejects data: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_get_cookies', {
+      url: 'data:text/html,<h1>hi</h1>',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_set_cookie rejects data: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_set_cookie', {
+      url: 'data:text/html,<h1>hi</h1>',
+      name: 'test',
+      value: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_delete_cookies rejects data: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_delete_cookies', {
+      url: 'data:text/html,<h1>hi</h1>',
+      name: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_get_cookies rejects file: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_get_cookies', {
+      url: 'file:///etc/passwd',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_set_cookie rejects file: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_set_cookie', {
+      url: 'file:///etc/passwd',
+      name: 'test',
+      value: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+
+  test('browser_delete_cookies rejects file: URL', async ({ mcpClient }) => {
+    const result = await mcpClient.callTool('browser_delete_cookies', {
+      url: 'file:///etc/passwd',
+      name: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('url');
+  });
+});
