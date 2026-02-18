@@ -263,9 +263,19 @@ describe('handleExtensionMessage — tab.syncAll', () => {
 });
 
 describe('handleExtensionMessage — tab.stateChanged', () => {
+  const makePlugin = (name: string): RegisteredPlugin => ({
+    name,
+    version: '1.0.0',
+    urlPatterns: [],
+    trustTier: 'community',
+    iife: '// noop',
+    tools: [],
+  });
+
   test('updates a single entry in state.tabMapping', () => {
     const state = createState();
     state.extensionWs = createMockWs();
+    state.plugins.set('slack', makePlugin('slack'));
 
     handleExtensionMessage(
       state,
@@ -284,6 +294,8 @@ describe('handleExtensionMessage — tab.stateChanged', () => {
   test('does not affect other entries in tabMapping', () => {
     const state = createState();
     state.extensionWs = createMockWs();
+    state.plugins.set('slack', makePlugin('slack'));
+    state.plugins.set('github', makePlugin('github'));
     state.tabMapping.set('github', { state: 'ready', tabId: 10, url: 'https://github.com' });
 
     handleExtensionMessage(
@@ -299,6 +311,70 @@ describe('handleExtensionMessage — tab.stateChanged', () => {
     expect(state.tabMapping.size).toBe(2);
     expect(state.tabMapping.get('github')).toEqual({ state: 'ready', tabId: 10, url: 'https://github.com' });
     expect(state.tabMapping.get('slack')).toEqual({ state: 'closed', tabId: null, url: null });
+  });
+
+  test('rejects unknown plugin name', () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tab.stateChanged',
+        id: 1,
+        params: { plugin: 'nonexistent', state: 'ready' },
+      }),
+      noopCallbacks,
+    );
+
+    expect(state.tabMapping.size).toBe(0);
+    expect(ws.sent).toHaveLength(1);
+    const response = parseJson(ws.sent[0] as string);
+    expect(response.error?.code).toBe(-32602);
+    expect(response.error?.message).toContain('Unknown plugin');
+  });
+
+  test('rejects invalid tab state value', () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+    state.plugins.set('slack', makePlugin('slack'));
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tab.stateChanged',
+        id: 2,
+        params: { plugin: 'slack', state: 'invalid-state' },
+      }),
+      noopCallbacks,
+    );
+
+    expect(state.tabMapping.has('slack')).toBe(false);
+    expect(ws.sent).toHaveLength(1);
+    const response = parseJson(ws.sent[0] as string);
+    expect(response.error?.code).toBe(-32602);
+    expect(response.error?.message).toContain('Invalid tab state');
+  });
+
+  test('logs warning for unknown plugin when no id present', () => {
+    const state = createState();
+    state.extensionWs = createMockWs();
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tab.stateChanged',
+        params: { plugin: 'nonexistent', state: 'ready' },
+      }),
+      noopCallbacks,
+    );
+
+    expect(state.tabMapping.size).toBe(0);
   });
 });
 

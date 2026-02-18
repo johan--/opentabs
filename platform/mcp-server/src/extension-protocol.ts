@@ -510,8 +510,18 @@ const handleTabStateChanged = (
     return;
   }
 
+  if (!state.plugins.has(plugin)) {
+    sendError(`Unknown plugin: ${plugin}`);
+    return;
+  }
+
   if (typeof params.state !== 'string') {
     sendError('Missing or invalid "state" field (expected string)');
+    return;
+  }
+
+  if (params.state !== 'closed' && params.state !== 'unavailable' && params.state !== 'ready') {
+    sendError(`Invalid tab state: ${params.state} (expected closed, unavailable, or ready)`);
     return;
   }
 
