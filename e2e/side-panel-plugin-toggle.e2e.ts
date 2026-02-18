@@ -31,6 +31,7 @@ import {
   setupAdapterSymlink,
   waitForToolResult,
   openTestAppTab,
+  BROWSER_TOOL_NAMES,
 } from './helpers.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -342,6 +343,128 @@ test.describe('Side panel — disabled tool dispatch rejection', () => {
       await context.close();
       await server.kill();
       await testServer.kill();
+      fs.rmSync(cleanupDir, { recursive: true, force: true });
+      cleanupTestConfigDir(configDir);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Toggle all tools
+// ---------------------------------------------------------------------------
+
+test.describe('Side panel — toggle all tools', () => {
+  test('master toggle disables and re-enables all plugin tools', async () => {
+    const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
+    const prefixedToolNames = readPluginToolNames();
+    const tools: Record<string, boolean> = {};
+    for (const t of prefixedToolNames) {
+      tools[t] = true;
+    }
+
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-toggle-all-'));
+    writeTestConfig(configDir, { plugins: [absPluginPath], tools });
+
+    const server = await startMcpServer(configDir, true);
+    const mcpClient = createMcpClient(server.port, server.secret);
+    const { context, cleanupDir, extensionDir } = await launchExtensionContext(server.port);
+    setupAdapterSymlink(configDir, extensionDir);
+
+    try {
+      await waitForExtensionConnected(server);
+      await waitForLog(server, 'tab.syncAll received', 15_000);
+      await mcpClient.initialize();
+
+      // Verify all e2e-test plugin tools initially appear in tools/list
+      await expect
+        .poll(
+          async () => {
+            const toolList = await mcpClient.listTools();
+            const toolNames = toolList.map(t => t.name);
+            return prefixedToolNames.every(name => toolNames.includes(name));
+          },
+          { timeout: 15_000, message: 'All e2e-test plugin tools should initially appear in tools/list' },
+        )
+        .toBe(true);
+
+      // Verify browser tools are present initially
+      const initialToolList = await mcpClient.listTools();
+      const initialToolNames = initialToolList.map(t => t.name);
+      const someBrowserTools = BROWSER_TOOL_NAMES.slice(0, 3);
+      for (const bt of someBrowserTools) {
+        expect(initialToolNames).toContain(bt);
+      }
+
+      // Open side panel
+      const sidePanelPage = await openSidePanel(context);
+      await expect(sidePanelPage.getByText('E2E Test')).toBeVisible({ timeout: 30_000 });
+
+      // Find the master toggle for e2e-test plugin
+      const masterToggle = sidePanelPage.locator('button[role="switch"][aria-label="Toggle all tools for e2e-test"]');
+      await expect(masterToggle).toBeVisible({ timeout: 5_000 });
+
+      // Click the master toggle to disable all tools
+      await masterToggle.click();
+
+      // Wait for all e2e-test plugin tools to disappear from tools/list
+      await expect
+        .poll(
+          async () => {
+            const toolList = await mcpClient.listTools();
+            const toolNames = toolList.map(t => t.name);
+            return prefixedToolNames.some(name => toolNames.includes(name));
+          },
+          { timeout: 15_000, message: 'All e2e-test plugin tools should disappear from tools/list' },
+        )
+        .toBe(false);
+
+      // Verify config.json on disk has all e2e-test tools set to false
+      await expect
+        .poll(
+          () => {
+            const configPath = path.join(configDir, 'config.json');
+            const raw = fs.readFileSync(configPath, 'utf-8');
+            const config = JSON.parse(raw) as { tools: Record<string, boolean> };
+            return prefixedToolNames.every(name => config.tools[name] === false);
+          },
+          { timeout: 15_000, message: 'All e2e-test tools should be set to false in config.json' },
+        )
+        .toBe(true);
+
+      // Verify browser tools are NOT affected by the toggle
+      const toolListAfterDisable = await mcpClient.listTools();
+      const toolNamesAfterDisable = toolListAfterDisable.map(t => t.name);
+      for (const bt of someBrowserTools) {
+        expect(toolNamesAfterDisable).toContain(bt);
+      }
+
+      // Click the master toggle again to re-enable all tools
+      await masterToggle.click();
+
+      // Wait for all e2e-test plugin tools to reappear in tools/list
+      await expect
+        .poll(
+          async () => {
+            const toolList = await mcpClient.listTools();
+            const toolNames = toolList.map(t => t.name);
+            return prefixedToolNames.every(name => toolNames.includes(name));
+          },
+          { timeout: 15_000, message: 'All e2e-test plugin tools should reappear in tools/list' },
+        )
+        .toBe(true);
+
+      // Verify browser tools still present after re-enable
+      const toolListAfterReenable = await mcpClient.listTools();
+      const toolNamesAfterReenable = toolListAfterReenable.map(t => t.name);
+      for (const bt of someBrowserTools) {
+        expect(toolNamesAfterReenable).toContain(bt);
+      }
+
+      await sidePanelPage.close();
+    } finally {
+      await mcpClient.close();
+      await context.close();
+      await server.kill();
       fs.rmSync(cleanupDir, { recursive: true, force: true });
       cleanupTestConfigDir(configDir);
     }
