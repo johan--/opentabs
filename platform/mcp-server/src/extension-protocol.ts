@@ -232,6 +232,8 @@ const dispatchToExtension = (
     };
     state.pendingDispatches.set(id, pending);
 
+    log.debug('dispatch → extension:', method, 'id:', id);
+
     try {
       ws.send(JSON.stringify(msg));
     } catch (err) {
@@ -358,6 +360,7 @@ const handleExtensionMessage = (
 
     state.pendingDispatches.delete(id);
     clearTimeout(pending.timerId);
+    log.debug('dispatch ← extension:', pending.label, 'id:', id, 'in', `${Date.now() - pending.startTs}ms`);
 
     if ('error' in parsed) {
       const err = parsed.error as { code: number; message: string; data?: Record<string, unknown> };

@@ -250,6 +250,7 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
     }
 
     const { pluginName: foundPlugin, toolName: foundTool } = callableCheck;
+    log.debug('tool.call:', toolName, '→', foundPlugin + '/' + foundTool);
     // Safe to assert: checkToolCallable verified the tool exists in toolLookup
     const lookup = state.toolLookup.get(toolName) as ToolLookupEntry;
 
@@ -281,6 +282,8 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
         isError: true,
       };
     }
+
+    log.debug('tool.call: input validated for', toolName);
 
     // Concurrency limit: prevent a runaway MCP client from flooding a single
     // plugin's tab with simultaneous executeScript calls. Each dispatch runs
@@ -318,6 +321,7 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
         };
       }
 
+      log.debug('tool.call: dispatching', foundPlugin + '/' + foundTool);
       const result = await dispatchToExtension(
         state,
         'tool.dispatch',
@@ -371,6 +375,7 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
         state.activeDispatches.set(foundPlugin, prev - 1);
       }
       const durationMs = Date.now() - startTs;
+      log.debug('tool.call:', foundPlugin + '/' + foundTool, 'completed in', `${durationMs}ms`);
       sendInvocationEnd(state, foundPlugin, foundTool, durationMs, success);
     }
   });
