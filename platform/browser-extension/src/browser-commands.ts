@@ -1149,6 +1149,156 @@ export const handleBrowserClearConsoleLogs = (params: Record<string, unknown>, i
   }
 };
 
+export const handleBrowserPressKey = async (params: Record<string, unknown>, id: string | number): Promise<void> => {
+  try {
+    const tabId = params.tabId;
+    if (typeof tabId !== 'number') {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32602, message: 'Missing or invalid tabId parameter' }, id });
+      return;
+    }
+    const key = params.key;
+    if (typeof key !== 'string' || key.length === 0) {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32602, message: 'Missing or invalid key parameter' }, id });
+      return;
+    }
+    const selector = typeof params.selector === 'string' && params.selector.length > 0 ? params.selector : null;
+    const modifiers =
+      typeof params.modifiers === 'object' && params.modifiers !== null
+        ? (params.modifiers as Record<string, unknown>)
+        : {};
+    const shiftKey = modifiers.shift === true;
+    const ctrlKey = modifiers.ctrl === true;
+    const altKey = modifiers.alt === true;
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: (k: string, sel: string | null, shift: boolean, ctrl: boolean, alt: boolean) => {
+        // Resolve target element
+        let target: Element | null = null;
+        if (sel) {
+          target = document.querySelector(sel);
+          if (!target) return { error: `Element not found: ${sel}` };
+          (target as HTMLElement).focus();
+        } else {
+          target = document.activeElement ?? document.body;
+        }
+
+        // Derive code from key
+        const deriveCode = (k: string): string => {
+          if (k.length === 1) {
+            const upper = k.toUpperCase();
+            if (upper >= 'A' && upper <= 'Z') return `Key${upper}`;
+            if (k >= '0' && k <= '9') return `Digit${k}`;
+            if (k === ' ') return 'Space';
+            return k;
+          }
+          return k;
+        };
+
+        // Map key to legacy keyCode
+        const KEY_CODES: Record<string, number> = {
+          Enter: 13,
+          Escape: 27,
+          Tab: 9,
+          Backspace: 8,
+          Delete: 46,
+          ArrowUp: 38,
+          ArrowDown: 40,
+          ArrowLeft: 37,
+          ArrowRight: 39,
+          Home: 36,
+          End: 35,
+          PageUp: 33,
+          PageDown: 34,
+          ' ': 32,
+        };
+
+        const getKeyCode = (k: string): number => {
+          if (KEY_CODES[k] !== undefined) return KEY_CODES[k];
+          if (k.length === 1) return k.toUpperCase().charCodeAt(0);
+          return 0;
+        };
+
+        const code = deriveCode(k);
+        const keyCode = getKeyCode(k);
+        const isPrintable = k.length === 1;
+
+        const eventInit: KeyboardEventInit = {
+          key: k,
+          code,
+          keyCode,
+          which: keyCode,
+          bubbles: true,
+          cancelable: true,
+          shiftKey: shift,
+          ctrlKey: ctrl,
+          metaKey: ctrl,
+          altKey: alt,
+        };
+
+        // Dispatch keyboard event sequence
+        target.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+
+        if (isPrintable) {
+          target.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+        }
+
+        target.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+
+        // For printable characters, dispatch InputEvent on editable elements
+        if (isPrintable) {
+          const tag = target.tagName.toLowerCase();
+          const isEditable = tag === 'input' || tag === 'textarea' || (target as HTMLElement).isContentEditable;
+          if (isEditable) {
+            target.dispatchEvent(
+              new InputEvent('input', {
+                bubbles: true,
+                cancelable: true,
+                inputType: 'insertText',
+                data: k,
+              }),
+            );
+          }
+        }
+
+        return {
+          pressed: true,
+          key: k,
+          target: {
+            tagName: target.tagName.toLowerCase(),
+            id: (target as HTMLElement).id || undefined,
+          },
+        };
+      },
+      args: [key, selector, shiftKey, ctrlKey, altKey],
+    });
+
+    const result = results[0]?.result as
+      | { error?: string; pressed?: boolean; key?: string; target?: { tagName: string; id?: string } }
+      | undefined;
+    if (!result) {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32603, message: 'No result from script execution' }, id });
+      return;
+    }
+    if (result.error) {
+      sendToServer({ jsonrpc: '2.0', error: { code: -32602, message: result.error }, id });
+      return;
+    }
+    sendToServer({
+      jsonrpc: '2.0',
+      result: { pressed: result.pressed, key: result.key, target: result.target },
+      id,
+    });
+  } catch (err) {
+    sendToServer({
+      jsonrpc: '2.0',
+      error: { code: -32603, message: sanitizeErrorMessage(err instanceof Error ? err.message : String(err)) },
+      id,
+    });
+  }
+};
+
 export const handleBrowserListResources = async (
   params: Record<string, unknown>,
   id: string | number,

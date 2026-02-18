@@ -88,6 +88,9 @@ const mockHandleBrowserListResources = mock(
 const mockHandleBrowserGetResourceContent = mock(
   asyncNoop as (params: Record<string, unknown>, id: string | number) => Promise<void>,
 );
+const mockHandleBrowserPressKey = mock(
+  asyncNoop as (params: Record<string, unknown>, id: string | number) => Promise<void>,
+);
 
 await mock.module('./messaging.js', () => ({
   sendToServer: mockSendToServer,
@@ -125,6 +128,7 @@ await mock.module('./browser-commands.js', () => ({
   handleBrowserExecuteScript: mockHandleBrowserExecuteScript,
   handleBrowserListResources: mockHandleBrowserListResources,
   handleBrowserGetResourceContent: mockHandleBrowserGetResourceContent,
+  handleBrowserPressKey: mockHandleBrowserPressKey,
 }));
 
 // Chrome API stubs for modules that are NOT mocked (plugin-storage, iife-injection,
@@ -927,6 +931,17 @@ describe('handleServerMessage', () => {
         { tabId: 26, url: 'https://example.com/app.js', maxLength: 100000 },
         44,
       );
+    });
+
+    test('dispatches browser.pressKey to handleBrowserPressKey', () => {
+      handleServerMessage({
+        method: 'browser.pressKey',
+        id: 45,
+        params: { tabId: 10, key: 'Enter' },
+      });
+
+      expect(mockHandleBrowserPressKey).toHaveBeenCalledTimes(1);
+      expect(mockHandleBrowserPressKey).toHaveBeenCalledWith({ tabId: 10, key: 'Enter' }, 45);
     });
   });
 

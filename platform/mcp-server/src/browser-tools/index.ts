@@ -22,6 +22,7 @@ import { listResources } from './list-resources.js';
 import { listTabs } from './list-tabs.js';
 import { navigateTab } from './navigate-tab.js';
 import { openTab } from './open-tab.js';
+import { pressKey } from './press-key.js';
 import { queryElements } from './query-elements.js';
 import { reloadExtension } from './reload-extension.js';
 import { screenshotTab } from './screenshot-tab.js';
@@ -59,6 +60,7 @@ const browserTools: BrowserToolDefinition[] = [
   clearConsoleLogs,
   listResources,
   getResourceContent,
+  pressKey,
 ];
 
 export { browserTools };

@@ -17,6 +17,7 @@ import {
   handleBrowserGetResourceContent,
   handleBrowserListResources,
   handleBrowserListTabs,
+  handleBrowserPressKey,
   handleBrowserNavigateTab,
   handleBrowserOpenTab,
   handleBrowserQueryElements,
@@ -447,6 +448,16 @@ const methodHandlers = new Map<string, MessageHandler>([
       if (id !== undefined) {
         handleBrowserGetResourceContent(params, id).catch((err: unknown) =>
           console.warn('[opentabs] browser.getResourceContent handler failed:', err),
+        );
+      }
+    },
+  ],
+  [
+    'browser.pressKey',
+    (params, id) => {
+      if (id !== undefined) {
+        handleBrowserPressKey(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.pressKey handler failed:', err),
         );
       }
     },
