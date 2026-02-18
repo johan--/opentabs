@@ -76,7 +76,7 @@ const generatePackageJson = async (args: ScaffoldArgs): Promise<string> => {
       format: 'prettier --write "src/**/*.ts"',
     },
     peerDependencies: {
-      zod: '^3.0.0',
+      zod: '^4.0.0',
     },
     dependencies: {
       '@opentabs-dev/plugin-sdk': sdkVersion,
@@ -90,7 +90,7 @@ const generatePackageJson = async (args: ScaffoldArgs): Promise<string> => {
       prettier: '^3.8.1',
       typescript: '^5.9.3',
       'typescript-eslint': '^8.55.0',
-      zod: '^3.0.0',
+      zod: '^4.0.0',
     },
   };
   return JSON.stringify(pkg, null, 2) + '\n';
