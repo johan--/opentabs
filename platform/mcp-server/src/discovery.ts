@@ -218,7 +218,7 @@ const discoverFromNodeModules = async (rootDir: string, allowedPackages: string[
       results.push({ plugin, source: `node_modules/${entry}` });
       discoveredDirs.add(pkgDir);
     } catch (err) {
-      log.error(`Failed to load plugin from node_modules/${entry}:`, err instanceof Error ? err.message : String(err));
+      log.error(`Failed to load plugin from node_modules/${entry}:`, err);
     }
   }
 
@@ -260,10 +260,7 @@ const discoverFromNodeModules = async (rootDir: string, allowedPackages: string[
         });
         discoveredDirs.add(pkgDir);
       } catch (err) {
-        log.error(
-          `Failed to load plugin from node_modules/${fullPkgName}:`,
-          err instanceof Error ? err.message : String(err),
-        );
+        log.error(`Failed to load plugin from node_modules/${fullPkgName}:`, err);
       }
     }
   }
@@ -300,10 +297,7 @@ const discoverFromNodeModules = async (rootDir: string, allowedPackages: string[
       results.push({ plugin, source: `node_modules/${entry} (keyword)` });
       discoveredDirs.add(pkgDir);
     } catch (err) {
-      log.error(
-        `Failed to load plugin from node_modules/${entry} (keyword):`,
-        err instanceof Error ? err.message : String(err),
-      );
+      log.error(`Failed to load plugin from node_modules/${entry} (keyword):`, err);
     }
   }
 
@@ -353,10 +347,7 @@ const discoverFromNodeModules = async (rootDir: string, allowedPackages: string[
         });
         discoveredDirs.add(pkgDir);
       } catch (err) {
-        log.error(
-          `Failed to load plugin from node_modules/${entry}/${scopeEntry} (keyword):`,
-          err instanceof Error ? err.message : String(err),
-        );
+        log.error(`Failed to load plugin from node_modules/${entry}/${scopeEntry} (keyword):`, err);
       }
     }
   }
@@ -425,7 +416,7 @@ const discoverFromLocalPaths = async (paths: string[]): Promise<DiscoveryResult[
       const plugin = await loadPluginFromDir(resolvedPath, 'local', null, resolvedPath);
       results.push({ plugin, source: resolvedPath });
     } catch (err) {
-      log.error(`Failed to load local plugin from ${resolvedPath}:`, err instanceof Error ? err.message : String(err));
+      log.error(`Failed to load local plugin from ${resolvedPath}:`, err);
     }
   }
 

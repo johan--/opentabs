@@ -443,11 +443,11 @@ test.describe('Console.warn transparency logging', () => {
       message: 'console test',
     });
 
-    // Poll until the [OpenTabs] warning appears instead of fixed sleep
-    await waitFor(() => warnings.some(w => w.includes('[OpenTabs]')), 5_000, 200, '[OpenTabs] console.warn to appear');
+    // Poll until the [opentabs] warning appears instead of fixed sleep
+    await waitFor(() => warnings.some(w => w.includes('[opentabs]')), 5_000, 200, '[opentabs] console.warn to appear');
 
-    // Verify the console.warn format: "[OpenTabs] e2e-test.echo invoked — <link>"
-    const openTabsWarning = warnings.find(w => w.includes('[OpenTabs]'));
+    // Verify the console.warn format: "[opentabs] e2e-test.echo invoked — <link>"
+    const openTabsWarning = warnings.find(w => w.includes('[opentabs]'));
     expect(openTabsWarning).toBeDefined();
     expect(openTabsWarning).toContain('e2e-test');
     expect(openTabsWarning).toContain('echo');

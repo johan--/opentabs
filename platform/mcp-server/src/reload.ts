@@ -91,22 +91,18 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
       const plugin = state.plugins.get(pluginName);
       if (plugin) {
         void sendPluginUpdate(state, pluginName, plugin.iife).catch((err: unknown) => {
-          log.error(
-            `Failed to write adapter file for ${pluginName}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          log.error(`Failed to write adapter file for ${pluginName}:`, err);
         });
       }
     },
     onIifeChanged: (pluginName: string, iife: string) => {
       void sendPluginUpdate(state, pluginName, iife).catch((err: unknown) => {
-        log.error(
-          `Failed to write adapter file for ${pluginName}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        log.error(`Failed to write adapter file for ${pluginName}:`, err);
       });
     },
     onConfigChanged: () => {
       void performConfigReload(state, sessionServers, transports).catch((err: unknown) => {
-        log.error(`Config watcher reload failed: ${err instanceof Error ? err.message : String(err)}`);
+        log.error('Config watcher reload failed:', err);
       });
     },
   };
@@ -183,7 +179,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     // it had before this reload attempt (old set on hot reload, empty on
     // first load). Log the error and continue — file watchers will still
     // be restarted below so they aren't left dead.
-    log.error('Reload failed, keeping previous state:', err instanceof Error ? err.message : String(err));
+    log.error('Reload failed, keeping previous state:', err);
   }
 
   // File watching — always restart regardless of success/failure so
@@ -263,16 +259,14 @@ const performReload = async (
     try {
       await ensureExtensionInstalled();
     } catch (err) {
-      log.warn(
-        `Extension install failed (continuing with plugin discovery): ${err instanceof Error ? err.message : String(err)}`,
-      );
+      log.warn('Extension install failed (continuing with plugin discovery):', err);
     }
 
     // Remove leftover __exec-*.js files from previous sessions/crashes
     try {
       await cleanupStaleExecFiles();
     } catch (err) {
-      log.warn(`Exec file cleanup failed: ${err instanceof Error ? err.message : String(err)}`);
+      log.warn('Exec file cleanup failed:', err);
     }
 
     // Update browser tools from the fresh module import (bun --hot re-evaluates
@@ -292,7 +286,7 @@ const performReload = async (
           registerMcpHandlers(srv, state);
           reregistered++;
         } catch (err) {
-          log.warn('Failed to re-register handlers on a session:', err instanceof Error ? err.message : String(err));
+          log.warn('Failed to re-register handlers on a session:', err);
         }
       }
       log.info(

@@ -53,7 +53,7 @@ const sendToExtension = (
     state.extensionWs.send(JSON.stringify(msg));
     return true;
   } catch (err) {
-    log.warn(`Failed to send to extension: ${err instanceof Error ? err.message : String(err)}`);
+    log.warn('Failed to send to extension:', err);
     return false;
   }
 };
@@ -106,9 +106,7 @@ const cleanupStaleAdapterFiles = async (currentPluginNames: Set<string>): Promis
   for (const [i, result] of results.entries()) {
     if (result.status === 'rejected') {
       const fileName = staleFiles[i] ?? 'unknown';
-      log.warn(
-        `Failed to delete stale adapter file ${fileName}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
-      );
+      log.warn(`Failed to delete stale adapter file ${fileName}:`, result.reason);
     } else {
       deleted++;
     }
@@ -159,9 +157,7 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
     for (const [i, result] of writeResults.entries()) {
       if (result.status === 'rejected') {
         const plugin = pluginList[i];
-        log.warn(
-          `Failed to write adapter file for ${plugin?.name ?? 'unknown'}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
-        );
+        log.warn(`Failed to write adapter file for ${plugin?.name ?? 'unknown'}:`, result.reason);
       }
     }
   }

@@ -85,8 +85,7 @@ const ensureExtensionInstalled = async (): Promise<void> => {
 
     log.info(`Managed extension installed to ${extensionDir}`);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.warn(`Failed to install managed extension: ${msg}`);
+    log.warn('Failed to install managed extension:', err);
   }
 };
 

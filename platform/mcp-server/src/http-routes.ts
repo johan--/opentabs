@@ -197,8 +197,8 @@ const createHandleFetch =
           durationMs: result.durationMs,
         });
       } catch (err) {
+        log.error('Config reload failed:', err);
         const rawMsg = err instanceof Error ? err.message : String(err);
-        log.error(`Config reload failed: ${rawMsg}`);
         return Response.json({ ok: false, error: sanitizeErrorMessage(rawMsg) }, { status: 500 });
       }
     }

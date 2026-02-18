@@ -97,10 +97,7 @@ const handleIifeChange = async (
 
     callbacks.onIifeChanged(pluginName, iife);
   } catch (err) {
-    log.error(
-      `File watcher: Failed to read IIFE for "${pluginName}":`,
-      err instanceof Error ? err.message : String(err),
-    );
+    log.error(`File watcher: Failed to read IIFE for "${pluginName}":`, err);
   }
 };
 
@@ -189,10 +186,7 @@ const handleManifestChange = async (
 
     callbacks.onManifestChanged(pluginName);
   } catch (err) {
-    log.error(
-      `File watcher: Failed to read manifest for "${pluginName}":`,
-      err instanceof Error ? err.message : String(err),
-    );
+    log.error(`File watcher: Failed to read manifest for "${pluginName}":`, err);
   }
 };
 
@@ -233,10 +227,7 @@ const watchPlugin = (
     });
     watchers.push(manifestWatcher);
   } catch (err) {
-    log.warn(
-      `File watcher: Could not watch plugin dir at ${pluginDir}:`,
-      err instanceof Error ? err.message : String(err),
-    );
+    log.warn(`File watcher: Could not watch plugin dir at ${pluginDir}:`, err);
   }
 
   // Watch dist directory for IIFE changes
@@ -259,7 +250,7 @@ const watchPlugin = (
     });
     watchers.push(distWatcher);
   } catch (err) {
-    log.warn(`File watcher: Could not watch dist dir at ${distDir}:`, err instanceof Error ? err.message : String(err));
+    log.warn(`File watcher: Could not watch dist dir at ${distDir}:`, err);
   }
 
   return { pluginDir, pluginName, watchers };
@@ -303,10 +294,7 @@ const startConfigWatching = (state: ServerState, callbacks: FileWatcherCallbacks
 
     log.info(`Config watcher: Watching ${configDir} for config.json changes`);
   } catch (err) {
-    log.warn(
-      `Config watcher: Could not watch config dir at ${configDir}:`,
-      err instanceof Error ? err.message : String(err),
-    );
+    log.warn(`Config watcher: Could not watch config dir at ${configDir}:`, err);
   }
 };
 
