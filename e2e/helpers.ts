@@ -280,6 +280,7 @@ export const openTestAppTab = async (
 
   const deadline = Date.now() + timeoutMs;
   let lastDiag = '';
+  let lastDiagnosticTime = 0;
 
   while (Date.now() < deadline) {
     const injected = await page.evaluate(() => {
@@ -298,8 +299,10 @@ export const openTestAppTab = async (
       return page;
     }
 
-    // Build diagnostic snapshot periodically
-    if (Date.now() % 2000 < 500) {
+    // Build diagnostic snapshot periodically (every ~2 seconds of elapsed time)
+    const now = Date.now();
+    if (now - lastDiagnosticTime >= 2000) {
+      lastDiagnosticTime = now;
       const parts: string[] = [
         `adapter: openTabs=${String(injected.hasOpenTabs)}, adapters=${String(injected.hasAdapters)}, e2e-test=${String(injected.hasE2eTest)}, names=[${injected.adapterNames.join(',')}]`,
       ];
