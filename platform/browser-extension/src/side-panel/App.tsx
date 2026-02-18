@@ -11,6 +11,7 @@ import type { InternalMessage } from '../types.js';
 import type { TabState } from '@opentabs-dev/shared';
 
 const validTabStates: ReadonlySet<string> = new Set<TabState>(['closed', 'unavailable', 'ready']);
+const VALID_PLUGIN_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 const App = () => {
   const [connected, setConnected] = useState(false);
@@ -63,7 +64,12 @@ const App = () => {
       // tab.stateChanged notification
       if (data.method === 'tab.stateChanged' && data.params) {
         const params = data.params as Record<string, unknown>;
-        if (typeof params.plugin === 'string' && typeof params.state === 'string' && validTabStates.has(params.state)) {
+        if (
+          typeof params.plugin === 'string' &&
+          typeof params.state === 'string' &&
+          validTabStates.has(params.state) &&
+          VALID_PLUGIN_NAME.test(params.plugin)
+        ) {
           const pluginName = params.plugin;
           const newState = params.state as TabState;
           setPlugins(prev => {
@@ -79,7 +85,11 @@ const App = () => {
       // tool.invocationStart notification
       if (data.method === 'tool.invocationStart' && data.params) {
         const params = data.params as Record<string, unknown>;
-        if (typeof params.plugin === 'string' && typeof params.tool === 'string') {
+        if (
+          typeof params.plugin === 'string' &&
+          typeof params.tool === 'string' &&
+          VALID_PLUGIN_NAME.test(params.plugin)
+        ) {
           const toolKey = `${params.plugin}:${params.tool}`;
           setActiveTools(prev => new Set(prev).add(toolKey));
         }
@@ -88,7 +98,11 @@ const App = () => {
       // tool.invocationEnd notification
       if (data.method === 'tool.invocationEnd' && data.params) {
         const params = data.params as Record<string, unknown>;
-        if (typeof params.plugin === 'string' && typeof params.tool === 'string') {
+        if (
+          typeof params.plugin === 'string' &&
+          typeof params.tool === 'string' &&
+          VALID_PLUGIN_NAME.test(params.plugin)
+        ) {
           const toolKey = `${params.plugin}:${params.tool}`;
           setActiveTools(prev => {
             const next = new Set(prev);
