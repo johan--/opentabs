@@ -1,4 +1,4 @@
-import { convertToolSchemas, validatePlugin } from './build.js';
+import { convertToolSchemas, formatBytes, formatTimestamp, validatePlugin } from './build.js';
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import type { OpenTabsPlugin, ToolDefinition } from '@opentabs-dev/plugin-sdk';
@@ -304,5 +304,54 @@ describe('convertToolSchemas', () => {
       required: ['results'],
       additionalProperties: false,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatBytes
+// ---------------------------------------------------------------------------
+
+describe('formatBytes', () => {
+  test('formats 0 bytes', () => {
+    expect(formatBytes(0)).toBe('0 B');
+  });
+
+  test('formats bytes below 1024', () => {
+    expect(formatBytes(512)).toBe('512 B');
+  });
+
+  test('formats 1023 bytes (boundary before KB)', () => {
+    expect(formatBytes(1023)).toBe('1023 B');
+  });
+
+  test('formats exactly 1024 bytes as KB', () => {
+    expect(formatBytes(1024)).toBe('1.0 KB');
+  });
+
+  test('formats kilobytes', () => {
+    expect(formatBytes(2048)).toBe('2.0 KB');
+    expect(formatBytes(1536)).toBe('1.5 KB');
+  });
+
+  test('formats 1048575 bytes (boundary before MB)', () => {
+    expect(formatBytes(1048575)).toBe('1024.0 KB');
+  });
+
+  test('formats exactly 1048576 bytes as MB', () => {
+    expect(formatBytes(1048576)).toBe('1.0 MB');
+  });
+
+  test('formats megabytes', () => {
+    expect(formatBytes(5242880)).toBe('5.0 MB');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatTimestamp
+// ---------------------------------------------------------------------------
+
+describe('formatTimestamp', () => {
+  test('returns a string matching HH:MM:SS format', () => {
+    expect(formatTimestamp()).toMatch(/^\d{2}:\d{2}:\d{2}$/);
   });
 });
