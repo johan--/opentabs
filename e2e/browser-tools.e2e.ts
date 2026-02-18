@@ -105,6 +105,82 @@ const openInteractivePage = async (mcpClient: McpClient, testServer: TestServer)
   return tabId;
 };
 
+/**
+ * Poll until no __exec-*.js files remain in the adapters directory.
+ * Replaces fixed `setTimeout` waits after browser_execute_script calls.
+ */
+const waitForExecFileCleanup = async (mcpServer: McpServer, timeoutMs = 5_000): Promise<void> => {
+  const adaptersDir = path.join(mcpServer.configDir, 'extension', 'adapters');
+  await waitFor(
+    () => {
+      const files = fs.readdirSync(adaptersDir);
+      return files.filter(f => f.startsWith('__exec-') && f.endsWith('.js')).length === 0;
+    },
+    timeoutMs,
+    200,
+    'exec file cleanup',
+  );
+};
+
+/**
+ * Poll browser_get_network_requests until at least one request is captured.
+ * Replaces fixed `setTimeout` waits after navigation during network capture.
+ */
+const waitForNetworkRequests = async (
+  mcpClient: McpClient,
+  tabId: number,
+  timeoutMs = 10_000,
+): Promise<Array<Record<string, unknown>>> => {
+  let requests: Array<Record<string, unknown>> = [];
+  await waitFor(
+    async () => {
+      try {
+        const result = await mcpClient.callTool('browser_get_network_requests', { tabId });
+        if (result.isError) return false;
+        const data = parseToolResult(result.content);
+        requests = data.requests as Array<Record<string, unknown>>;
+        return requests.length > 0;
+      } catch {
+        return false;
+      }
+    },
+    timeoutMs,
+    300,
+    'network requests captured',
+  );
+  return requests;
+};
+
+/**
+ * Poll browser_get_console_logs until a log entry matching the predicate appears.
+ * Replaces fixed `setTimeout` waits after console.log/error calls.
+ */
+const waitForConsoleLogs = async (
+  mcpClient: McpClient,
+  tabId: number,
+  predicate: (logs: Array<Record<string, unknown>>) => boolean,
+  timeoutMs = 10_000,
+): Promise<Array<Record<string, unknown>>> => {
+  let logs: Array<Record<string, unknown>> = [];
+  await waitFor(
+    async () => {
+      try {
+        const result = await mcpClient.callTool('browser_get_console_logs', { tabId });
+        if (result.isError) return false;
+        const data = parseToolResult(result.content);
+        logs = data.logs as Array<Record<string, unknown>>;
+        return predicate(logs);
+      } catch {
+        return false;
+      }
+    },
+    timeoutMs,
+    300,
+    'console logs match predicate',
+  );
+  return logs;
+};
+
 // ---------------------------------------------------------------------------
 // Browser tools presence
 // ---------------------------------------------------------------------------
@@ -582,14 +658,8 @@ test.describe('browser_execute_script', () => {
       code: 'return "file-cleanup-test"',
     });
 
-    // Wait briefly for async file deletion
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Check that no __exec-*.js files remain in the adapters directory
-    const adaptersDir = path.join(mcpServer.configDir, 'extension', 'adapters');
-    const files = fs.readdirSync(adaptersDir);
-    const execFiles = files.filter(f => f.startsWith('__exec-') && f.endsWith('.js'));
-    expect(execFiles).toEqual([]);
+    // Poll until exec files are cleaned up
+    await waitForExecFileCleanup(mcpServer);
 
     await mcpClient.callTool('browser_close_tab', { tabId });
   });
@@ -606,14 +676,8 @@ test.describe('browser_execute_script', () => {
       code: 'return 1',
     });
 
-    // Wait briefly for async file deletion
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Check that no __exec-*.js files remain
-    const adaptersDir = path.join(mcpServer.configDir, 'extension', 'adapters');
-    const files = fs.readdirSync(adaptersDir);
-    const execFiles = files.filter(f => f.startsWith('__exec-') && f.endsWith('.js'));
-    expect(execFiles).toEqual([]);
+    // Poll until exec files are cleaned up
+    await waitForExecFileCleanup(mcpServer);
   });
 
   test('sequential executions leave no leftover state', async ({
@@ -648,14 +712,8 @@ test.describe('browser_execute_script', () => {
     expect(checkValue.hasResult).toBe(false);
     expect(checkValue.hasAsync).toBe(false);
 
-    // Wait for file cleanup
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Verify no leftover exec files
-    const adaptersDir = path.join(mcpServer.configDir, 'extension', 'adapters');
-    const files = fs.readdirSync(adaptersDir);
-    const execFiles = files.filter(f => f.startsWith('__exec-') && f.endsWith('.js'));
-    expect(execFiles).toEqual([]);
+    // Poll until exec files are cleaned up
+    await waitForExecFileCleanup(mcpServer);
 
     await mcpClient.callTool('browser_close_tab', { tabId });
   });
@@ -695,14 +753,8 @@ test.describe('browser_execute_script', () => {
     expect(value1.startsWith('tab1-')).toBe(true);
     expect(value2.startsWith('tab2-')).toBe(true);
 
-    // Wait for file cleanup
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Verify no leftover exec files
-    const adaptersDir = path.join(mcpServer.configDir, 'extension', 'adapters');
-    const files = fs.readdirSync(adaptersDir);
-    const execFiles = files.filter(f => f.startsWith('__exec-') && f.endsWith('.js'));
-    expect(execFiles).toEqual([]);
+    // Poll until exec files are cleaned up
+    await waitForExecFileCleanup(mcpServer);
 
     await mcpClient.callTool('browser_close_tab', { tabId: tabId1 });
     await mcpClient.callTool('browser_close_tab', { tabId: tabId2 });
@@ -969,13 +1021,24 @@ test.describe('browser_screenshot_tab', () => {
     await initAndListTools(mcpServer, mcpClient);
     const tabId = await openTestServerTab(mcpClient, testServer);
 
-    // Small delay for the page to render fully
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Poll until screenshot returns a valid PNG (page fully rendered)
+    let data: Record<string, unknown> = {};
+    await waitFor(
+      async () => {
+        try {
+          const r = await mcpClient.callTool('browser_screenshot_tab', { tabId });
+          if (r.isError) return false;
+          data = parseToolResult(r.content);
+          return typeof data.image === 'string' && data.image.startsWith('iVBOR');
+        } catch {
+          return false;
+        }
+      },
+      10_000,
+      300,
+      'screenshot returns valid PNG',
+    );
 
-    const result = await mcpClient.callTool('browser_screenshot_tab', { tabId });
-    expect(result.isError).toBe(false);
-
-    const data = parseToolResult(result.content);
     expect(typeof data.image).toBe('string');
     // PNG files encoded in base64 start with 'iVBOR' (the base64 encoding of the PNG header)
     expect((data.image as string).startsWith('iVBOR')).toBe(true);
@@ -1557,15 +1620,8 @@ test.describe('Browser tools — network capture lifecycle', () => {
     });
     expect(navResult.isError).toBe(false);
 
-    // Wait for requests to be captured
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // 3. Get captured requests
-    const getResult = await mcpClient.callTool('browser_get_network_requests', { tabId });
-    expect(getResult.isError).toBe(false);
-
-    const reqData = parseToolResult(getResult.content);
-    const requests = reqData.requests as Array<Record<string, unknown>>;
+    // 3. Poll until requests are captured
+    const requests = await waitForNetworkRequests(mcpClient, tabId);
     expect(requests.length).toBeGreaterThan(0);
 
     // Verify request shape
@@ -1598,7 +1654,9 @@ test.describe('Browser tools — network capture lifecycle', () => {
       tabId,
       url: testServer.url + '/interactive',
     });
-    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Poll until requests are captured
+    await waitForNetworkRequests(mcpClient, tabId);
 
     // Get with clear=true
     const getResult1 = await mcpClient.callTool('browser_get_network_requests', { tabId, clear: true });
@@ -1637,12 +1695,9 @@ test.describe('Browser tools — network capture lifecycle', () => {
       tabId,
       url: testServer.url + '/interactive',
     });
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const getResult = await mcpClient.callTool('browser_get_network_requests', { tabId });
-    expect(getResult.isError).toBe(false);
-    const data = parseToolResult(getResult.content);
-    const requests = data.requests as Array<Record<string, unknown>>;
+    // Poll until requests matching the filter are captured
+    const requests = await waitForNetworkRequests(mcpClient, tabId);
 
     // All captured requests should contain '/interactive' in the URL
     for (const req of requests) {
@@ -1689,15 +1744,11 @@ test.describe('Browser tools — console log capture', () => {
       code: 'console.log("e2e-test-message"); console.error("e2e-test-error")',
     });
 
-    // Wait for console events to be captured
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Get console logs
-    const getResult = await mcpClient.callTool('browser_get_console_logs', { tabId });
-    expect(getResult.isError).toBe(false);
-
-    const data = parseToolResult(getResult.content);
-    const logs = data.logs as Array<Record<string, unknown>>;
+    // Poll until both console entries are captured
+    const logs = await waitForConsoleLogs(mcpClient, tabId, entries => {
+      const messages = entries.map(l => l.message as string);
+      return messages.some(m => m.includes('e2e-test-message')) && messages.some(m => m.includes('e2e-test-error'));
+    });
     expect(logs.length).toBeGreaterThanOrEqual(2);
 
     const logMessages = logs.map(l => l.message as string);
@@ -1733,7 +1784,11 @@ test.describe('Browser tools — console log capture', () => {
       tabId,
       code: 'console.log("clear-test")',
     });
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Poll until the log entry is captured
+    await waitForConsoleLogs(mcpClient, tabId, entries =>
+      entries.some(l => (l.message as string).includes('clear-test')),
+    );
 
     // Clear logs
     const clearResult = await mcpClient.callTool('browser_clear_console_logs', { tabId });
