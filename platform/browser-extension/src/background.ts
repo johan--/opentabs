@@ -106,9 +106,11 @@ chrome.runtime.onMessage.addListener((message: InternalMessage, _sender, sendRes
           const res = await fetch(`${httpBase}/ws-info`, { signal: AbortSignal.timeout(3_000) });
           if (res.ok) {
             const wsInfo = (await res.json()) as { wsUrl?: string };
-            if (typeof wsInfo.wsUrl === 'string') {
+            if (typeof wsInfo.wsUrl === 'string' && wsInfo.wsUrl !== '') {
               sendResponse({ url: wsInfo.wsUrl });
               return;
+            } else if (typeof wsInfo.wsUrl === 'string') {
+              console.warn('[opentabs:background] /ws-info returned empty wsUrl, using fallback URL');
             }
           }
         } catch {

@@ -166,7 +166,7 @@ const refreshWsUrl = async (): Promise<void> => {
     const res = await fetch(`${httpBase}/ws-info`, { signal: AbortSignal.timeout(3_000) });
     if (res.ok) {
       const wsInfo = (await res.json()) as { wsUrl?: string };
-      if (typeof wsInfo.wsUrl === 'string' && wsInfo.wsUrl !== mcpServerUrl) {
+      if (typeof wsInfo.wsUrl === 'string' && wsInfo.wsUrl !== '' && wsInfo.wsUrl !== mcpServerUrl) {
         mcpServerUrl = wsInfo.wsUrl;
       }
     }
@@ -295,8 +295,10 @@ chrome.runtime.onMessage.addListener((message: InternalMessage, _sender, sendRes
           const res = await fetch(`${httpBase}/ws-info`, { signal: AbortSignal.timeout(3_000) });
           if (res.ok) {
             const wsInfo = (await res.json()) as { wsUrl?: string };
-            if (typeof wsInfo.wsUrl === 'string') {
+            if (typeof wsInfo.wsUrl === 'string' && wsInfo.wsUrl !== '') {
               resolvedUrl = wsInfo.wsUrl;
+            } else if (typeof wsInfo.wsUrl === 'string') {
+              console.warn('[opentabs:offscreen] /ws-info returned empty wsUrl, using fallback URL');
             }
           }
         } catch {
