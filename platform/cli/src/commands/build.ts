@@ -114,6 +114,7 @@ const existing = adapters[${JSON.stringify(pluginName)}];
 if (existing && typeof existing.teardown === 'function') {
   try { existing.teardown(); } catch (e) { console.warn('[OpenTabs] teardown failed for ' + ${JSON.stringify(pluginName)} + ':', e); }
 }
+Reflect.deleteProperty(adapters, ${JSON.stringify(pluginName)});
 adapters[${JSON.stringify(pluginName)}] = plugin;
 `;
   await Bun.write(wrapperPath, wrapperCode);
@@ -211,9 +212,17 @@ const runBuild = async (projectDir: string): Promise<void> => {
   const iifeContent = await Bun.file(iifePath).text();
   const adapterHash = new Bun.CryptoHasher('sha256').update(iifeContent).digest('hex');
 
-  // Append a self-contained snippet that exposes the hash on the adapter object
-  const hashSetter = `\n(function(){var o=(globalThis).__openTabs;if(o&&o.adapters&&o.adapters[${JSON.stringify(plugin.name)}])o.adapters[${JSON.stringify(plugin.name)}].__adapterHash=${JSON.stringify(adapterHash)};})();\n`;
-  await Bun.write(iifePath, iifeContent + hashSetter);
+  // Append a self-contained snippet that sets the adapter hash and then freezes
+  // the adapter entry to prevent cross-adapter tampering. The freeze must happen
+  // AFTER the hash is set (since frozen objects reject new properties). The
+  // property descriptor uses writable:false + configurable:true so that:
+  //   - Simple assignment by page scripts fails (non-writable)
+  //   - Re-injection via Object.defineProperty succeeds (configurable)
+  //   - Extension cleanup via Reflect.deleteProperty succeeds (configurable)
+  const hashAndFreeze = `
+(function(){var o=(globalThis).__openTabs;if(o&&o.adapters&&o.adapters[${JSON.stringify(plugin.name)}]){var a=o.adapters[${JSON.stringify(plugin.name)}];a.__adapterHash=${JSON.stringify(adapterHash)};if(a.tools&&Array.isArray(a.tools)){for(var i=0;i<a.tools.length;i++){Object.freeze(a.tools[i]);}Object.freeze(a.tools);}Object.freeze(a);Object.defineProperty(o.adapters,${JSON.stringify(plugin.name)},{value:a,writable:false,configurable:true,enumerable:true});}})();
+`;
+  await Bun.write(iifePath, iifeContent + hashAndFreeze);
   const iifeSize = (await Bun.file(iifePath).stat()).size;
   console.log(`  Written: ${pc.bold('dist/adapter.iife.js')} (${formatBytes(iifeSize)})`);
 
