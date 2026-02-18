@@ -20,16 +20,16 @@ export const setChannelTopic = defineTool({
   }),
   handle: async params => {
     const data = await slackApi<{
-      topic: { value?: string; creator?: string; last_set?: number };
+      channel: { topic: { value?: string; creator?: string; last_set?: number } };
     }>('conversations.setTopic', {
       channel: params.channel,
       topic: params.topic,
     });
     return {
       topic: {
-        value: data.topic.value ?? params.topic,
-        creator: data.topic.creator ?? '',
-        last_set: data.topic.last_set ?? 0,
+        value: data.channel.topic.value ?? params.topic,
+        creator: data.channel.topic.creator ?? '',
+        last_set: data.channel.topic.last_set ?? 0,
       },
     };
   },
