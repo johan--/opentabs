@@ -1,5 +1,6 @@
-import { matchPattern, urlMatchesPatterns } from './tab-matching.js';
-import { describe, expect, test } from 'bun:test';
+import { findAllMatchingTabs, matchPattern, urlMatchesPatterns } from './tab-matching.js';
+import { beforeEach, describe, expect, test } from 'bun:test';
+import type { PluginMeta } from './types.js';
 
 describe('matchPattern', () => {
   describe('scheme matching', () => {
@@ -160,5 +161,123 @@ describe('urlMatchesPatterns', () => {
 
   test('empty patterns list returns false', () => {
     expect(urlMatchesPatterns('https://example.com/path', [])).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findAllMatchingTabs — requires Chrome API mocks
+// ---------------------------------------------------------------------------
+
+const FOCUSED_WINDOW_ID = 100;
+const OTHER_WINDOW_ID = 200;
+
+const makeTab = (id: number, opts: { active?: boolean; windowId?: number } = {}): chrome.tabs.Tab =>
+  ({
+    id,
+    active: opts.active ?? false,
+    windowId: opts.windowId ?? OTHER_WINDOW_ID,
+  }) as chrome.tabs.Tab;
+
+const makePlugin = (urlPatterns: string[]): PluginMeta => ({
+  name: 'test-plugin',
+  version: '1.0.0',
+  urlPatterns,
+  trustTier: 'local',
+  tools: [{ name: 'test-tool', description: 'A test tool', enabled: true }],
+});
+
+let queryResults: Map<string, chrome.tabs.Tab[]>;
+
+beforeEach(() => {
+  queryResults = new Map();
+  (globalThis as Record<string, unknown>).chrome = {
+    tabs: {
+      query: ({ url }: { url: string }): Promise<chrome.tabs.Tab[]> => Promise.resolve(queryResults.get(url) ?? []),
+    },
+    windows: {
+      getLastFocused: (): Promise<{ id: number }> => Promise.resolve({ id: FOCUSED_WINDOW_ID }),
+    },
+  };
+});
+
+describe('findAllMatchingTabs', () => {
+  test('active tab in focused window is ranked first', async () => {
+    const activeFocused = makeTab(1, { active: true, windowId: FOCUSED_WINDOW_ID });
+    const activeOther = makeTab(2, { active: true, windowId: OTHER_WINDOW_ID });
+    const inactiveUnfocused = makeTab(3, { active: false, windowId: OTHER_WINDOW_ID });
+
+    queryResults.set('*://example.com/*', [inactiveUnfocused, activeOther, activeFocused]);
+
+    const result = await findAllMatchingTabs(makePlugin(['*://example.com/*']));
+    expect(result.map(t => t.id)).toEqual([1, 2, 3]);
+  });
+
+  test('active-only tab is ranked above focused-only tab', async () => {
+    const activeOther = makeTab(1, { active: true, windowId: OTHER_WINDOW_ID });
+    const inactiveFocused = makeTab(2, { active: false, windowId: FOCUSED_WINDOW_ID });
+
+    queryResults.set('*://example.com/*', [inactiveFocused, activeOther]);
+
+    const result = await findAllMatchingTabs(makePlugin(['*://example.com/*']));
+    expect(result.map(t => t.id)).toEqual([1, 2]);
+  });
+
+  test('inactive unfocused tab is ranked last', async () => {
+    const activeFocused = makeTab(1, { active: true, windowId: FOCUSED_WINDOW_ID });
+    const inactiveFocused = makeTab(2, { active: false, windowId: FOCUSED_WINDOW_ID });
+    const activeOther = makeTab(3, { active: true, windowId: OTHER_WINDOW_ID });
+    const inactiveUnfocused = makeTab(4, { active: false, windowId: OTHER_WINDOW_ID });
+
+    queryResults.set('*://example.com/*', [inactiveUnfocused, inactiveFocused, activeOther, activeFocused]);
+
+    const result = await findAllMatchingTabs(makePlugin(['*://example.com/*']));
+    expect(result.map(t => t.id)).toEqual([1, 3, 2, 4]);
+  });
+
+  test('deduplicates when same tab matches multiple URL patterns', async () => {
+    const tab = makeTab(1, { active: true, windowId: FOCUSED_WINDOW_ID });
+
+    queryResults.set('*://example.com/*', [tab]);
+    queryResults.set('*://*.example.com/*', [tab]);
+
+    const result = await findAllMatchingTabs(makePlugin(['*://example.com/*', '*://*.example.com/*']));
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe(1);
+  });
+
+  test('returns empty array when no tabs match', async () => {
+    const result = await findAllMatchingTabs(makePlugin(['*://example.com/*']));
+    expect(result).toEqual([]);
+  });
+
+  test('returns single tab without sorting', async () => {
+    const tab = makeTab(1, { active: false, windowId: OTHER_WINDOW_ID });
+    queryResults.set('*://example.com/*', [tab]);
+
+    const result = await findAllMatchingTabs(makePlugin(['*://example.com/*']));
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe(1);
+  });
+
+  test('skips patterns that throw errors', async () => {
+    const tab = makeTab(1, { active: true, windowId: FOCUSED_WINDOW_ID });
+
+    // Set up a query mock that rejects for invalid patterns
+    (globalThis as Record<string, unknown>).chrome = {
+      tabs: {
+        query: ({ url }: { url: string }): Promise<chrome.tabs.Tab[]> => {
+          if (url === 'bad-pattern') return Promise.reject(new Error('Invalid pattern'));
+          if (url === '*://good.com/*') return Promise.resolve([tab]);
+          return Promise.resolve([]);
+        },
+      },
+      windows: {
+        getLastFocused: (): Promise<{ id: number }> => Promise.resolve({ id: FOCUSED_WINDOW_ID }),
+      },
+    };
+
+    const result = await findAllMatchingTabs(makePlugin(['bad-pattern', '*://good.com/*']));
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe(1);
   });
 });
