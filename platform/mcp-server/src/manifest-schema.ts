@@ -11,7 +11,10 @@ import type { PluginManifest } from '@opentabs-dev/shared';
 
 const manifestToolSchema = z.object({
   name: z.string().min(1, 'Tool name is required'),
-  description: z.string().min(1, 'Tool description is required'),
+  description: z
+    .string()
+    .min(1, 'Tool description is required')
+    .max(1000, 'Tool description must be at most 1000 characters'),
   input_schema: z.record(z.string(), z.unknown()),
   output_schema: z.record(z.string(), z.unknown()),
 });
@@ -20,7 +23,10 @@ const pluginManifestSchema = z.looseObject({
   name: z.string().min(1, 'Plugin name is required'),
   version: z.string().min(1, 'Plugin version is required'),
   displayName: z.string().optional(),
-  description: z.string().min(1, 'Plugin description is required'),
+  description: z
+    .string()
+    .min(1, 'Plugin description is required')
+    .max(500, 'Plugin description must be at most 500 characters'),
   url_patterns: z.array(z.string()).min(1, 'At least one URL pattern is required'),
   tools: z.array(manifestToolSchema).min(1, 'At least one tool is required'),
   adapterHash: z.string().optional(),

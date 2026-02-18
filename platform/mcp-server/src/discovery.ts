@@ -107,6 +107,13 @@ const loadPluginFromDir = async (
     if (patternError) throw new Error(patternError);
   }
 
+  // Warn if any tool description references browser tool names (possible prompt injection)
+  for (const match of checkBrowserToolReferences(manifest.tools)) {
+    log.warn(
+      `Plugin "${pluginName}" tool "${match.toolName}" description references browser tool "${match.browserToolName}" — possible prompt injection attempt`,
+    );
+  }
+
   // Read IIFE — reject missing, empty, or oversized files
   const MAX_IIFE_SIZE = 5 * 1024 * 1024;
   const iifeFile = Bun.file(iifePath);
@@ -394,7 +401,7 @@ const discoverFromLocalPaths = async (paths: string[]): Promise<DiscoveryResult[
  *   Only packages in this list are loaded from node_modules. Empty array means
  *   no npm plugins are loaded.
  */
-export const discoverPlugins = async (
+const discoverPlugins = async (
   localPaths: string[],
   allowedNpmPackages: string[],
   rootDir?: string,
@@ -435,4 +442,36 @@ export const discoverPlugins = async (
   return plugins;
 };
 
-export { pluginNameFromPackage };
+/**
+ * Browser tool names that should not appear in plugin tool descriptions.
+ * Presence of these names may indicate a prompt injection attempt where
+ * a plugin tries to instruct the AI agent to invoke browser-level tools.
+ */
+const BROWSER_TOOL_NAMES = [
+  'browser_execute_script',
+  'browser_list_tabs',
+  'browser_open_tab',
+  'browser_close_tab',
+  'browser_navigate_tab',
+];
+
+/**
+ * Check plugin tool descriptions for references to browser tool names.
+ * Returns an array of { toolName, browserToolName } for each match found.
+ */
+const checkBrowserToolReferences = (
+  tools: ReadonlyArray<{ name: string; description: string }>,
+): Array<{ toolName: string; browserToolName: string }> => {
+  const matches: Array<{ toolName: string; browserToolName: string }> = [];
+  for (const tool of tools) {
+    const descLower = tool.description.toLowerCase();
+    for (const btName of BROWSER_TOOL_NAMES) {
+      if (descLower.includes(btName)) {
+        matches.push({ toolName: tool.name, browserToolName: btName });
+      }
+    }
+  }
+  return matches;
+};
+
+export { checkBrowserToolReferences, discoverPlugins, pluginNameFromPackage };
