@@ -1,6 +1,8 @@
-import { checkBearerAuth, sweepStaleSessions } from './http-routes.js';
-import { createState } from './state.js';
+import { checkBearerAuth, createHandlers, sweepStaleSessions } from './http-routes.js';
+import { createState, STATE_SCHEMA_VERSION } from './state.js';
+import { version } from './version.js';
 import { describe, expect, test } from 'bun:test';
+import type { HotHandlers } from './http-routes.js';
 import type { McpServerInstance } from './mcp-setup.js';
 
 /** Create a minimal mock McpServerInstance */
@@ -157,5 +159,146 @@ describe('sweepStaleSessions', () => {
 
     expect(swept).toBe(0);
     expect(sessionServers).toHaveLength(0);
+  });
+});
+
+/** Create a HotHandlers instance with minimal dependencies for route testing */
+const createTestHandlers = (
+  overrides: {
+    getHotState?: () => { reloadCount: number; lastReloadTimestamp: number; lastReloadDurationMs: number } | undefined;
+  } = {},
+): { handlers: HotHandlers; state: ReturnType<typeof createState>; transports: Map<string, never> } => {
+  const state = createState();
+  const transports = new Map<string, never>();
+  const sessionServers: McpServerInstance[] = [];
+  const getHotState = overrides.getHotState ?? (() => undefined);
+  const handlers = createHandlers({ state, transports, sessionServers, getHotState });
+  return { handlers, state, transports };
+};
+
+/** Minimal mock bunServer (only needed for WebSocket upgrade paths, not HTTP) */
+const mockBunServer = {
+  upgrade: () => false,
+  timeout: () => {},
+};
+
+/** Shape returned by the /health endpoint */
+interface HealthResponse {
+  status: string;
+  version: string;
+  extensionConnected: boolean;
+  mcpClients: number;
+  plugins: number;
+  pluginDetails: { name: string; displayName: string; toolCount: number; tabState: string }[];
+  toolCount: number;
+  uptime: number;
+  reloadCount: number;
+  lastReloadTimestamp: number;
+  lastReloadDurationMs: number;
+  stateSchemaVersion: number;
+}
+
+/** Shape returned by the /ws-info endpoint */
+interface WsInfoResponse {
+  wsUrl: string;
+  wsSecret?: string;
+}
+
+/** Fetch a route and parse the JSON response with a typed shape */
+const fetchJson = async <T>(handlers: HotHandlers, url: string): Promise<T> => {
+  const req = new Request(url);
+  const res = await handlers.fetch(req, mockBunServer);
+  expect(res).toBeInstanceOf(Response);
+  return (res as Response).json() as Promise<T>;
+};
+
+describe('/health endpoint', () => {
+  test('returns JSON with all expected fields', async () => {
+    const { handlers } = createTestHandlers({
+      getHotState: () => ({ reloadCount: 3, lastReloadTimestamp: 1000, lastReloadDurationMs: 42 }),
+    });
+
+    const body = await fetchJson<HealthResponse>(handlers, 'http://localhost:9876/health');
+
+    expect(body.status).toBe('ok');
+    expect(body.version).toBe(version);
+    expect(body.extensionConnected).toBe(false);
+    expect(body.mcpClients).toBe(0);
+    expect(body.plugins).toBe(0);
+    expect(body.pluginDetails).toEqual([]);
+    expect(body.toolCount).toBe(0);
+    expect(typeof body.uptime).toBe('number');
+    expect(body.reloadCount).toBe(3);
+    expect(body.lastReloadTimestamp).toBe(1000);
+    expect(body.lastReloadDurationMs).toBe(42);
+    expect(body.stateSchemaVersion).toBe(STATE_SCHEMA_VERSION);
+  });
+
+  test('reflects registered plugins in pluginDetails', async () => {
+    const { handlers, state } = createTestHandlers();
+
+    state.plugins.set('test-plugin', {
+      name: 'test-plugin',
+      version: '1.0.0',
+      displayName: 'Test Plugin',
+      urlPatterns: ['*://example.com/*'],
+      trustTier: 'local',
+      iife: '(function(){})()',
+      tools: [{ name: 'do_thing', description: 'Does a thing', input_schema: {}, output_schema: {} }],
+    });
+    state.tabMapping.set('test-plugin', { state: 'ready', tabId: 1, url: 'https://example.com' });
+
+    const body = await fetchJson<HealthResponse>(handlers, 'http://localhost:9876/health');
+
+    expect(body.plugins).toBe(1);
+    expect(body.pluginDetails).toHaveLength(1);
+    expect(body.pluginDetails[0]?.name).toBe('test-plugin');
+    expect(body.pluginDetails[0]?.displayName).toBe('Test Plugin');
+    expect(body.pluginDetails[0]?.toolCount).toBe(1);
+    expect(body.pluginDetails[0]?.tabState).toBe('ready');
+  });
+
+  test('uses fallback values when getHotState returns undefined', async () => {
+    const { handlers } = createTestHandlers({ getHotState: () => undefined });
+
+    const body = await fetchJson<HealthResponse>(handlers, 'http://localhost:9876/health');
+
+    expect(body.reloadCount).toBe(0);
+    expect(body.lastReloadTimestamp).toBe(0);
+    expect(body.lastReloadDurationMs).toBe(0);
+  });
+
+  test('includes browser tools in toolCount', async () => {
+    const { handlers, state } = createTestHandlers();
+
+    state.cachedBrowserTools = [
+      { name: 'browser_openTab', description: 'Open tab', inputSchema: {}, tool: {} as never },
+      { name: 'browser_closeTab', description: 'Close tab', inputSchema: {}, tool: {} as never },
+    ];
+
+    const body = await fetchJson<HealthResponse>(handlers, 'http://localhost:9876/health');
+
+    expect(body.toolCount).toBe(2);
+  });
+});
+
+describe('/ws-info endpoint', () => {
+  test('returns wsUrl without secret when no auth configured', async () => {
+    const { handlers } = createTestHandlers();
+
+    const body = await fetchJson<WsInfoResponse>(handlers, 'http://localhost:9876/ws-info');
+
+    expect(body.wsUrl).toBe('ws://localhost:9876/ws');
+    expect(body).not.toHaveProperty('wsSecret');
+  });
+
+  test('returns wsUrl with secret when auth is configured', async () => {
+    const { handlers, state } = createTestHandlers();
+    state.wsSecret = 'my-test-secret';
+
+    const body = await fetchJson<WsInfoResponse>(handlers, 'http://localhost:9876/ws-info');
+
+    expect(body.wsUrl).toBe('ws://localhost:9876/ws');
+    expect(body.wsSecret).toBe('my-test-secret');
   });
 });
