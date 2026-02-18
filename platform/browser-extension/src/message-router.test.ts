@@ -511,7 +511,7 @@ describe('handleServerMessage', () => {
     test('dispatches sync.full to the internal handler without error', () => {
       // sync.full triggers handleSyncFull which calls plugin-storage and
       // iife-injection internally. The handler runs asynchronously via
-      // .catch(console.error), so we verify it doesn't produce a -32601 error.
+      // .catch(err => console.warn(...)), so we verify it doesn't produce a -32601 error.
       handleServerMessage({
         method: 'sync.full',
         params: {

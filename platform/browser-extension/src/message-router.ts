@@ -168,20 +168,22 @@ const methodHandlers = new Map<string, MessageHandler>([
   [
     'sync.full',
     params => {
-      handleSyncFull(params).catch(console.error);
+      handleSyncFull(params).catch((err: unknown) => console.warn('[opentabs] sync.full handler failed:', err));
     },
   ],
   [
     'plugin.update',
     params => {
-      handlePluginUpdate(params).catch(console.error);
+      handlePluginUpdate(params).catch((err: unknown) => console.warn('[opentabs] plugin.update handler failed:', err));
     },
   ],
   [
     'plugin.uninstall',
     (params, id) => {
       if (id !== undefined) {
-        handlePluginUninstall(params, id).catch(console.error);
+        handlePluginUninstall(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] plugin.uninstall handler failed:', err),
+        );
       }
     },
   ],
@@ -189,7 +191,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'tool.dispatch',
     (params, id) => {
       if (id !== undefined) {
-        handleToolDispatch(params, id).catch(console.error);
+        handleToolDispatch(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] tool.dispatch handler failed:', err),
+        );
       }
     },
   ],
@@ -197,7 +201,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.listTabs',
     (_params, id) => {
       if (id !== undefined) {
-        handleBrowserListTabs(id).catch(console.error);
+        handleBrowserListTabs(id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.listTabs handler failed:', err),
+        );
       }
     },
   ],
@@ -205,7 +211,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.openTab',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserOpenTab(params, id).catch(console.error);
+        handleBrowserOpenTab(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.openTab handler failed:', err),
+        );
       }
     },
   ],
@@ -213,7 +221,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.closeTab',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserCloseTab(params, id).catch(console.error);
+        handleBrowserCloseTab(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.closeTab handler failed:', err),
+        );
       }
     },
   ],
@@ -221,7 +231,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.navigateTab',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserNavigateTab(params, id).catch(console.error);
+        handleBrowserNavigateTab(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.navigateTab handler failed:', err),
+        );
       }
     },
   ],
@@ -229,7 +241,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.focusTab',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserFocusTab(params, id).catch(console.error);
+        handleBrowserFocusTab(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.focusTab handler failed:', err),
+        );
       }
     },
   ],
@@ -237,7 +251,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.getTabInfo',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserGetTabInfo(params, id).catch(console.error);
+        handleBrowserGetTabInfo(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.getTabInfo handler failed:', err),
+        );
       }
     },
   ],
@@ -245,7 +261,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.screenshotTab',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserScreenshotTab(params, id).catch(console.error);
+        handleBrowserScreenshotTab(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.screenshotTab handler failed:', err),
+        );
       }
     },
   ],
@@ -253,7 +271,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.getTabContent',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserGetTabContent(params, id).catch(console.error);
+        handleBrowserGetTabContent(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.getTabContent handler failed:', err),
+        );
       }
     },
   ],
@@ -261,7 +281,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.getPageHtml',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserGetPageHtml(params, id).catch(console.error);
+        handleBrowserGetPageHtml(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.getPageHtml handler failed:', err),
+        );
       }
     },
   ],
@@ -269,7 +291,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.getStorage',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserGetStorage(params, id).catch(console.error);
+        handleBrowserGetStorage(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.getStorage handler failed:', err),
+        );
       }
     },
   ],
@@ -277,7 +301,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.clickElement',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserClickElement(params, id).catch(console.error);
+        handleBrowserClickElement(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.clickElement handler failed:', err),
+        );
       }
     },
   ],
@@ -285,7 +311,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.typeText',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserTypeText(params, id).catch(console.error);
+        handleBrowserTypeText(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.typeText handler failed:', err),
+        );
       }
     },
   ],
@@ -293,7 +321,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.selectOption',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserSelectOption(params, id).catch(console.error);
+        handleBrowserSelectOption(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.selectOption handler failed:', err),
+        );
       }
     },
   ],
@@ -301,7 +331,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.waitForElement',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserWaitForElement(params, id).catch(console.error);
+        handleBrowserWaitForElement(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.waitForElement handler failed:', err),
+        );
       }
     },
   ],
@@ -309,7 +341,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.queryElements',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserQueryElements(params, id).catch(console.error);
+        handleBrowserQueryElements(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.queryElements handler failed:', err),
+        );
       }
     },
   ],
@@ -317,7 +351,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.getCookies',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserGetCookies(params, id).catch(console.error);
+        handleBrowserGetCookies(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.getCookies handler failed:', err),
+        );
       }
     },
   ],
@@ -325,7 +361,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.setCookie',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserSetCookie(params, id).catch(console.error);
+        handleBrowserSetCookie(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.setCookie handler failed:', err),
+        );
       }
     },
   ],
@@ -333,7 +371,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.deleteCookies',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserDeleteCookies(params, id).catch(console.error);
+        handleBrowserDeleteCookies(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.deleteCookies handler failed:', err),
+        );
       }
     },
   ],
@@ -341,7 +381,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.enableNetworkCapture',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserEnableNetworkCapture(params, id).catch(console.error);
+        handleBrowserEnableNetworkCapture(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.enableNetworkCapture handler failed:', err),
+        );
       }
     },
   ],
@@ -381,7 +423,9 @@ const methodHandlers = new Map<string, MessageHandler>([
     'browser.executeScript',
     (params, id) => {
       if (id !== undefined) {
-        handleBrowserExecuteScript(params, id).catch(console.error);
+        handleBrowserExecuteScript(params, id).catch((err: unknown) =>
+          console.warn('[opentabs] browser.executeScript handler failed:', err),
+        );
       }
     },
   ],
