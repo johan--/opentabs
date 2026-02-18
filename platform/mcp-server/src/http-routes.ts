@@ -71,6 +71,21 @@ const checkBearerAuth = (req: Request, wsSecret: string | null): Response | null
   return null;
 };
 
+// --- Rate limiting for administrative endpoints ---
+const endpointCallTimestamps = new Map<string, number[]>();
+
+const checkEndpointRateLimit = (endpoint: string, maxPerMinute: number): boolean => {
+  const now = Date.now();
+  const timestamps = (endpointCallTimestamps.get(endpoint) ?? []).filter(t => now - t < 60_000);
+  if (timestamps.length >= maxPerMinute) {
+    endpointCallTimestamps.set(endpoint, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  endpointCallTimestamps.set(endpoint, timestamps);
+  return true;
+};
+
 const createHandleFetch =
   ({ state, transports, sessionServers, getHotState }: RouteDeps) =>
   async (
@@ -170,6 +185,9 @@ const createHandleFetch =
     if (url.pathname === '/reload' && req.method === 'POST') {
       const authError = checkBearerAuth(req, state.wsSecret);
       if (authError) return authError;
+      if (!checkEndpointRateLimit('/reload', 10)) {
+        return new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '60' } });
+      }
       try {
         const result = await performConfigReload(state, sessionServers, transports);
         return Response.json({
@@ -187,6 +205,9 @@ const createHandleFetch =
     if (url.pathname === '/extension/reload' && req.method === 'POST') {
       const authError = checkBearerAuth(req, state.wsSecret);
       if (authError) return authError;
+      if (!checkEndpointRateLimit('/extension/reload', 10)) {
+        return new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '60' } });
+      }
       if (!state.extensionWs) {
         return Response.json({ ok: false, error: 'Extension not connected' }, { status: 503 });
       }
