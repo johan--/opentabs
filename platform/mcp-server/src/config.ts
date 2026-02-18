@@ -11,7 +11,7 @@
  */
 
 import { log } from './logger.js';
-import { mkdir } from 'node:fs/promises';
+import { chmod, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -58,13 +58,14 @@ const loadConfig = async (): Promise<OpentabsConfig> => {
   const configDir = getConfigDir();
   const configPath = getConfigPath();
   try {
-    await mkdir(configDir, { recursive: true });
+    await mkdir(configDir, { recursive: true, mode: 0o700 });
 
     const configFile = Bun.file(configPath);
     if (!(await configFile.exists())) {
       // First run — create default config with a fresh shared secret
       const config: OpentabsConfig = { plugins: [], tools: {}, secret: crypto.randomUUID(), npmPlugins: [] };
       await Bun.write(configPath, JSON.stringify(config, null, 2) + '\n');
+      await chmod(configPath, 0o600).catch(() => {});
       log.info(`Created default config at ${configPath}`);
       return config;
     }
@@ -106,6 +107,7 @@ const loadConfig = async (): Promise<OpentabsConfig> => {
       secret = crypto.randomUUID();
       const updated: OpentabsConfig = { plugins, tools, secret, npmPlugins };
       await Bun.write(configPath, JSON.stringify(updated, null, 2) + '\n');
+      await chmod(configPath, 0o600).catch(() => {});
       log.info(`Generated WebSocket authentication secret in ${configPath}`);
     }
 
@@ -128,8 +130,9 @@ const saveConfig = async (state: { configWriteMutex: Promise<void> }, config: Op
   const prev = state.configWriteMutex;
   state.configWriteMutex = (async () => {
     await prev;
-    await mkdir(configDir, { recursive: true });
+    await mkdir(configDir, { recursive: true, mode: 0o700 });
     await Bun.write(configPath, JSON.stringify(config, null, 2) + '\n');
+    await chmod(configPath, 0o600).catch(() => {});
   })().catch((err: unknown) => {
     // Reset mutex so subsequent writes don't hang on a rejected promise
     state.configWriteMutex = Promise.resolve();
