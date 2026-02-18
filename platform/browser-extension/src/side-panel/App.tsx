@@ -20,13 +20,24 @@ const App = () => {
   const [versionMismatch, setVersionMismatch] = useState(false);
 
   const lastFetchRef = useRef(0);
+  /** Buffer tab.stateChanged notifications that arrive before fetchConfigState resolves. */
+  const pendingTabStates = useRef<Map<string, TabState>>(new Map());
+
   const loadPlugins = useCallback(() => {
     const now = Date.now();
     if (now - lastFetchRef.current < 200) return;
     lastFetchRef.current = now;
     fetchConfigState()
       .then(result => {
-        setPlugins(result.plugins);
+        let updatedPlugins = result.plugins;
+        if (pendingTabStates.current.size > 0) {
+          updatedPlugins = updatedPlugins.map(p => {
+            const buffered = pendingTabStates.current.get(p.name);
+            return buffered ? { ...p, tabState: buffered } : p;
+          });
+          pendingTabStates.current.clear();
+        }
+        setPlugins(updatedPlugins);
         if (result.protocolVersion !== undefined && result.protocolVersion !== SIDE_PANEL_PROTOCOL_VERSION) {
           setVersionMismatch(true);
         } else if (result.protocolVersion !== undefined) {
@@ -55,7 +66,13 @@ const App = () => {
         if (typeof params.plugin === 'string' && typeof params.state === 'string' && validTabStates.has(params.state)) {
           const pluginName = params.plugin;
           const newState = params.state as TabState;
-          setPlugins(prev => prev.map(p => (p.name === pluginName ? { ...p, tabState: newState } : p)));
+          setPlugins(prev => {
+            if (prev.length === 0) {
+              pendingTabStates.current.set(pluginName, newState);
+              return prev;
+            }
+            return prev.map(p => (p.name === pluginName ? { ...p, tabState: newState } : p));
+          });
         }
       }
 
