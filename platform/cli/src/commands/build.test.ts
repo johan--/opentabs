@@ -1,5 +1,6 @@
-import { validatePlugin } from './build.js';
+import { convertToolSchemas, validatePlugin } from './build.js';
 import { describe, expect, test } from 'bun:test';
+import { z } from 'zod';
 import type { OpenTabsPlugin, ToolDefinition } from '@opentabs-dev/plugin-sdk';
 
 /**
@@ -199,5 +200,109 @@ describe('validatePlugin', () => {
     );
     // Should have at least one error for each invalid field
     expect(errors.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// convertToolSchemas
+// ---------------------------------------------------------------------------
+
+/** Creates a ToolDefinition with real Zod schemas for convertToolSchemas tests. */
+const makeRealTool = (
+  overrides: Partial<Pick<ToolDefinition, 'name' | 'description' | 'input' | 'output'>> = {},
+): ToolDefinition =>
+  ({
+    name: 'test_tool',
+    description: 'A test tool',
+    input: z.object({ name: z.string() }),
+    output: z.object({ ok: z.boolean() }),
+    handle: () => Promise.resolve({ ok: true }),
+    ...overrides,
+  }) as unknown as ToolDefinition;
+
+describe('convertToolSchemas', () => {
+  test('converts a valid Zod object schema to JSON Schema with correct structure', () => {
+    const tool = makeRealTool({
+      input: z.object({ name: z.string(), count: z.number().optional() }),
+      output: z.object({ ok: z.boolean() }),
+    });
+    const { inputSchema, outputSchema } = convertToolSchemas(tool);
+
+    expect(inputSchema).toEqual({
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        count: { type: 'number' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    });
+    expect(outputSchema).toEqual({
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+      },
+      required: ['ok'],
+      additionalProperties: false,
+    });
+  });
+
+  test('strips $schema key from both input and output schemas', () => {
+    const tool = makeRealTool();
+    const { inputSchema, outputSchema } = convertToolSchemas(tool);
+
+    expect(inputSchema).not.toHaveProperty('$schema');
+    expect(outputSchema).not.toHaveProperty('$schema');
+  });
+
+  test('throws when input schema uses .transform()', () => {
+    const tool = makeRealTool({
+      input: z.object({ name: z.string().transform(s => s.toUpperCase()) }) as unknown as z.ZodObject<z.ZodRawShape>,
+    });
+    expect(() => convertToolSchemas(tool)).toThrow(/cannot use \.transform\(\)/);
+  });
+
+  test('throws when output schema uses .transform()', () => {
+    const tool = makeRealTool({
+      output: z.object({ upper: z.string().transform(s => s.toUpperCase()) }),
+    });
+    expect(() => convertToolSchemas(tool)).toThrow(/cannot use \.transform\(\)/);
+  });
+
+  test('converts nested objects and arrays correctly', () => {
+    const tool = makeRealTool({
+      input: z.object({
+        tags: z.array(z.string()),
+        meta: z.object({ key: z.string(), value: z.string() }),
+      }),
+      output: z.object({ results: z.array(z.number()) }),
+    });
+    const { inputSchema, outputSchema } = convertToolSchemas(tool);
+
+    expect(inputSchema).toEqual({
+      type: 'object',
+      properties: {
+        tags: { type: 'array', items: { type: 'string' } },
+        meta: {
+          type: 'object',
+          properties: {
+            key: { type: 'string' },
+            value: { type: 'string' },
+          },
+          required: ['key', 'value'],
+          additionalProperties: false,
+        },
+      },
+      required: ['tags', 'meta'],
+      additionalProperties: false,
+    });
+    expect(outputSchema).toEqual({
+      type: 'object',
+      properties: {
+        results: { type: 'array', items: { type: 'number' } },
+      },
+      required: ['results'],
+      additionalProperties: false,
+    });
   });
 });

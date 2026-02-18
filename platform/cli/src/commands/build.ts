@@ -346,4 +346,4 @@ Examples:
     .action((options: { watch?: boolean }) => handleBuild(options));
 };
 
-export { registerBuildCommand, validatePlugin };
+export { convertToolSchemas, registerBuildCommand, validatePlugin };
