@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const greet = defineTool({
   name: 'greet',
+  displayName: 'Greet',
   description: 'Greet a person by name — tests input→output transformation via the server',
+  icon: 'wrench',
   input: z.object({
     name: z.string().describe('The name of the person to greet'),
   }),

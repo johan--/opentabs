@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const setChannelPurpose = defineTool({
   name: 'set_channel_purpose',
+  displayName: 'Set Channel Purpose',
   description: 'Set the purpose of a Slack channel',
+  icon: 'target',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID to set the purpose for (e.g., C01234567)'),
     purpose: z.string().min(1).max(250).describe('New purpose text for the channel (max 250 chars)'),

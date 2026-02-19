@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const echo = defineTool({
   name: 'echo',
+  displayName: 'Echo',
   description: 'Echo a message back — simplest possible tool for E2E testing',
+  icon: 'wrench',
   input: z.object({
     message: z.string().describe('The message to echo back'),
   }),

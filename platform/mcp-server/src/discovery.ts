@@ -142,7 +142,9 @@ const loadPluginFromDir = async (
     iife,
     tools: manifest.tools.map(t => ({
       name: t.name,
+      displayName: t.displayName,
       description: t.description,
+      icon: t.icon,
       input_schema: t.input_schema,
       output_schema: t.output_schema,
     })),

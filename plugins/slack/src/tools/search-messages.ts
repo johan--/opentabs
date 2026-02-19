@@ -38,7 +38,9 @@ interface SearchMessagesResponse {
 
 export const searchMessages = defineTool({
   name: 'search_messages',
+  displayName: 'Search Messages',
   description: 'Search for messages across Slack channels with optional pagination and sorting',
+  icon: 'search',
   input: z.object({
     query: z
       .string()

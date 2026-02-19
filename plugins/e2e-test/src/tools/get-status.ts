@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const getStatus = defineTool({
   name: 'get_status',
+  displayName: 'Get Status',
   description: "Get the current status of the test server — tests zero-input tools (similar to Slack's auth.test)",
+  icon: 'wrench',
   input: z.object({}),
   output: z.object({
     ok: z.boolean().describe('Whether the server is reachable and responding'),

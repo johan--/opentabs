@@ -31,7 +31,11 @@ export interface PluginManifest {
 /** Single tool definition within a plugin manifest */
 export interface ManifestTool {
   name: string;
+  /** Human-readable display name shown in the side panel */
+  displayName: string;
   description: string;
+  /** Lucide icon name (kebab-case) displayed in the side panel */
+  icon: string;
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
 }
@@ -86,7 +90,11 @@ export interface JsonRpcError {
 /** Tool definition as sent over the wire (sync.full / plugin.update) */
 export interface WireToolDef {
   name: string;
+  /** Human-readable display name shown in the side panel */
+  displayName: string;
   description: string;
+  /** Lucide icon name (kebab-case) displayed in the side panel */
+  icon: string;
   enabled: boolean;
 }
 

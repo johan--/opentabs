@@ -205,7 +205,7 @@ const makePlugin = (urlPatterns: string[]): PluginMeta => ({
   displayName: 'Test Plugin',
   urlPatterns,
   trustTier: 'local',
-  tools: [{ name: 'test-tool', description: 'A test tool', enabled: true }],
+  tools: [{ name: 'test-tool', displayName: 'Test Tool', description: 'A test tool', icon: 'wrench', enabled: true }],
 });
 
 let queryResults: Map<string, chrome.tabs.Tab[]>;

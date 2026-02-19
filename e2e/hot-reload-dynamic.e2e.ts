@@ -275,14 +275,18 @@ test.describe.serial('File watcher — manifest changes', () => {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
         tools: Array<{
           name: string;
+          displayName: string;
           description: string;
+          icon: string;
           input_schema: Record<string, unknown>;
           output_schema: Record<string, unknown>;
         }>;
       };
       manifest.tools.push({
         name: 'dynamic_tool',
+        displayName: 'Dynamic Tool',
         description: 'Dynamically added via file watcher',
+        icon: 'wrench',
         input_schema: { type: 'object', properties: {}, additionalProperties: false },
         output_schema: {
           type: 'object',
@@ -630,14 +634,18 @@ test.describe('File watcher + hot reload combined', () => {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
         tools: Array<{
           name: string;
+          displayName: string;
           description: string;
+          icon: string;
           input_schema: Record<string, unknown>;
           output_schema: Record<string, unknown>;
         }>;
       };
       manifest.tools.push({
         name: 'fw_tool',
+        displayName: 'Fw Tool',
         description: 'Added by file watcher',
+        icon: 'wrench',
         input_schema: { type: 'object', properties: {}, additionalProperties: false },
         output_schema: {
           type: 'object',
@@ -1099,6 +1107,7 @@ test.describe.serial('File watcher — restart after hot reload', () => {
         tools: Array<{
           name: string;
           description: string;
+          icon: string;
           input_schema: Record<string, unknown>;
           output_schema: Record<string, unknown>;
         }>;
@@ -1140,14 +1149,18 @@ test.describe.serial('File watcher — restart after hot reload', () => {
       const manifestAfter = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
         tools: Array<{
           name: string;
+          displayName: string;
           description: string;
+          icon: string;
           input_schema: Record<string, unknown>;
           output_schema: Record<string, unknown>;
         }>;
       };
       manifestAfter.tools.push({
         name: 'post_reload_tool',
+        displayName: 'Post Reload Tool',
         description: 'Added after hot reload to verify file watcher restart',
+        icon: 'wrench',
         input_schema: { type: 'object', properties: {}, additionalProperties: false },
         output_schema: {
           type: 'object',

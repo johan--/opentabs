@@ -9,7 +9,9 @@
   "tools": [
     {
       "name": "send_message",
+      "displayName": "Send Message",
       "description": "Send a message to a Slack channel or thread",
+      "icon": "send",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -55,7 +57,9 @@
     },
     {
       "name": "edit_message",
+      "displayName": "Edit Message",
       "description": "Edit an existing Slack message. The caller must be the original author of the message.",
+      "icon": "pencil",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -108,7 +112,9 @@
     },
     {
       "name": "delete_message",
+      "displayName": "Delete Message",
       "description": "Delete a Slack message. The caller must be the original author, or the channel must allow message deletion.",
+      "icon": "trash-2",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -150,7 +156,9 @@
     },
     {
       "name": "read_messages",
+      "displayName": "Read Messages",
       "description": "Read recent messages from a Slack channel with optional date-range filtering and pagination",
+      "icon": "book-open",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -240,7 +248,9 @@
     },
     {
       "name": "read_thread",
+      "displayName": "Read Thread",
       "description": "Read replies in a Slack thread. Returns all messages including the parent message, with optional pagination.",
+      "icon": "message-square",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -337,7 +347,9 @@
     },
     {
       "name": "search_messages",
+      "displayName": "Search Messages",
       "description": "Search for messages across Slack channels with optional pagination and sorting",
+      "icon": "search",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -488,7 +500,9 @@
     },
     {
       "name": "list_channels",
+      "displayName": "List Channels",
       "description": "List channels in the Slack workspace with optional pagination",
+      "icon": "list",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -606,7 +620,9 @@
     },
     {
       "name": "get_channel_info",
+      "displayName": "Get Channel Info",
       "description": "Get detailed information about a Slack channel including topic, purpose, and member count",
+      "icon": "info",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -697,7 +713,9 @@
     },
     {
       "name": "create_channel",
+      "displayName": "Create Channel",
       "description": "Create a new public or private Slack channel",
+      "icon": "plus-circle",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -764,7 +782,9 @@
     },
     {
       "name": "set_channel_topic",
+      "displayName": "Set Channel Topic",
       "description": "Set the topic of a Slack channel",
+      "icon": "hash",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -822,7 +842,9 @@
     },
     {
       "name": "set_channel_purpose",
+      "displayName": "Set Channel Purpose",
       "description": "Set the purpose of a Slack channel",
+      "icon": "target",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -880,7 +902,9 @@
     },
     {
       "name": "invite_to_channel",
+      "displayName": "Invite to Channel",
       "description": "Invite a user to a Slack channel",
+      "icon": "user-plus",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -932,7 +956,9 @@
     },
     {
       "name": "list_members",
+      "displayName": "List Members",
       "description": "List member user IDs of a Slack channel with optional pagination. Returns user IDs only — use get_user_profile to resolve a specific user ID to a name/profile, or list_users to get all workspace users with names.",
+      "icon": "users",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -991,7 +1017,9 @@
     },
     {
       "name": "get_user_profile",
+      "displayName": "Get User Profile",
       "description": "Retrieve a Slack user's profile information by user ID",
+      "icon": "user",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1097,7 +1125,9 @@
     },
     {
       "name": "list_users",
+      "displayName": "List Users",
       "description": "List users in the Slack workspace with optional pagination",
+      "icon": "contact",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1177,7 +1207,9 @@
     },
     {
       "name": "open_dm",
+      "displayName": "Open DM",
       "description": "Open a direct message conversation with one or more users. Returns an existing DM channel if one already exists, or creates a new one. For multi-person DMs (group DMs), pass multiple comma-separated user IDs.",
+      "icon": "mail",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1213,7 +1245,9 @@
     },
     {
       "name": "upload_file",
+      "displayName": "Upload File",
       "description": "Upload a file to a Slack channel",
+      "icon": "upload",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1288,7 +1322,9 @@
     },
     {
       "name": "list_files",
+      "displayName": "List Files",
       "description": "List files in a Slack channel or workspace with optional filters",
+      "icon": "files",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1412,7 +1448,9 @@
     },
     {
       "name": "add_reaction",
+      "displayName": "Add Reaction",
       "description": "Add an emoji reaction to a Slack message",
+      "icon": "smile-plus",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1447,7 +1485,9 @@
     },
     {
       "name": "remove_reaction",
+      "displayName": "Remove Reaction",
       "description": "Remove an emoji reaction from a Slack message",
+      "icon": "smile",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1482,7 +1522,9 @@
     },
     {
       "name": "pin_message",
+      "displayName": "Pin Message",
       "description": "Pin a message to a Slack channel",
+      "icon": "pin",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1511,7 +1553,9 @@
     },
     {
       "name": "unpin_message",
+      "displayName": "Unpin Message",
       "description": "Unpin a message from a Slack channel",
+      "icon": "pin-off",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1539,5 +1583,5 @@
       }
     }
   ],
-  "adapterHash": "05bc0387463410d59f96b58017bb6754f421d8f93f65915b740d8709826cce71"
+  "adapterHash": "827e9eb55e905ded60bba4c58111a9065f951fc8c14bfe44de4a8bfff5e1390b"
 }

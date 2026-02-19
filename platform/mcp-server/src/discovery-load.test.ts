@@ -18,7 +18,16 @@ const validManifest = (overrides: Record<string, unknown> = {}) => ({
   displayName: 'Test Plugin',
   description: 'A test plugin',
   url_patterns: ['http://localhost/*'],
-  tools: [{ name: 'my_tool', description: 'A tool', input_schema: {}, output_schema: {} }],
+  tools: [
+    {
+      name: 'my_tool',
+      displayName: 'My Tool',
+      description: 'A tool',
+      icon: 'wrench',
+      input_schema: {},
+      output_schema: {},
+    },
+  ],
   ...overrides,
 });
 

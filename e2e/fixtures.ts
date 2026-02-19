@@ -204,7 +204,12 @@ const createMinimalPlugin = (
     url_patterns: urlPatterns,
     tools: tools.map(t => ({
       name: t.name,
+      displayName: t.name
+        .split(/[_-]/)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' '),
       description: t.description,
+      icon: 'wrench',
       input_schema: { type: 'object', properties: {}, additionalProperties: false },
       output_schema: {
         type: 'object',

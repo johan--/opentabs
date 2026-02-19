@@ -216,7 +216,9 @@ import { defineTool } from '@opentabs-dev/plugin-sdk';
 
 export const exampleTool = defineTool({
   name: 'example',
+  displayName: 'Example',
   description: 'An example tool for ' + ${escaped} + ' — replace with your own implementation',
+  icon: 'sparkles',
   input: z.object({
     message: z.string().describe('A sample input message'),
   }),

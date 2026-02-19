@@ -11,10 +11,12 @@ import type { PluginManifest } from '@opentabs-dev/shared';
 
 const manifestToolSchema = z.object({
   name: z.string().min(1, 'Tool name is required'),
+  displayName: z.string().min(1, 'Tool displayName is required'),
   description: z
     .string()
     .min(1, 'Tool description is required')
     .max(1000, 'Tool description must be at most 1000 characters'),
+  icon: z.string().min(1, 'Tool icon is required'),
   input_schema: z.record(z.string(), z.unknown()),
   output_schema: z.record(z.string(), z.unknown()),
 });

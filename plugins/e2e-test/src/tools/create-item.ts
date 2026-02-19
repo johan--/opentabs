@@ -4,8 +4,10 @@ import { z } from 'zod';
 
 export const createItem = defineTool({
   name: 'create_item',
+  displayName: 'Create Item',
   description:
     "Create a new item on the test server — tests write operations (similar to Slack's conversations.create)",
+  icon: 'wrench',
   input: z.object({
     name: z.string().describe('Name for the new item'),
     description: z.string().optional().describe('Optional description for the item'),

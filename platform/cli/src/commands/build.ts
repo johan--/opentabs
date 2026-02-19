@@ -3,7 +3,7 @@
  * With `--watch`, rebuilds automatically when tsc output in `dist/` changes.
  */
 
-import { validatePluginName, validateUrlPattern } from '@opentabs-dev/plugin-sdk';
+import { validatePluginName, validateUrlPattern, LUCIDE_ICON_NAMES } from '@opentabs-dev/plugin-sdk';
 import pc from 'picocolors';
 import { z } from 'zod';
 import { mkdirSync, watch } from 'node:fs';
@@ -60,7 +60,14 @@ const validatePlugin = (plugin: OpenTabsPlugin): string[] => {
           `Tool name "${tool.name}" must be snake_case (lowercase alphanumeric with underscores, e.g., "send_message")`,
         );
       }
+      if (!tool.displayName || tool.displayName.length === 0)
+        errors.push(`Tool "${tool.name || '(unnamed)'}" is missing a displayName`);
       if (tool.description.length === 0) errors.push(`Tool "${tool.name || '(unnamed)'}" is missing a description`);
+      if (!LUCIDE_ICON_NAMES.has(tool.icon)) {
+        errors.push(
+          `Tool "${tool.name || '(unnamed)'}" has invalid icon "${tool.icon}" — must be a valid Lucide icon name (kebab-case). See https://lucide.dev/icons`,
+        );
+      }
       if (tool.name.length > 0 && toolNames.has(tool.name)) {
         errors.push(`Duplicate tool name "${tool.name}"`);
       }
@@ -105,7 +112,9 @@ const generateManifest = (plugin: OpenTabsPlugin): Manifest => {
     const { inputSchema, outputSchema } = convertToolSchemas(tool);
     return {
       name: tool.name,
+      displayName: tool.displayName,
       description: tool.description,
+      icon: tool.icon,
       input_schema: inputSchema,
       output_schema: outputSchema,
     };

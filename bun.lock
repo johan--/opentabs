@@ -106,10 +106,11 @@
       "name": "@opentabs-dev/plugin-sdk",
       "version": "0.0.6",
       "dependencies": {
-        "@opentabs-dev/shared": "^0.0.2",
+        "@opentabs-dev/shared": "^0.0.6",
       },
       "devDependencies": {
         "bun-types": "^1.3.9",
+        "lucide-react": "^0.574.0",
       },
       "peerDependencies": {
         "zod": "^4.0.0",

@@ -470,7 +470,16 @@ describe('sendSyncFull', () => {
         urlPatterns: ['http://alpha.com/*'],
         trustTier: 'community',
         iife: '// alpha iife',
-        tools: [{ name: 'ping', description: 'Ping', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'ping',
+            displayName: 'Ping',
+            description: 'Ping',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
     state.plugins.set(
@@ -481,7 +490,16 @@ describe('sendSyncFull', () => {
         urlPatterns: ['http://beta.com/*'],
         trustTier: 'local',
         iife: '// beta iife',
-        tools: [{ name: 'pong', description: 'Pong', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'pong',
+            displayName: 'Pong',
+            description: 'Pong',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 
@@ -505,7 +523,7 @@ describe('sendSyncFull', () => {
           displayName: string;
           sourcePath: string | undefined;
           adapterHash: string | undefined;
-          tools: { name: string; description: string; enabled: boolean }[];
+          tools: { name: string; displayName: string; description: string; icon: string; enabled: boolean }[];
         }[];
       };
     };
@@ -528,7 +546,7 @@ describe('sendSyncFull', () => {
       displayName: 'alpha',
       sourcePath: undefined,
       adapterHash: undefined,
-      tools: [{ name: 'ping', description: 'Ping', enabled: true }],
+      tools: [{ name: 'ping', displayName: 'Ping', description: 'Ping', icon: 'wrench', enabled: true }],
     });
 
     const secondPlugin = sorted[1];
@@ -541,7 +559,7 @@ describe('sendSyncFull', () => {
       displayName: 'beta',
       sourcePath: undefined,
       adapterHash: undefined,
-      tools: [{ name: 'pong', description: 'Pong', enabled: false }],
+      tools: [{ name: 'pong', displayName: 'Pong', description: 'Pong', icon: 'wrench', enabled: false }],
     });
   });
 
@@ -555,7 +573,16 @@ describe('sendSyncFull', () => {
       makePlugin({
         name: 'test-plugin',
         iife: '(function(){/* adapter */})()',
-        tools: [{ name: 'echo', description: 'Echo', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'echo',
+            displayName: 'Echo',
+            description: 'Echo',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 
@@ -679,8 +706,22 @@ describe('handleExtensionMessage — config.getState', () => {
         trustTier: 'local',
         urlPatterns: ['http://test.com/*'],
         tools: [
-          { name: 'ping', description: 'Ping tool', input_schema: {}, output_schema: {} },
-          { name: 'pong', description: 'Pong tool', input_schema: {}, output_schema: {} },
+          {
+            name: 'ping',
+            displayName: 'Ping',
+            description: 'Ping tool',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+          {
+            name: 'pong',
+            displayName: 'Pong',
+            description: 'Pong tool',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
         ],
       }),
     );
@@ -702,7 +743,7 @@ describe('handleExtensionMessage — config.getState', () => {
           trustTier: string;
           tabState: string;
           urlPatterns: string[];
-          tools: { name: string; description: string; enabled: boolean }[];
+          tools: { name: string; displayName: string; description: string; icon: string; enabled: boolean }[];
         }[];
         outdatedPlugins: unknown[];
       };
@@ -724,10 +765,22 @@ describe('handleExtensionMessage — config.getState', () => {
     expect(plugin.tools).toHaveLength(2);
     const pingTool = plugin.tools[0];
     expect(pingTool).toBeDefined();
-    expect(pingTool).toEqual({ name: 'ping', description: 'Ping tool', enabled: true });
+    expect(pingTool).toEqual({
+      name: 'ping',
+      displayName: 'Ping',
+      description: 'Ping tool',
+      icon: 'wrench',
+      enabled: true,
+    });
     const pongTool = plugin.tools[1];
     expect(pongTool).toBeDefined();
-    expect(pongTool).toEqual({ name: 'pong', description: 'Pong tool', enabled: true });
+    expect(pongTool).toEqual({
+      name: 'pong',
+      displayName: 'Pong',
+      description: 'Pong tool',
+      icon: 'wrench',
+      enabled: true,
+    });
   });
 
   test('tools respect enabled/disabled state from toolConfig', () => {
@@ -740,8 +793,22 @@ describe('handleExtensionMessage — config.getState', () => {
       makePlugin({
         name: 'my-plugin',
         tools: [
-          { name: 'enabled-tool', description: 'Enabled', input_schema: {}, output_schema: {} },
-          { name: 'disabled-tool', description: 'Disabled', input_schema: {}, output_schema: {} },
+          {
+            name: 'enabled-tool',
+            displayName: 'Enabled Tool',
+            description: 'Enabled',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+          {
+            name: 'disabled-tool',
+            displayName: 'Disabled Tool',
+            description: 'Disabled',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
         ],
       }),
     );
@@ -752,7 +819,11 @@ describe('handleExtensionMessage — config.getState', () => {
     const rawConfig = ws.sent[0];
     expect(rawConfig).toBeDefined();
     const response = JSON.parse(rawConfig as string) as {
-      result: { plugins: { tools: { name: string; description: string; enabled: boolean }[] }[] };
+      result: {
+        plugins: {
+          tools: { name: string; displayName: string; description: string; icon: string; enabled: boolean }[];
+        }[];
+      };
     };
     const pluginEntry = response.result.plugins[0];
     expect(pluginEntry).toBeDefined();
@@ -760,10 +831,22 @@ describe('handleExtensionMessage — config.getState', () => {
 
     const enabledTool = tools[0];
     expect(enabledTool).toBeDefined();
-    expect(enabledTool).toEqual({ name: 'enabled-tool', description: 'Enabled', enabled: true });
+    expect(enabledTool).toEqual({
+      name: 'enabled-tool',
+      displayName: 'Enabled Tool',
+      description: 'Enabled',
+      icon: 'wrench',
+      enabled: true,
+    });
     const disabledTool = tools[1];
     expect(disabledTool).toBeDefined();
-    expect(disabledTool).toEqual({ name: 'disabled-tool', description: 'Disabled', enabled: false });
+    expect(disabledTool).toEqual({
+      name: 'disabled-tool',
+      displayName: 'Disabled Tool',
+      description: 'Disabled',
+      icon: 'wrench',
+      enabled: false,
+    });
   });
 
   test('includes outdatedPlugins from state', () => {
@@ -806,7 +889,16 @@ describe('handleExtensionMessage — config.getState', () => {
       'unmapped-plugin',
       makePlugin({
         name: 'unmapped-plugin',
-        tools: [{ name: 'test', description: 'Test', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'test',
+            displayName: 'Test',
+            description: 'Test',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
     // No tabMapping entry for 'unmapped-plugin'
@@ -882,7 +974,16 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       'my-plugin',
       makePlugin({
         name: 'my-plugin',
-        tools: [{ name: 'send', description: 'Send', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'send',
+            displayName: 'Send',
+            description: 'Send',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 
@@ -931,7 +1032,16 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       'my-plugin',
       makePlugin({
         name: 'my-plugin',
-        tools: [{ name: 'send', description: 'Send', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'send',
+            displayName: 'Send',
+            description: 'Send',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 
@@ -1098,7 +1208,16 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       'my-plugin',
       makePlugin({
         name: 'my-plugin',
-        tools: [{ name: 'send', description: 'Send', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'send',
+            displayName: 'Send',
+            description: 'Send',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 
@@ -1168,7 +1287,16 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       'my-plugin',
       makePlugin({
         name: 'my-plugin',
-        tools: [{ name: 'send', description: 'Send', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'send',
+            displayName: 'Send',
+            description: 'Send',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 
@@ -1208,9 +1336,30 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       makePlugin({
         name: 'my-plugin',
         tools: [
-          { name: 'alpha', description: 'Alpha', input_schema: {}, output_schema: {} },
-          { name: 'beta', description: 'Beta', input_schema: {}, output_schema: {} },
-          { name: 'gamma', description: 'Gamma', input_schema: {}, output_schema: {} },
+          {
+            name: 'alpha',
+            displayName: 'Alpha',
+            description: 'Alpha',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+          {
+            name: 'beta',
+            displayName: 'Beta',
+            description: 'Beta',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+          {
+            name: 'gamma',
+            displayName: 'Gamma',
+            description: 'Gamma',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
         ],
       }),
     );
@@ -1249,8 +1398,22 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       makePlugin({
         name: 'my-plugin',
         tools: [
-          { name: 'alpha', description: 'Alpha', input_schema: {}, output_schema: {} },
-          { name: 'beta', description: 'Beta', input_schema: {}, output_schema: {} },
+          {
+            name: 'alpha',
+            displayName: 'Alpha',
+            description: 'Alpha',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+          {
+            name: 'beta',
+            displayName: 'Beta',
+            description: 'Beta',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
         ],
       }),
     );
@@ -1280,7 +1443,16 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       'my-plugin',
       makePlugin({
         name: 'my-plugin',
-        tools: [{ name: 'alpha', description: 'Alpha', input_schema: {}, output_schema: {} }],
+        tools: [
+          {
+            name: 'alpha',
+            displayName: 'Alpha',
+            description: 'Alpha',
+            icon: 'wrench',
+            input_schema: {},
+            output_schema: {},
+          },
+        ],
       }),
     );
 

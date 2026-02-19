@@ -96,7 +96,10 @@ const PluginCard = ({
   const filterLower = toolFilter?.toLowerCase() ?? '';
   const visibleTools = filterLower
     ? plugin.tools.filter(
-        t => t.name.toLowerCase().includes(filterLower) || t.description.toLowerCase().includes(filterLower),
+        t =>
+          t.displayName.toLowerCase().includes(filterLower) ||
+          t.name.toLowerCase().includes(filterLower) ||
+          t.description.toLowerCase().includes(filterLower),
       )
     : plugin.tools;
 
@@ -152,7 +155,9 @@ const PluginCard = ({
           <ToolRow
             key={tool.name}
             name={tool.name}
+            displayName={tool.displayName}
             description={tool.description}
+            icon={tool.icon}
             enabled={tool.enabled}
             active={activeTools.has(`${plugin.name}:${tool.name}`)}
             onToggle={() => handleToggleTool(tool.name, tool.enabled)}

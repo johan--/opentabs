@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const removeReaction = defineTool({
   name: 'remove_reaction',
+  displayName: 'Remove Reaction',
   description: 'Remove an emoji reaction from a Slack message',
+  icon: 'smile',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID where the message is located (e.g., C01234567)'),
     ts: z

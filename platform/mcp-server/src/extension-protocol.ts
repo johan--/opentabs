@@ -172,7 +172,9 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
     adapterHash: p.adapterHash,
     tools: p.tools.map(t => ({
       name: t.name,
+      displayName: t.displayName,
       description: t.description,
+      icon: t.icon,
       enabled: isToolEnabled(state, prefixedToolName(p.name, t.name)),
     })),
   }));
@@ -303,7 +305,9 @@ const sendPluginUpdate = async (state: ServerState, pluginName: string, iife: st
       adapterHash: plugin.adapterHash,
       tools: plugin.tools.map(t => ({
         name: t.name,
+        displayName: t.displayName,
         description: t.description,
+        icon: t.icon,
         enabled: isToolEnabled(state, prefixedToolName(plugin.name, t.name)),
       })),
     },
@@ -557,7 +561,9 @@ const handleConfigGetState = (state: ServerState, id: string | number): void => 
         urlPatterns: p.urlPatterns,
         tools: p.tools.map(t => ({
           name: t.name,
+          displayName: t.displayName,
           description: t.description,
+          icon: t.icon,
           enabled: isToolEnabled(state, prefixedToolName(p.name, t.name)),
         })),
       };

@@ -5,7 +5,9 @@ import { z } from 'zod';
 
 export const listUsers = defineTool({
   name: 'list_users',
+  displayName: 'List Users',
   description: 'List users in the Slack workspace with optional pagination',
+  icon: 'contact',
   input: z.object({
     limit: z
       .number()

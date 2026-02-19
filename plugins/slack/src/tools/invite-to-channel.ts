@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const inviteToChannel = defineTool({
   name: 'invite_to_channel',
+  displayName: 'Invite to Channel',
   description: 'Invite a user to a Slack channel',
+  icon: 'user-plus',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID to invite the user to (e.g., C01234567)'),
     user: z.string().min(1).describe('User ID to invite (e.g., U01234567)'),

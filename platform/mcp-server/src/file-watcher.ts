@@ -162,7 +162,9 @@ const handleManifestChange = async (
     plugin.adapterHash = manifest.adapterHash;
     plugin.tools = manifest.tools.map(t => ({
       name: t.name,
+      displayName: t.displayName,
       description: t.description,
+      icon: t.icon,
       input_schema: t.input_schema,
       output_schema: t.output_schema,
     }));

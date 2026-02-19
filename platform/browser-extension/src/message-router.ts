@@ -137,14 +137,24 @@ const validatePluginPayload = (raw: unknown): ValidatedPluginPayload | null => {
     : [];
 
   const tools = Array.isArray(obj.tools)
-    ? (obj.tools as unknown[]).filter(
-        (t): t is WireToolDef =>
-          typeof t === 'object' &&
-          t !== null &&
-          typeof (t as Record<string, unknown>).name === 'string' &&
-          typeof (t as Record<string, unknown>).description === 'string' &&
-          typeof (t as Record<string, unknown>).enabled === 'boolean',
-      )
+    ? (obj.tools as unknown[])
+        .filter(
+          (t): t is Record<string, unknown> =>
+            typeof t === 'object' &&
+            t !== null &&
+            typeof (t as Record<string, unknown>).name === 'string' &&
+            typeof (t as Record<string, unknown>).description === 'string' &&
+            typeof (t as Record<string, unknown>).enabled === 'boolean',
+        )
+        .map(
+          (t): WireToolDef => ({
+            name: t.name as string,
+            displayName: typeof t.displayName === 'string' ? t.displayName : (t.name as string),
+            description: t.description as string,
+            icon: typeof t.icon === 'string' ? t.icon : 'wrench',
+            enabled: t.enabled as boolean,
+          }),
+        )
     : [];
 
   return {

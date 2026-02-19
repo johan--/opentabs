@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const unpinMessage = defineTool({
   name: 'unpin_message',
+  displayName: 'Unpin Message',
   description: 'Unpin a message from a Slack channel',
+  icon: 'pin-off',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID where the message is pinned (e.g., C01234567)'),
     ts: z

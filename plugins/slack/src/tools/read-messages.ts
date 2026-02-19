@@ -5,7 +5,9 @@ import { z } from 'zod';
 
 export const readMessages = defineTool({
   name: 'read_messages',
+  displayName: 'Read Messages',
   description: 'Read recent messages from a Slack channel with optional date-range filtering and pagination',
+  icon: 'book-open',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID to read messages from (e.g., C01234567)'),
     limit: z

@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const createChannel = defineTool({
   name: 'create_channel',
+  displayName: 'Create Channel',
   description: 'Create a new public or private Slack channel',
+  icon: 'plus-circle',
   input: z.object({
     name: z
       .string()

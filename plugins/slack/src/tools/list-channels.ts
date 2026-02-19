@@ -6,7 +6,9 @@ import type { SlackChannel } from './channel-schema.js';
 
 export const listChannels = defineTool({
   name: 'list_channels',
+  displayName: 'List Channels',
   description: 'List channels in the Slack workspace with optional pagination',
+  icon: 'list',
   input: z.object({
     limit: z
       .number()

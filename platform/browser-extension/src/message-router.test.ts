@@ -199,7 +199,7 @@ const validPayload = (): Record<string, unknown> => ({
   name: 'test-plugin',
   version: '1.0.0',
   urlPatterns: ['*://example.com/*'],
-  tools: [{ name: 'do-thing', description: 'Does a thing', enabled: true }],
+  tools: [{ name: 'do-thing', displayName: 'Do Thing', description: 'Does a thing', icon: 'wrench', enabled: true }],
 });
 
 /** Assert the result is non-null and return the narrowed type */
@@ -363,8 +363,8 @@ describe('validatePluginPayload', () => {
   describe('tools handling', () => {
     test('passes through valid tool definitions', () => {
       const tools = [
-        { name: 'tool-a', description: 'Tool A', enabled: true },
-        { name: 'tool-b', description: 'Tool B', enabled: false },
+        { name: 'tool-a', displayName: 'Tool A', description: 'Tool A', icon: 'wrench', enabled: true },
+        { name: 'tool-b', displayName: 'Tool B', description: 'Tool B', icon: 'wrench', enabled: false },
       ];
       const result = expectValid({ ...validPayload(), tools });
       expect(result.tools).toHaveLength(2);
@@ -391,8 +391,8 @@ describe('validatePluginPayload', () => {
       const result = expectValid({
         ...validPayload(),
         tools: [
-          { description: 'No name', enabled: true },
-          { name: 'valid', description: 'Has name', enabled: true },
+          { description: 'No name', icon: 'wrench', enabled: true },
+          { name: 'valid', displayName: 'Valid', description: 'Has name', icon: 'wrench', enabled: true },
         ],
       });
       expect(result.tools).toHaveLength(1);
@@ -405,8 +405,8 @@ describe('validatePluginPayload', () => {
       const result = expectValid({
         ...validPayload(),
         tools: [
-          { name: 'no-desc', enabled: true },
-          { name: 'valid', description: 'Has desc', enabled: true },
+          { name: 'no-desc', displayName: 'No Desc', icon: 'wrench', enabled: true },
+          { name: 'valid', displayName: 'Valid', description: 'Has desc', icon: 'wrench', enabled: true },
         ],
       });
       expect(result.tools).toHaveLength(1);
@@ -416,8 +416,8 @@ describe('validatePluginPayload', () => {
       const result = expectValid({
         ...validPayload(),
         tools: [
-          { name: 'no-enabled', description: 'Missing enabled' },
-          { name: 'valid', description: 'Has enabled', enabled: false },
+          { name: 'no-enabled', displayName: 'No Enabled', description: 'Missing enabled', icon: 'wrench' },
+          { name: 'valid', displayName: 'Valid', description: 'Has enabled', icon: 'wrench', enabled: false },
         ],
       });
       expect(result.tools).toHaveLength(1);
@@ -429,7 +429,12 @@ describe('validatePluginPayload', () => {
     test('filters out non-object tool entries', () => {
       const result = expectValid({
         ...validPayload(),
-        tools: ['not-an-object', null, 42, { name: 'valid', description: 'OK', enabled: true }],
+        tools: [
+          'not-an-object',
+          null,
+          42,
+          { name: 'valid', displayName: 'Valid', description: 'OK', icon: 'wrench', enabled: true },
+        ],
       });
       expect(result.tools).toHaveLength(1);
     });
@@ -578,7 +583,15 @@ describe('handleServerMessage', () => {
               name: 'test-plugin',
               version: '1.0.0',
               urlPatterns: ['*://example.com/*'],
-              tools: [{ name: 'do-thing', description: 'Does a thing', enabled: true }],
+              tools: [
+                {
+                  name: 'do-thing',
+                  displayName: 'Do Thing',
+                  description: 'Does a thing',
+                  icon: 'wrench',
+                  enabled: true,
+                },
+              ],
             },
           ],
         },
@@ -607,7 +620,9 @@ describe('handleServerMessage', () => {
           name: 'test-plugin',
           version: '2.0.0',
           urlPatterns: ['*://example.com/*'],
-          tools: [{ name: 'do-thing', description: 'Does a thing', enabled: true }],
+          tools: [
+            { name: 'do-thing', displayName: 'Do Thing', description: 'Does a thing', icon: 'wrench', enabled: true },
+          ],
         },
       });
 

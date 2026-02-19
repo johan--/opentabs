@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const uploadFile = defineTool({
   name: 'upload_file',
+  displayName: 'Upload File',
   description: 'Upload a file to a Slack channel',
+  icon: 'upload',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID to share the file to (e.g., C01234567)'),
     content: z

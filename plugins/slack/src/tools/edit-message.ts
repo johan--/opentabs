@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const editMessage = defineTool({
   name: 'edit_message',
+  displayName: 'Edit Message',
   description: 'Edit an existing Slack message. The caller must be the original author of the message.',
+  icon: 'pencil',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID where the message is located (e.g., C01234567)'),
     ts: z

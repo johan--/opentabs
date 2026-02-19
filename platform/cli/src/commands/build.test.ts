@@ -20,10 +20,14 @@ const makePlugin = (overrides: Partial<OpenTabsPlugin> = {}): OpenTabsPlugin =>
     ...overrides,
   }) as unknown as OpenTabsPlugin;
 
-const makeTool = (overrides: Partial<Pick<ToolDefinition, 'name' | 'description'>> = {}): ToolDefinition =>
+const makeTool = (
+  overrides: Partial<Pick<ToolDefinition, 'name' | 'displayName' | 'description' | 'icon'>> = {},
+): ToolDefinition =>
   ({
     name: 'test_tool',
+    displayName: 'Test Tool',
     description: 'A test tool',
+    icon: 'wrench',
     ...overrides,
   }) as unknown as ToolDefinition;
 

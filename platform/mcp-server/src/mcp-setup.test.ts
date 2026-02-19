@@ -22,7 +22,9 @@ const createPlugin = (name: string, toolNames: string[]): RegisteredPlugin => ({
   iife: `(function(){/* ${name} */})()`,
   tools: toolNames.map(t => ({
     name: t,
+    displayName: t,
     description: `${t} description`,
+    icon: 'wrench',
     input_schema: { type: 'object' },
     output_schema: { type: 'object' },
   })),
@@ -160,7 +162,9 @@ describe('rebuildToolLookups — input validation', () => {
       tools: [
         {
           name: 'greet',
+          displayName: 'Greet',
           description: 'Greet a user',
+          icon: 'wrench',
           input_schema: {
             type: 'object',
             properties: { name: { type: 'string' } },
@@ -192,7 +196,9 @@ describe('rebuildToolLookups — input validation', () => {
       tools: [
         {
           name: 'greet',
+          displayName: 'Greet',
           description: 'Greet a user',
+          icon: 'wrench',
           input_schema: {
             type: 'object',
             properties: { name: { type: 'string' }, age: { type: 'number' } },
@@ -236,7 +242,9 @@ describe('rebuildToolLookups — input validation', () => {
       tools: [
         {
           name: 'strict',
+          displayName: 'Strict',
           description: 'Strict tool',
+          icon: 'wrench',
           input_schema: {
             type: 'object',
             properties: { a: { type: 'string' } },

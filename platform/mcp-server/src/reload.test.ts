@@ -49,7 +49,16 @@ const createPluginDir = (baseDir: string, name: string): string => {
       displayName: name,
       description: 'A test plugin',
       url_patterns: ['http://localhost/*'],
-      tools: [{ name: 'test_tool', description: 'A test tool', input_schema: {}, output_schema: {} }],
+      tools: [
+        {
+          name: 'test_tool',
+          displayName: 'Test Tool',
+          description: 'A test tool',
+          icon: 'wrench',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
     }),
   );
   writeFileSync(join(distDir, 'adapter.iife.js'), '(function(){window.__test=true})()');

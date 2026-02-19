@@ -9,7 +9,9 @@
   "tools": [
     {
       "name": "echo",
+      "displayName": "Echo",
       "description": "Echo a message back — simplest possible tool for E2E testing",
+      "icon": "wrench",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -44,7 +46,9 @@
     },
     {
       "name": "greet",
+      "displayName": "Greet",
       "description": "Greet a person by name — tests input→output transformation via the server",
+      "icon": "wrench",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -79,7 +83,9 @@
     },
     {
       "name": "list_items",
+      "displayName": "List Items",
       "description": "List items from the test server with optional pagination — mirrors patterns like Slack's conversations.list",
+      "icon": "wrench",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -138,7 +144,9 @@
     },
     {
       "name": "get_status",
+      "displayName": "Get Status",
       "description": "Get the current status of the test server — tests zero-input tools (similar to Slack's auth.test)",
+      "icon": "wrench",
       "input_schema": {
         "type": "object",
         "properties": {},
@@ -175,7 +183,9 @@
     },
     {
       "name": "create_item",
+      "displayName": "Create Item",
       "description": "Create a new item on the test server — tests write operations (similar to Slack's conversations.create)",
+      "icon": "wrench",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -239,7 +249,9 @@
     },
     {
       "name": "failing_tool",
+      "displayName": "Failing Tool",
       "description": "A tool that always fails — calls a server endpoint that returns an error, testing ToolError propagation through the full dispatch stack",
+      "icon": "wrench",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -269,5 +281,5 @@
       }
     }
   ],
-  "adapterHash": "bb111cb30e6e5d4089bf4183b805f53e2a0bf104092a30aacc5db738f3468e58"
+  "adapterHash": "589c0db585f12301c21692ffe894843b56ec99b1c23519105f7e67daab3ace1f"
 }

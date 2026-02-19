@@ -244,7 +244,16 @@ describe('/health endpoint', () => {
       urlPatterns: ['*://example.com/*'],
       trustTier: 'local',
       iife: '(function(){})()',
-      tools: [{ name: 'do_thing', description: 'Does a thing', input_schema: {}, output_schema: {} }],
+      tools: [
+        {
+          name: 'do_thing',
+          displayName: 'Do Thing',
+          description: 'Does a thing',
+          icon: 'wrench',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
     });
     state.tabMapping.set('test-plugin', { state: 'ready', tabId: 1, url: 'https://example.com' });
 

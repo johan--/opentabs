@@ -3,8 +3,10 @@ import { z } from 'zod';
 
 export const failingTool = defineTool({
   name: 'failing_tool',
+  displayName: 'Failing Tool',
   description:
     'A tool that always fails — calls a server endpoint that returns an error, testing ToolError propagation through the full dispatch stack',
+  icon: 'wrench',
   input: z.object({
     error_code: z
       .string()

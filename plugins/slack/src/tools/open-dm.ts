@@ -4,8 +4,10 @@ import { z } from 'zod';
 
 export const openDm = defineTool({
   name: 'open_dm',
+  displayName: 'Open DM',
   description:
     'Open a direct message conversation with one or more users. Returns an existing DM channel if one already exists, or creates a new one. For multi-person DMs (group DMs), pass multiple comma-separated user IDs.',
+  icon: 'mail',
   input: z.object({
     users: z
       .string()

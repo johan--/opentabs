@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 export const getUserProfile = defineTool({
   name: 'get_user_profile',
+  displayName: 'Get User Profile',
   description: "Retrieve a Slack user's profile information by user ID",
+  icon: 'user',
   input: z.object({
     user: z.string().min(1).describe('User ID to retrieve the profile for (e.g., U01234567)'),
   }),

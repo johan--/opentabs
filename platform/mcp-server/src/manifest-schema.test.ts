@@ -4,7 +4,9 @@ import { describe, expect, test } from 'bun:test';
 /** Minimal valid tool for reuse across tests */
 const validTool = {
   name: 'test_tool',
+  displayName: 'Test Tool',
   description: 'A test tool',
+  icon: 'wrench',
   input_schema: { type: 'object' },
   output_schema: { type: 'object' },
 };
@@ -111,7 +113,9 @@ describe('parseManifest', () => {
         tools: [
           {
             name: 'test_tool',
+            displayName: 'Test Tool',
             description: longDesc,
+            icon: 'wrench',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
           },
@@ -126,7 +130,9 @@ describe('parseManifest', () => {
         tools: [
           {
             name: 'test_tool',
+            displayName: 'Test Tool',
             description: exactDesc,
+            icon: 'wrench',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
           },

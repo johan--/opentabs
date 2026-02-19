@@ -6,7 +6,9 @@ import type { SlackChannel } from './channel-schema.js';
 
 export const getChannelInfo = defineTool({
   name: 'get_channel_info',
+  displayName: 'Get Channel Info',
   description: 'Get detailed information about a Slack channel including topic, purpose, and member count',
+  icon: 'info',
   input: z.object({
     channel: z.string().min(1).describe('Channel ID to get info for (e.g., C01234567)'),
   }),

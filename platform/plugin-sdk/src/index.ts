@@ -1,3 +1,4 @@
+import type { LucideIconName } from './lucide-icon-names.js';
 import type { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -6,6 +7,8 @@ import type { z } from 'zod';
 
 export { NAME_REGEX, RESERVED_NAMES, validatePluginName, validateUrlPattern } from '@opentabs-dev/shared';
 export type { ManifestTool, PluginManifest as Manifest } from '@opentabs-dev/shared';
+export type { LucideIconName } from './lucide-icon-names.js';
+export { LUCIDE_ICON_NAMES } from './lucide-icon-names.js';
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -17,8 +20,12 @@ export interface ToolDefinition<
 > {
   /** Tool name — auto-prefixed with plugin name (e.g., 'send_message' → 'slack_send_message') */
   name: string;
+  /** Human-readable display name shown in the side panel (e.g., 'Send Message') */
+  displayName: string;
   /** Human-readable description shown to MCP clients / AI agents */
   description: string;
+  /** Lucide icon name (kebab-case) displayed in the side panel. See https://lucide.dev/icons */
+  icon: LucideIconName;
   /** Zod schema — used for MCP registration + server-side input validation */
   input: TInput;
   /** Zod schema describing the tool output shape. Used for manifest generation and MCP tool registration. */
