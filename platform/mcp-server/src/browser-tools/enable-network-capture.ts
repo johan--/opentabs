@@ -26,12 +26,19 @@ const enableNetworkCapture = defineBrowserTool({
       .optional()
       .describe('Maximum requests to buffer before dropping oldest — defaults to 100'),
     urlFilter: z.string().optional().describe('Only capture requests whose URL contains this substring'),
+    maxConsoleLogs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Maximum console log entries to buffer before dropping oldest — defaults to 500'),
   }),
   handler: async (args, state) =>
     dispatchToExtension(state, 'browser.enableNetworkCapture', {
       tabId: args.tabId,
       ...(args.maxRequests !== undefined ? { maxRequests: args.maxRequests } : {}),
       ...(args.urlFilter !== undefined ? { urlFilter: args.urlFilter } : {}),
+      ...(args.maxConsoleLogs !== undefined ? { maxConsoleLogs: args.maxConsoleLogs } : {}),
     }),
 });
 

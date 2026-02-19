@@ -1069,8 +1069,9 @@ export const handleBrowserEnableNetworkCapture = async (
     }
     const maxRequests = typeof params.maxRequests === 'number' ? params.maxRequests : 100;
     const urlFilter = typeof params.urlFilter === 'string' ? params.urlFilter : undefined;
+    const maxConsoleLogs = typeof params.maxConsoleLogs === 'number' ? params.maxConsoleLogs : 500;
 
-    await startCapture(tabId, maxRequests, urlFilter);
+    await startCapture(tabId, maxRequests, urlFilter, maxConsoleLogs);
     sendToServer({ jsonrpc: '2.0', result: { enabled: true, tabId }, id });
   } catch (err) {
     sendToServer({

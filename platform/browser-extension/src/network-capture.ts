@@ -28,6 +28,7 @@ interface CaptureState {
   requests: CapturedRequest[];
   consoleLogs: ConsoleEntry[];
   maxRequests: number;
+  maxConsoleLogs: number;
   urlFilter?: string;
   pendingRequests: Map<string, Partial<CapturedRequest>>;
   /** Maps requestId → index in requests[] for attaching response bodies after loadingFinished */
@@ -197,6 +198,9 @@ chrome.debugger.onEvent.addListener((source: chrome.debugger.Debuggee, method: s
       }
     }
 
+    if (state.consoleLogs.length >= state.maxConsoleLogs) {
+      state.consoleLogs.shift();
+    }
     state.consoleLogs.push({
       level: type,
       message: messageParts.join(' '),
@@ -221,7 +225,12 @@ chrome.tabs.onRemoved.addListener((tabId: number) => {
  * Start capturing network requests and console logs for a tab.
  * Attaches the Chrome DevTools Protocol debugger and enables Network + Runtime domains.
  */
-export const startCapture = async (tabId: number, maxRequests: number = 100, urlFilter?: string): Promise<void> => {
+export const startCapture = async (
+  tabId: number,
+  maxRequests: number = 100,
+  urlFilter?: string,
+  maxConsoleLogs: number = 500,
+): Promise<void> => {
   if (captures.has(tabId)) {
     throw new Error(`Network capture already active for tab ${tabId}. Call stopCapture first.`);
   }
@@ -247,6 +256,7 @@ export const startCapture = async (tabId: number, maxRequests: number = 100, url
     requests: [],
     consoleLogs: [],
     maxRequests,
+    maxConsoleLogs,
     urlFilter,
     pendingRequests: new Map(),
     requestIdToIndex: new Map(),
