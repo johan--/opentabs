@@ -229,6 +229,10 @@ export const BROWSER_TOOL_NAMES = [
   'browser_clear_console_logs',
   'browser_list_resources',
   'browser_get_resource_content',
+  'browser_press_key',
+  'browser_scroll',
+  'browser_hover_element',
+  'browser_handle_dialog',
 ];
 
 // ---------------------------------------------------------------------------

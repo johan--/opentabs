@@ -240,6 +240,20 @@ const INTERACTIVE_HTML = `<!DOCTYPE html>
   <div id="delayed-content" style="display:none">Delayed content loaded</div>
   <span id="status">ready</span>
 
+  <!-- Input for Enter key testing (keydown listener detects Enter) -->
+  <input id="form-input" type="text" placeholder="Press Enter" />
+
+  <!-- Hover target -->
+  <div id="hover-target" style="padding:10px;border:1px solid #ccc;">Hover me</div>
+
+  <!-- Alert trigger -->
+  <button id="show-alert" onclick="alert('test-alert')">Show Alert</button>
+
+  <!-- Long scrollable section for scroll testing -->
+  <div id="scroll-section" style="height:2000px;background:linear-gradient(white,lightgray);position:relative;">
+    <div id="scroll-bottom" style="position:absolute;bottom:0;">Bottom marker</div>
+  </div>
+
   <script>
     document.getElementById('test-btn').addEventListener('click', function() {
       window.__btnClicked = true;
@@ -248,6 +262,18 @@ const INTERACTIVE_HTML = `<!DOCTYPE html>
     setTimeout(function() {
       document.getElementById('delayed-content').style.display = 'block';
     }, 500);
+
+    document.addEventListener('keydown', function(e) {
+      window.__lastKeydown = e.key;
+    });
+
+    document.getElementById('form-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') window.__formSubmitted = true;
+    });
+
+    document.getElementById('hover-target').addEventListener('mouseenter', function() {
+      window.__hovered = true;
+    });
   </script>
 </body>
 </html>`;

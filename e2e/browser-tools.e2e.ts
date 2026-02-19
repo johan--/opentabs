@@ -1992,3 +1992,236 @@ test.describe('Browser tools — resource inspection', () => {
     await mcpClient.callTool('browser_close_tab', { tabId });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Browser tools — keyboard input
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — keyboard input', () => {
+  test('browser_press_key sends Enter to submit a form', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    // Focus the form input and type text
+    const typeResult = await mcpClient.callTool('browser_type_text', {
+      tabId,
+      selector: '#form-input',
+      text: 'test-value',
+    });
+    expect(typeResult.isError).toBe(false);
+
+    // Press Enter on the form input to submit
+    const pressResult = await mcpClient.callTool('browser_press_key', {
+      tabId,
+      key: 'Enter',
+      selector: '#form-input',
+    });
+    expect(pressResult.isError).toBe(false);
+
+    // Verify the form was submitted (window.__formSubmitted set by onsubmit handler)
+    const checkResult = await mcpClient.callTool('browser_execute_script', {
+      tabId,
+      code: 'return window.__formSubmitted === true',
+    });
+    expect(checkResult.isError).toBe(false);
+    const checkData = parseToolResult(checkResult.content);
+    const value = checkData.value as Record<string, unknown>;
+    expect(value.value).toBe(true);
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('browser_press_key dispatches Escape and records keydown event', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    // Press Escape
+    const pressResult = await mcpClient.callTool('browser_press_key', {
+      tabId,
+      key: 'Escape',
+    });
+    expect(pressResult.isError).toBe(false);
+
+    // Verify the keydown event was captured by the document listener
+    const checkResult = await mcpClient.callTool('browser_execute_script', {
+      tabId,
+      code: 'return window.__lastKeydown',
+    });
+    expect(checkResult.isError).toBe(false);
+    const checkData = parseToolResult(checkResult.content);
+    const value = checkData.value as Record<string, unknown>;
+    expect(value.value).toBe('Escape');
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Browser tools — scrolling
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — scrolling', () => {
+  test('browser_scroll with direction=down scrolls the page', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    const scrollResult = await mcpClient.callTool('browser_scroll', {
+      tabId,
+      direction: 'down',
+    });
+    expect(scrollResult.isError).toBe(false);
+
+    const scrollData = parseToolResult(scrollResult.content);
+    const scrollPosition = scrollData.scrollPosition as Record<string, number>;
+    expect(scrollPosition.y).toBeGreaterThan(0);
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('browser_scroll with selector scrolls element into view', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    // Scroll to the bottom marker (positioned at bottom of 2000px section)
+    const scrollResult = await mcpClient.callTool('browser_scroll', {
+      tabId,
+      selector: '#scroll-bottom',
+    });
+    expect(scrollResult.isError).toBe(false);
+
+    const scrollData = parseToolResult(scrollResult.content);
+    const scrollPosition = scrollData.scrollPosition as Record<string, number>;
+    expect(scrollPosition.y).toBeGreaterThan(0);
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Browser tools — hover
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — hover', () => {
+  test('browser_hover_element dispatches mouseenter on target', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    const hoverResult = await mcpClient.callTool('browser_hover_element', {
+      tabId,
+      selector: '#hover-target',
+    });
+    expect(hoverResult.isError).toBe(false);
+
+    // Verify the mouseenter event was captured
+    const checkResult = await mcpClient.callTool('browser_execute_script', {
+      tabId,
+      code: 'return window.__hovered === true',
+    });
+    expect(checkResult.isError).toBe(false);
+    const checkData = parseToolResult(checkResult.content);
+    const value = checkData.value as Record<string, unknown>;
+    expect(value.value).toBe(true);
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('browser_hover_element returns error for non-existent selector', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    const hoverResult = await mcpClient.callTool('browser_hover_element', {
+      tabId,
+      selector: '#does-not-exist',
+    });
+    expect(hoverResult.isError).toBe(true);
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Browser tools — dialog handling
+// ---------------------------------------------------------------------------
+
+test.describe('Browser tools — dialog handling', () => {
+  test('browser_handle_dialog returns clear error when no dialog is open', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    // Call handle_dialog with no dialog open — should return a helpful error
+    const dialogResult = await mcpClient.callTool('browser_handle_dialog', {
+      tabId,
+      action: 'accept',
+    });
+    expect(dialogResult.isError).toBe(true);
+    expect(dialogResult.content).toContain('No JavaScript dialog');
+
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+
+  test('browser_handle_dialog works while network capture is active (debugger sharing)', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+    const tabId = await openInteractivePage(mcpClient, testServer);
+
+    // Enable network capture (attaches debugger)
+    const enableResult = await mcpClient.callTool('browser_enable_network_capture', { tabId });
+    expect(enableResult.isError).toBe(false);
+
+    // Call handle_dialog — no dialog open, but should reuse the debugger
+    // session from network capture and return a clear "no dialog" error
+    const dialogResult = await mcpClient.callTool('browser_handle_dialog', {
+      tabId,
+      action: 'accept',
+    });
+    expect(dialogResult.isError).toBe(true);
+    expect(dialogResult.content).toContain('No JavaScript dialog');
+
+    // Verify network capture still works after handle_dialog
+    const netResult = await mcpClient.callTool('browser_get_network_requests', { tabId });
+    expect(netResult.isError).toBe(false);
+
+    // Clean up
+    await mcpClient.callTool('browser_disable_network_capture', { tabId });
+    await mcpClient.callTool('browser_close_tab', { tabId });
+  });
+});
