@@ -125,7 +125,7 @@ const config: Linter.Config[] = [
   },
   // Browser globals for extension and plugin code (runs in Chrome)
   {
-    files: ['platform/browser-extension/**/*.{ts,tsx}', 'plugins/**/*.ts'],
+    files: ['platform/browser-extension/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...browser,
