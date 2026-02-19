@@ -28,13 +28,13 @@ const TabStateHint = ({ plugin }: { plugin: PluginState }) => {
 
   if (plugin.tabState === 'closed') {
     return (
-      <div className="text-destructive px-3 pb-2 pl-[42px] text-[11px]">
+      <div className="text-destructive pr-3 pb-2 pl-[52px] text-[11px]">
         {domain ? `Open ${domain} in your browser` : 'Open a matching tab in your browser'}
       </div>
     );
   }
 
-  return <div className="text-muted-foreground px-3 pb-2 pl-[42px] text-[11px]">Log in to {plugin.displayName}</div>;
+  return <div className="text-muted-foreground pr-3 pb-2 pl-[52px] text-[11px]">Log in to {plugin.displayName}</div>;
 };
 
 const PluginCard = ({
