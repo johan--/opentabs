@@ -5,7 +5,7 @@ const Footer = () => (
       href="https://github.com/opentabs-dev/opentabs"
       target="_blank"
       rel="noopener noreferrer"
-      className="hover:text-foreground transition-colors">
+      className="decoration-primary hover:text-foreground underline-offset-2 transition-colors hover:underline">
       Feedback
     </a>
   </footer>
