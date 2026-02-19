@@ -143,6 +143,7 @@ html {
   --sl-color-gray-4: var(--muted);
   --sl-color-gray-5: var(--secondary);
   --sl-color-gray-6: var(--card);
+  --sl-color-gray-7: var(--card);
   --sl-color-black: var(--background);
 
   --sl-color-text: var(--foreground);
