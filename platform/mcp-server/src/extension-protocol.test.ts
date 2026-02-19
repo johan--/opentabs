@@ -266,6 +266,7 @@ describe('handleExtensionMessage — tab.stateChanged', () => {
   const makePlugin = (name: string): RegisteredPlugin => ({
     name,
     version: '1.0.0',
+    displayName: name,
     urlPatterns: [],
     trustTier: 'community',
     iife: '// noop',
@@ -447,6 +448,7 @@ describe('sendSyncFull', () => {
 
   const makePlugin = (overrides: Partial<RegisteredPlugin> & Pick<RegisteredPlugin, 'name'>): RegisteredPlugin => ({
     version: '1.0.0',
+    displayName: overrides.name,
     urlPatterns: [],
     trustTier: 'community',
     iife: '// noop',
@@ -500,7 +502,7 @@ describe('sendSyncFull', () => {
           version: string;
           urlPatterns: string[];
           trustTier: string;
-          displayName: string | undefined;
+          displayName: string;
           sourcePath: string | undefined;
           adapterHash: string | undefined;
           tools: { name: string; description: string; enabled: boolean }[];
@@ -523,7 +525,7 @@ describe('sendSyncFull', () => {
       version: '1.0.0',
       urlPatterns: ['http://alpha.com/*'],
       trustTier: 'community',
-      displayName: undefined,
+      displayName: 'alpha',
       sourcePath: undefined,
       adapterHash: undefined,
       tools: [{ name: 'ping', description: 'Ping', enabled: true }],
@@ -536,7 +538,7 @@ describe('sendSyncFull', () => {
       version: '2.0.0',
       urlPatterns: ['http://beta.com/*'],
       trustTier: 'local',
-      displayName: undefined,
+      displayName: 'beta',
       sourcePath: undefined,
       adapterHash: undefined,
       tools: [{ name: 'pong', description: 'Pong', enabled: false }],
@@ -655,6 +657,7 @@ describe('dispatchToExtension', () => {
 describe('handleExtensionMessage — config.getState', () => {
   const makePlugin = (overrides: Partial<RegisteredPlugin> & Pick<RegisteredPlugin, 'name'>): RegisteredPlugin => ({
     version: '1.0.0',
+    displayName: overrides.name,
     urlPatterns: [],
     trustTier: 'community',
     iife: '// noop',
@@ -862,6 +865,7 @@ describe('handleExtensionMessage — config.getState', () => {
 describe('handleExtensionMessage — config.setToolEnabled', () => {
   const makePlugin = (overrides: Partial<RegisteredPlugin> & Pick<RegisteredPlugin, 'name'>): RegisteredPlugin => ({
     version: '1.0.0',
+    displayName: overrides.name,
     urlPatterns: [],
     trustTier: 'community',
     iife: '// noop',
@@ -1186,6 +1190,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
 describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
   const makePlugin = (overrides: Partial<RegisteredPlugin> & Pick<RegisteredPlugin, 'name'>): RegisteredPlugin => ({
     version: '1.0.0',
+    displayName: overrides.name,
     urlPatterns: [],
     trustTier: 'community',
     iife: '// noop',

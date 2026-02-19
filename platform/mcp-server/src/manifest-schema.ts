@@ -22,7 +22,7 @@ const manifestToolSchema = z.object({
 const pluginManifestSchema = z.looseObject({
   name: z.string().min(1, 'Plugin name is required'),
   version: z.string().min(1, 'Plugin version is required'),
-  displayName: z.string().optional(),
+  displayName: z.string().min(1, 'Plugin displayName is required'),
   description: z
     .string()
     .min(1, 'Plugin description is required')

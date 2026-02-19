@@ -63,8 +63,8 @@ export abstract class OpenTabsPlugin {
    * @returns true if the user is authenticated and the service is operational
    */
   abstract isReady(): Promise<boolean>;
-  /** Human-readable display name. Defaults to `name` if not set. */
-  displayName?: string;
+  /** Human-readable display name shown in the side panel and health endpoint */
+  abstract readonly displayName: string;
   /**
    * Called by the platform before re-injection (plugin.update) to allow
    * cleanup of event listeners, timers, or global state set up by the

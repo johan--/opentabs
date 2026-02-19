@@ -20,7 +20,7 @@ export type TrustTier = 'official' | 'community' | 'local';
 export interface PluginManifest {
   name: string;
   version: string;
-  displayName?: string;
+  displayName: string;
   description: string;
   url_patterns: string[];
   tools: ManifestTool[];
@@ -94,7 +94,7 @@ export interface WireToolDef {
 export interface WirePluginPayload {
   name: string;
   version: string;
-  displayName?: string;
+  displayName: string;
   urlPatterns: string[];
   trustTier: TrustTier;
   sourcePath?: string;

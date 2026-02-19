@@ -202,6 +202,7 @@ const makeTab = (id: number, opts: { active?: boolean; windowId?: number } = {})
 const makePlugin = (urlPatterns: string[]): PluginMeta => ({
   name: 'test-plugin',
   version: '1.0.0',
+  displayName: 'Test Plugin',
   urlPatterns,
   trustTier: 'local',
   tools: [{ name: 'test-tool', description: 'A test tool', enabled: true }],

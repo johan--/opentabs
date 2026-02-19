@@ -30,6 +30,9 @@ const validatePlugin = (plugin: OpenTabsPlugin): string[] => {
     errors.push(`Plugin version "${plugin.version}" is not valid semver (expected: MAJOR.MINOR.PATCH)`);
   }
 
+  // Display name
+  if (plugin.displayName.length === 0) errors.push('Plugin displayName is required');
+
   // Description
   if (plugin.description.length === 0) errors.push('Plugin description is required');
 
@@ -111,7 +114,7 @@ const generateManifest = (plugin: OpenTabsPlugin): Manifest => {
   return {
     name: plugin.name,
     version: plugin.version,
-    displayName: plugin.displayName ?? plugin.name,
+    displayName: plugin.displayName,
     description: plugin.description,
     url_patterns: plugin.urlPatterns,
     tools,

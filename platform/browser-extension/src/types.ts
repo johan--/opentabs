@@ -106,7 +106,7 @@ export type InternalMessage =
 export interface PluginMeta {
   name: string;
   version: string;
-  displayName?: string;
+  displayName: string;
   urlPatterns: string[];
   trustTier: TrustTier;
   sourcePath?: string;

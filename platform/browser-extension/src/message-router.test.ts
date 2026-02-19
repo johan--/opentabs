@@ -469,12 +469,12 @@ describe('validatePluginPayload', () => {
       expect(expectValid({ ...validPayload(), trustTier: 'local' }).trustTier).toBe('local');
     });
 
-    test('displayName is undefined when missing', () => {
-      expect(expectValid(validPayload()).displayName).toBeUndefined();
+    test('displayName falls back to name when missing', () => {
+      expect(expectValid(validPayload()).displayName).toBe('test-plugin');
     });
 
-    test('displayName is undefined when non-string', () => {
-      expect(expectValid({ ...validPayload(), displayName: 42 }).displayName).toBeUndefined();
+    test('displayName falls back to name when non-string', () => {
+      expect(expectValid({ ...validPayload(), displayName: 42 }).displayName).toBe('test-plugin');
     });
 
     test('sourcePath is undefined when missing', () => {

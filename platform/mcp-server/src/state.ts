@@ -25,7 +25,7 @@ export interface FileWatcherEntry {
 export interface RegisteredPlugin {
   name: string;
   version: string;
-  displayName?: string;
+  displayName: string;
   urlPatterns: string[];
   trustTier: TrustTier;
   iife: string;

@@ -13,6 +13,7 @@ const validTool = {
 const validManifestObj = {
   name: 'test-plugin',
   version: '1.0.0',
+  displayName: 'Test Plugin',
   description: 'A test plugin',
   url_patterns: ['*://example.com/*'],
   tools: [validTool],

@@ -16,6 +16,7 @@ import type { RegisteredPlugin } from './state.js';
 const createPlugin = (name: string, toolNames: string[]): RegisteredPlugin => ({
   name,
   version: '1.0.0',
+  displayName: name,
   urlPatterns: [`https://${name}.example.com/*`],
   trustTier: 'local',
   iife: `(function(){/* ${name} */})()`,

@@ -171,7 +171,7 @@ const createHandleFetch =
 
       const pluginDetails = [...state.plugins.values()].map(p => ({
         name: p.name,
-        displayName: p.displayName ?? p.name,
+        displayName: p.displayName,
         toolCount: p.tools.length,
         tabState: state.tabMapping.get(p.name)?.state ?? 'closed',
       }));

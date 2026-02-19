@@ -550,7 +550,7 @@ const handleConfigGetState = (state: ServerState, id: string | number): void => 
       const tabInfo = state.tabMapping.get(p.name);
       return {
         name: p.name,
-        displayName: p.displayName ?? p.name,
+        displayName: p.displayName,
         version: p.version,
         trustTier: p.trustTier,
         tabState: tabInfo?.state ?? 'closed',

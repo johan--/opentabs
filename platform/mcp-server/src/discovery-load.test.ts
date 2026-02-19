@@ -15,6 +15,7 @@ import { join } from 'node:path';
 const validManifest = (overrides: Record<string, unknown> = {}) => ({
   name: 'test-plugin',
   version: '1.0.0',
+  displayName: 'Test Plugin',
   description: 'A test plugin',
   url_patterns: ['http://localhost/*'],
   tools: [{ name: 'my_tool', description: 'A tool', input_schema: {}, output_schema: {} }],

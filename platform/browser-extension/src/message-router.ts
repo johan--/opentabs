@@ -85,7 +85,7 @@ const SIDE_PANEL_METHODS = new Set([
 interface ValidatedPluginPayload {
   name: string;
   version: string;
-  displayName?: string;
+  displayName: string;
   urlPatterns: string[];
   trustTier: TrustTier;
   sourcePath?: string;
@@ -150,7 +150,7 @@ const validatePluginPayload = (raw: unknown): ValidatedPluginPayload | null => {
   return {
     name: obj.name,
     version: typeof obj.version === 'string' ? obj.version : '0.0.0',
-    displayName: typeof obj.displayName === 'string' ? obj.displayName : undefined,
+    displayName: typeof obj.displayName === 'string' ? obj.displayName : obj.name,
     urlPatterns,
     trustTier:
       obj.trustTier === 'official' || obj.trustTier === 'community' || obj.trustTier === 'local'

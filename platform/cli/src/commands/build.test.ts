@@ -13,6 +13,7 @@ const makePlugin = (overrides: Partial<OpenTabsPlugin> = {}): OpenTabsPlugin =>
   ({
     name: 'test-plugin',
     version: '1.0.0',
+    displayName: 'Test Plugin',
     description: 'A test plugin',
     urlPatterns: ['https://example.com/*'],
     tools: [makeTool()],

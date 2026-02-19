@@ -49,6 +49,7 @@ const mockChromeStorage = {
 const makeMeta = (name: string, overrides?: Partial<PluginMeta>): PluginMeta => ({
   name,
   version: '1.0.0',
+  displayName: name,
   urlPatterns: ['*://example.com/*'],
   trustTier: 'local',
   tools: [{ name: 'test-tool', description: 'A test tool', enabled: true }],
