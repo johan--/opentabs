@@ -525,9 +525,6 @@ export const handleBrowserTypeText = async (params: Record<string, unknown>, id:
         if (!el) return { error: `Element not found: ${sel}` };
         const input = el as HTMLInputElement | HTMLTextAreaElement;
         input.focus();
-        if (clr) {
-          input.value = '';
-        }
         input.value = clr ? txt : input.value + txt;
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
