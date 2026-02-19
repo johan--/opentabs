@@ -387,27 +387,27 @@ test.describe('Side panel data flow — tool invocation animation', () => {
       // 6. Set test server to slow mode (3s delay for tool responses)
       await testServer.setSlow(3_000);
 
-      // 7. Start tool call and check for spinner in parallel
-      const spinnerLocator = sidePanelPage.locator('.animate-spin');
-      const activeBorderLocator = sidePanelPage.locator('.border-primary.border-l-2');
+      // 7. Start tool call and check for loader in parallel
+      const loaderLocator = sidePanelPage.locator('[role="status"][aria-label="Loading..."]');
+      const activeRowLocator = sidePanelPage.locator('.bg-accent\\/20');
 
-      // Verify no spinner before tool call
-      await expect(spinnerLocator).toBeHidden({ timeout: 2_000 });
+      // Verify no loader before tool call
+      await expect(loaderLocator).toBeHidden({ timeout: 2_000 });
 
       // Start the tool call (will take ~3s due to slow mode)
       const toolCallPromise = mcpClient.callTool('e2e-test_echo', { message: 'spinner test' });
 
-      // 8. Verify the spinner appears during tool execution
-      await expect(spinnerLocator).toBeVisible({ timeout: 10_000 });
-      await expect(activeBorderLocator).toBeVisible({ timeout: 2_000 });
+      // 8. Verify the loader appears during tool execution
+      await expect(loaderLocator).toBeVisible({ timeout: 10_000 });
+      await expect(activeRowLocator).toBeVisible({ timeout: 2_000 });
 
       // 9. Wait for tool to complete
       const result = await toolCallPromise;
       expect(result.isError).toBe(false);
 
-      // 10. Verify spinner disappears after completion
-      await expect(spinnerLocator).toBeHidden({ timeout: 10_000 });
-      await expect(activeBorderLocator).toBeHidden({ timeout: 2_000 });
+      // 10. Verify loader disappears after completion
+      await expect(loaderLocator).toBeHidden({ timeout: 10_000 });
+      await expect(activeRowLocator).toBeHidden({ timeout: 2_000 });
 
       // Reset slow mode
       await testServer.setSlow(0);
