@@ -141,3 +141,21 @@ body {
   --sl-color-hairline: var(--border);
   --sl-color-hairline-shade: var(--border);
 }
+
+/* Sidebar active item — RetroUI border-l-2 with primary color */
+nav.sidebar a[aria-current='page'],
+.sidebar-content a[aria-current='page'] {
+  border-left: 2px solid var(--primary);
+  background-color: transparent;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Content links — hover:text-primary transition */
+.sl-markdown-content a {
+  transition: color 0.2s ease;
+}
+
+.sl-markdown-content a:hover {
+  color: var(--primary);
+}

@@ -6,6 +6,12 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'OpenTabs',
+      components: {
+        Header: './src/overrides/Header.astro',
+        Footer: './src/overrides/Footer.astro',
+        Pagination: './src/overrides/Pagination.astro',
+        SiteTitle: './src/overrides/SiteTitle.astro',
+      },
       social: [
         {
           icon: 'github',
