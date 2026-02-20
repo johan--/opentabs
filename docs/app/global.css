@@ -476,6 +476,20 @@ code {
     min-height: 2.75rem;
   }
 
+  /* Search input: 16px minimum prevents iOS Safari auto-zoom on focus.
+   * Fumadocs uses text-lg (18px) by default, but this guard ensures the
+   * behavior is preserved regardless of upstream class changes. */
+  [role='dialog'] input {
+    font-size: 16px;
+  }
+
+  /* Search results scroll area: contain scroll so reaching the end of results
+   * doesn't chain into the page body behind the dialog overlay. The scrollable
+   * div is the direct child of the [data-empty] container in SearchDialogList. */
+  [role='dialog'] [data-empty] > div {
+    overscroll-behavior: contain;
+  }
+
   /* Tab scroll fade: horizontal gradient mask hints at offscreen tabs.
    * The 2rem transparent→opaque zones at each edge fade content that
    * overflows, signaling more tabs are available by scrolling. On lists
