@@ -29,16 +29,10 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
-  --background-image: var(--background-image);
-  --chart-1: var(--chart-1);
-  --chart-2: var(--chart-2);
-  --chart-3: var(--chart-3);
-  --chart-4: var(--chart-4);
-  --chart-5: var(--chart-5);
 }
 
 :root {
-  --radius: 0;
+  --radius: 0.5rem;
   --background: #fff;
   --foreground: #000;
   --card: #fff;
@@ -48,19 +42,13 @@
   --primary-foreground: #000;
   --secondary: #000;
   --secondary-foreground: #fff;
-  --muted: #d5d5d5;
+  --muted: #cccccc;
   --muted-foreground: #5a5a5a;
   --accent: #fae583;
   --accent-foreground: #000;
   --destructive: #e63946;
   --destructive-foreground: #fff;
   --border: #000;
-  --background-image: url("/images/banner_void_2.svg");
-  --chart-1: #c4a1ff;
-  --chart-2: #01ffcc;
-  --chart-3: #e7f192;
-  --chart-4: #000;
-  --chart-5: #ff30cd;
 }
 
 .dark {
@@ -80,16 +68,6 @@
   --destructive: #e63946;
   --destructive-foreground: #fff;
   --border: #5c5c5c;
-  --background-image: url("/images/bg_void_3.svg");
-  --chart-1: #ffdb33;
-  --chart-2: #000;
-  --chart-3: #aeaeae;
-  --chart-4: #fae583;
-  --chart-5: #e63946;
-}
-
-.with-radius {
-  --radius: 0.5rem;
 }
 
 body {
@@ -101,12 +79,6 @@ body {
 html {
   scrollbar-width: auto;
   scrollbar-color: var(--muted) var(--foreground);
-}
-
-.bg-image {
-  background-image: var(--background-image);
-  background-size: cover;
-  background-position: center;
 }
 
 .text-outlined {
