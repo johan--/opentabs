@@ -539,6 +539,16 @@ code {
     overscroll-behavior-y: none;
   }
 
+  /* Docs grid: collapse gutter columns so the content area fills the full viewport width.
+   * The default grid has 5 columns: gutter | sidebar | content | toc | gutter. On desktop
+   * the gutter columns (minmax(min-content, 1fr)) center the layout. On mobile the sidebar
+   * and TOC are hidden, but the gutter columns can still claim space via their 1fr max,
+   * preventing the content from stretching edge-to-edge. Override to 0 0 1fr 0 0 so the
+   * content column (grid-area: main) absorbs all available width. */
+  #nd-docs-layout {
+    grid-template-columns: 0 0 1fr 0 0 !important;
+  }
+
   /* Safe-area insets for the main content area on landscape mobile.
    * Prevents content from being hidden behind notch/sensor housing. */
   #nd-page {
