@@ -2,7 +2,7 @@
  * `opentabs plugin` command — manage plugins (list, add, remove, create).
  */
 
-import { getConfigPath, getPluginsFromConfig, readConfig, resolvePluginPath } from '../config.js';
+import { atomicWriteConfig, getConfigPath, getPluginsFromConfig, readConfig, resolvePluginPath } from '../config.js';
 import { scaffoldPlugin, ScaffoldError } from '../scaffold.js';
 import pc from 'picocolors';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -129,12 +129,19 @@ const handlePluginAdd = async (pathArg: string): Promise<void> => {
 
   if (!existsSync(resolvedNew)) {
     console.warn(pc.yellow(`Warning: Path does not exist: ${normalizedNew}`));
+  } else {
+    if (!existsSync(join(resolvedNew, 'opentabs-plugin.json'))) {
+      console.warn(pc.yellow('Warning: No opentabs-plugin.json found — run bun run build in the plugin directory.'));
+    }
+    if (!existsSync(join(resolvedNew, 'dist', 'adapter.iife.js'))) {
+      console.warn(pc.yellow('Warning: No dist/adapter.iife.js found — run bun run build in the plugin directory.'));
+    }
   }
 
   plugins.push(normalizedNew);
-  await Bun.write(configPath, JSON.stringify(config, null, 2) + '\n');
+  await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(pc.green(`Added: ${normalizedNew}`));
-  console.log('Restart the MCP server to pick up the new plugin.');
+  console.log('The MCP server will detect the change automatically.');
 };
 
 const handlePluginRemove = async (nameOrPath: string): Promise<void> => {
@@ -159,9 +166,9 @@ const handlePluginRemove = async (nameOrPath: string): Promise<void> => {
   }
 
   const removed = plugins.splice(idx, 1)[0] as string;
-  await Bun.write(configPath, JSON.stringify(config, null, 2) + '\n');
+  await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(pc.green(`Removed: ${removed}`));
-  console.log('Restart the MCP server to pick up the change.');
+  console.log('The MCP server will detect the change automatically.');
 };
 
 // --- Command registration ---

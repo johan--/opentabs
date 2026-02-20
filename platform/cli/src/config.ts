@@ -2,6 +2,7 @@
  * Config file helpers shared across CLI commands.
  */
 
+import { chmod, rename, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname, resolve, isAbsolute } from 'node:path';
 
@@ -38,6 +39,23 @@ export const getPluginsFromConfig = (config: Record<string, unknown>): string[] 
 
 export const resolvePluginPath = (pluginPath: string, configPath: string): string =>
   isAbsolute(pluginPath) ? pluginPath : resolve(dirname(configPath), pluginPath);
+
+/**
+ * Write config atomically: write to a temp file in the same directory,
+ * set restrictive permissions, then rename over the target. The rename
+ * is atomic on POSIX filesystems, so readers never see a partially-written file.
+ */
+export const atomicWriteConfig = async (configPath: string, content: string): Promise<void> => {
+  const tmpPath = configPath + '.tmp';
+  try {
+    await Bun.write(tmpPath, content);
+    await chmod(tmpPath, 0o600).catch(() => {});
+    await rename(tmpPath, configPath);
+  } catch (err) {
+    await unlink(tmpPath).catch(() => {});
+    throw err;
+  }
+};
 
 export const isConnectionRefused = (err: unknown): boolean => {
   if (!(err instanceof TypeError)) return false;
