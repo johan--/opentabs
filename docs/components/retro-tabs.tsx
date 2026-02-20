@@ -63,7 +63,7 @@ export function RetroTabs({
 
   return (
     <RadixTabs.Root
-      className={cn('my-4', className)}
+      className={cn('my-6', className)}
       value={value}
       onValueChange={v => {
         // In items mode, only accept values that came from the items list
