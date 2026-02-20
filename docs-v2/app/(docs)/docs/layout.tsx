@@ -2,7 +2,7 @@ import SideNav from "@/components/SideNav";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Getting Started | RetroUI",
+  title: "Docs | OpenTabs",
 };
 
 export default function ComponentLayout({

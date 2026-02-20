@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://retroui.dev/sitemap.xml",
+    sitemap: "https://opentabs.dev/sitemap.xml",
   };
 }

@@ -29,12 +29,12 @@ export async function generateMetadata({ params }: IProps): Promise<Metadata> {
 
   if (!doc) {
     return {
-      title: "Not Found | Retro UI",
+      title: "Not Found | OpenTabs",
     };
   }
 
   return {
-    title: `${doc.title} | Retro UI`,
+    title: `${doc.title} | OpenTabs`,
     description: doc.description,
   };
 }
