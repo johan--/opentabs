@@ -9,7 +9,7 @@ import type { ComponentProps, ReactNode } from 'react';
 type AccordionRootProps = ComponentProps<typeof AccordionPrimitive.Root>;
 
 const RetroAccordions = ({ className, ...props }: AccordionRootProps) => (
-  <AccordionPrimitive.Root className={cn('my-6 flex flex-col gap-2', className)} {...props} />
+  <AccordionPrimitive.Root className={cn('my-6 flex flex-col gap-3', className)} {...props} />
 );
 RetroAccordions.displayName = 'RetroAccordions';
 
