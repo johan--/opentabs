@@ -54,7 +54,7 @@ export function RetroTabs({
   items,
   label,
   defaultIndex = 0,
-  defaultValue = items ? escapeValue(items[defaultIndex]) : undefined,
+  defaultValue = items?.[defaultIndex] ? escapeValue(items[defaultIndex]) : undefined,
   children,
   ...props
 }: RetroTabsProps) {
