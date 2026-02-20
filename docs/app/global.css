@@ -511,6 +511,19 @@ code {
   border-bottom-width: 2px;
 }
 
+/* TOC popover trigger: 40px minimum height for touch-friendly tap target */
+[data-toc-popover-trigger] {
+  min-height: 2.5rem;
+}
+
+/* TOC popover content: cap height to prevent full-screen takeover, contain
+ * overscroll so scrolling to the end of the TOC list doesn't chain into
+ * the page body underneath. */
+[data-toc-popover-content] {
+  max-height: 50vh;
+  overscroll-behavior: contain;
+}
+
 /* TOC popover: safe area insets for notch devices (mobile only, where px-4 = 1rem).
  * On md+ screens Fumadocs uses px-6 (1.5rem) which already exceeds typical safe areas. */
 @media (max-width: 767px) {
