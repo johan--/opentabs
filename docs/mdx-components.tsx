@@ -123,6 +123,9 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
         {...props}
       />
     ),
+    hr: ({ className, ...props }: ComponentPropsWithoutRef<'hr'>) => (
+      <hr className={cn('border-border my-8 border-x-0 border-t-2 border-b-0', className)} {...props} />
+    ),
     // Fenced code blocks — RetroUI styling: border-2 shadow-md, primary title bar, outline copy button
     pre: (props: CodeBlockProps) => (
       <RetroCodeBlock {...props}>
