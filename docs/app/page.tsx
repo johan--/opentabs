@@ -110,7 +110,7 @@ export default function HomePage() {
               },
             ].map(({ step, title, desc }) => (
               <div key={step} className="border-border bg-card border-2 p-6 shadow-md">
-                <div className="font-head border-border bg-primary mb-3 inline-flex size-12 items-center justify-center border-2 text-xl font-bold">
+                <div className="font-head border-border bg-primary mb-4 inline-flex size-12 items-center justify-center border-2 text-xl font-bold">
                   {step}
                 </div>
                 <h3 className="font-head mb-2 text-lg font-medium">{title}</h3>
