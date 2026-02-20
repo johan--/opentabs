@@ -66,6 +66,34 @@ const readFileWithRetry = async (path: string, maxRetries = 3, initialDelayMs = 
 const fileExists = async (path: string): Promise<boolean> => Bun.file(path).exists();
 
 /**
+ * Get the mtimeMs for a file, or null if the file does not exist or stat fails.
+ */
+const getFileMtimeMs = (path: string): number | null => {
+  try {
+    const stat = statSync(path, { throwIfNoEntry: false });
+    return stat ? stat.mtimeMs : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Find the FileWatcherEntry for a given plugin directory.
+ */
+const findEntry = (state: ServerState, pluginDir: string): FileWatcherEntry | undefined =>
+  state.fileWatcherEntries.find(e => e.pluginDir === pluginDir);
+
+/**
+ * Record the current mtime for a file on a FileWatcherEntry's lastSeenMtimes map.
+ */
+const recordMtime = (entry: FileWatcherEntry, filePath: string): void => {
+  const mtime = getFileMtimeMs(filePath);
+  if (mtime !== null) {
+    entry.lastSeenMtimes.set(filePath, mtime);
+  }
+};
+
+/**
  * Extract the adapter hash embedded by the CLI's hash-setter snippet.
  *
  * The `opentabs build` CLI appends a self-contained hash-setter IIFE to every
@@ -120,6 +148,10 @@ const handleIifeChange = async (
     if (embeddedHash) {
       plugin.adapterHash = embeddedHash;
     }
+
+    // Update mtime for polling fallback
+    const entry = findEntry(state, pluginDir);
+    if (entry) recordMtime(entry, iifePath);
 
     log.info(`File watcher: IIFE updated for "${pluginName}" — sending plugin.update`);
 
@@ -216,6 +248,13 @@ const handleManifestChange = async (
       }
     }
 
+    // Update mtimes for polling fallback (both manifest and IIFE were re-read)
+    const entry = findEntry(state, pluginDir);
+    if (entry) {
+      recordMtime(entry, manifestPath);
+      recordMtime(entry, iifePath);
+    }
+
     log.info(`File watcher: Manifest updated for "${pluginName}" — re-registering MCP tools`);
 
     callbacks.onManifestChanged(pluginName);
@@ -247,6 +286,14 @@ const handlePendingPluginChange = async (
     }
 
     state.plugins.set(plugin.name, plugin);
+
+    // Update mtimes for polling fallback
+    const entry = findEntry(state, pluginDir);
+    if (entry) {
+      recordMtime(entry, join(pluginDir, 'opentabs-plugin.json'));
+      recordMtime(entry, join(pluginDir, 'dist', 'adapter.iife.js'));
+    }
+
     log.info(`File watcher: Discovered pending plugin "${plugin.name}" at ${pluginDir}`);
 
     callbacks.onPluginDiscovered(plugin.name);
@@ -315,7 +362,7 @@ const watchPendingPlugin = (
     // dist/ may not exist yet — the manifest watcher will still catch changes
   }
 
-  return { pluginDir, pluginName: `(pending:${pluginDir})`, watchers };
+  return { pluginDir, pluginName: `(pending:${pluginDir})`, watchers, lastSeenMtimes: new Map() };
 };
 
 /**
@@ -381,7 +428,7 @@ const watchPlugin = (
     log.warn(`File watcher: Could not watch dist dir at ${distDir}:`, err);
   }
 
-  return { pluginDir, pluginName, watchers };
+  return { pluginDir, pluginName, watchers, lastSeenMtimes: new Map() };
 };
 
 /**
@@ -401,6 +448,10 @@ const startConfigWatching = (state: ServerState, callbacks: FileWatcherCallbacks
   const configDir = getConfigDir();
   const gen = state.fileWatcherGeneration;
 
+  // Record initial config.json mtime for mtime polling fallback
+  const configPath = join(configDir, 'config.json');
+  state.configLastSeenMtime = getFileMtimeMs(configPath);
+
   try {
     state.configWatcher = watch(configDir, (_eventType, filename) => {
       if (filename !== 'config.json') return;
@@ -415,6 +466,8 @@ const startConfigWatching = (state: ServerState, callbacks: FileWatcherCallbacks
           state.fileWatcherTimers.delete(key);
           if (state.fileWatcherGeneration !== gen) return;
           log.info('Config watcher: config.json changed — triggering reload');
+          // Update config mtime for polling fallback
+          state.configLastSeenMtime = getFileMtimeMs(configPath);
           callbacks.onConfigChanged();
         }, 200),
       );
@@ -461,6 +514,10 @@ const startFileWatching = (
     const entry = watchPlugin(state, srcPath, plugin.name, callbacks);
     state.fileWatcherEntries.push(entry);
 
+    // Record initial mtimes for mtime polling fallback
+    recordMtime(entry, join(srcPath, 'opentabs-plugin.json'));
+    recordMtime(entry, join(srcPath, 'dist', 'adapter.iife.js'));
+
     log.info(`File watcher: Watching "${plugin.name}" at ${srcPath}`);
   }
 
@@ -478,6 +535,11 @@ const startFileWatching = (
 
     const entry = watchPendingPlugin(state, pluginPath, callbacks);
     state.fileWatcherEntries.push(entry);
+
+    // Record initial mtimes for mtime polling fallback
+    recordMtime(entry, join(pluginPath, 'opentabs-plugin.json'));
+    recordMtime(entry, join(pluginPath, 'dist', 'adapter.iife.js'));
+
     pendingCount++;
 
     log.info(`File watcher: Watching pending plugin path at ${pluginPath}`);

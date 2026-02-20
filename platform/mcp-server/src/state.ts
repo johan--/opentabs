@@ -19,6 +19,8 @@ export interface FileWatcherEntry {
   pluginDir: string;
   pluginName: string;
   watchers: FSWatcher[];
+  /** Last-seen mtime (ms) for each watched file path — used by mtime polling fallback */
+  lastSeenMtimes: Map<string, number>;
 }
 
 /** Plugin registered in the server */
@@ -146,6 +148,8 @@ export interface ServerState {
   fileWatcherGeneration: number;
   /** FSWatcher for ~/.opentabs/ directory, detecting config.json changes */
   configWatcher: FSWatcher | null;
+  /** Last-seen mtime (ms) of ~/.opentabs/config.json — used by mtime polling fallback */
+  configLastSeenMtime: number | null;
 }
 
 /** Increment when changing the type of an existing ServerState field */
@@ -175,6 +179,7 @@ export const createState = (): ServerState => ({
   startedAt: Date.now(),
   fileWatcherGeneration: 0,
   configWatcher: null,
+  configLastSeenMtime: null,
 });
 
 /** Generate a cryptographically random JSON-RPC request ID */
