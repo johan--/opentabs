@@ -201,11 +201,16 @@ body {
   background-color: var(--background);
 }
 
-/* Sidebar top padding: Fumadocs renders a header area (title + search + collapse) inside
- * a div with p-4 pb-2. With search and collapse disabled, this area is nearly empty but
- * still takes up space. Reduce it to a minimal top margin for the page tree. */
+/* Sidebar header area: with search toggle and collapse button disabled, the Fumadocs
+ * sidebar header (div.p-4.pb-2 containing title + search + collapse) is empty but still
+ * occupies space. Collapse it entirely so the page tree starts at the top. */
 #nd-sidebar aside > div > div:first-child {
-  padding: 0.5rem 0 0;
+  padding: 0;
+  gap: 0;
+}
+
+#nd-sidebar aside > div > div:first-child > * {
+  display: none;
 }
 
 /* Active sidebar link: full primary yellow bg with black text (RetroUI active state).
@@ -287,6 +292,7 @@ body {
   font-weight: 600;
   background-color: color-mix(in srgb, var(--primary) 20%, transparent);
   border-inline-start-color: var(--primary);
+  border-radius: var(--radius);
 }
 
 /* Inactive TOC headings: hover to foreground */
