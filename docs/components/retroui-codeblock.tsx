@@ -89,7 +89,7 @@ const RetroCodeBlock = ({
       data-line-numbers-start={lineNumbersStart}
       {...props}
       className={cn(
-        'shiki not-prose border-border relative my-6 overflow-hidden rounded border-2 text-sm shadow-md',
+        'shiki not-prose border-border relative my-4 overflow-hidden rounded border-2 text-sm shadow-sm sm:my-6 sm:shadow-md',
         keepBackground && 'bg-(--shiki-light-bg) dark:bg-(--shiki-dark-bg)',
         className,
       )}>
@@ -117,7 +117,7 @@ const RetroCodeBlock = ({
           <div className="absolute top-2 right-2 z-10 sm:top-3 sm:right-3">
             <RetroCopyButton
               containerRef={areaRef}
-              className="border-border bg-background text-muted-foreground hover:text-foreground"
+              className="border-border bg-background text-muted-foreground hover:text-foreground max-sm:min-h-10 max-sm:min-w-10 max-sm:p-2"
             />
           </div>
         )
@@ -129,7 +129,7 @@ const RetroCodeBlock = ({
         aria-label="Code content"
         tabIndex={0}
         className={cn(
-          'fd-scroll-container max-h-[400px] overflow-auto bg-(--shiki-light-bg) p-4 font-mono sm:max-h-[600px] dark:bg-(--shiki-dark-bg)',
+          'fd-scroll-container max-h-[400px] overflow-auto bg-(--shiki-light-bg) p-3 font-mono sm:max-h-[600px] sm:p-4 dark:bg-(--shiki-dark-bg)',
           'focus-visible:ring-border focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset',
           viewportProps.className,
         )}
