@@ -30,7 +30,7 @@ const RetroAccordion = ({ className, title, id, value, children, ...props }: Ret
       id={id}
       {...props}>
       <AccordionPrimitive.Header className="flex">
-        <AccordionPrimitive.Trigger className="font-head flex flex-1 cursor-pointer items-start justify-between gap-2 px-4 py-2 focus:outline-hidden [&[data-state=open]>svg]:rotate-180">
+        <AccordionPrimitive.Trigger className="font-head flex min-h-11 flex-1 cursor-pointer items-start justify-between gap-2 px-4 py-2 focus:outline-hidden [&[data-state=open]>svg]:rotate-180">
           <span className="min-w-0 text-left">{title}</span>
           <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 transition-transform duration-200" />
         </AccordionPrimitive.Trigger>

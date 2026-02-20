@@ -46,7 +46,7 @@ const RetroCopyButton = ({
       aria-label={checked ? 'Copied Text' : 'Copy Text'}
       onClick={onClick}
       className={cn(
-        'inline-flex cursor-pointer items-center justify-center border-2 p-1.5 transition-all',
+        'inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center border-2 p-1.5 transition-all',
         'shadow-sm hover:shadow-none active:translate-x-0.5 active:translate-y-0.5',
         className,
       )}>
