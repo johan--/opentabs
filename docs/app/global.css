@@ -328,7 +328,7 @@ pre, code {
   content: counter(retro-step);
   position: absolute;
   left: -3.625rem;
-  top: 0;
+  top: 2rem;
   width: 2rem;
   height: 2rem;
   display: flex;
