@@ -8,14 +8,15 @@ You are an autonomous coding agent working on the OpenTabs Platform project.
 2. Find the matching progress file: replace the `prd-` prefix with `progress-`, strip `~running`, and change the extension to `.txt` (e.g., `prd-2026-02-17-143000-improve-sdk~running.json` → `progress-2026-02-17-143000-improve-sdk.txt`)
 3. Read the progress file's Codebase Patterns section first (if it exists)
 4. Work on the current branch (do NOT create or switch branches)
-5. Pick the **highest priority** user story where `passes: false`
-6. Implement that single user story
+5. Pick the **highest priority** user story where `passes: false` — you will implement **only this one story** and then stop
+6. Implement that single user story (do NOT continue to the next story after this one)
 7. Run ALL quality checks. If the PRD has a top-level `"qualityChecks"` field (a string containing the shell command), use that instead of the default. Otherwise use the default: `bun run build && bun run type-check && bun run lint && bun run knip && bun run test && bun run test:e2e`
 8. **If ANY check fails, fix it before proceeding** — even pre-existing failures. See "Own the Codebase" below.
 9. Update CLAUDE.md files if you discover reusable patterns (see below)
 10. **Only if ALL checks exit 0**, commit code changes (see Git Rules below)
 11. **After committing**, update the PRD to set `passes: true` for the completed story
 12. **After committing**, append your progress to the matching progress file
+13. **STOP.** Do not pick up another story. Your invocation is done. End your response.
 
 ## Project Context
 
@@ -151,18 +152,20 @@ git commit -m "feat: [Story ID] - [Story Title]"
 
 Steps 10 and 11 (updating the PRD and progress file) must happen **after** the commit, so these files are never in the staging area during a commit.
 
-## Stop Condition
+## Stop Condition — CRITICAL
 
-After completing a user story, check if ALL stories have `passes: true`.
+**You MUST stop after completing exactly ONE user story.** Do not continue to the next story. Do not loop. One story per invocation, then stop.
+
+After completing your one story, check if ALL stories now have `passes: true`.
 
 If ALL stories are complete and passing, reply with:
 <promise>COMPLETE</promise>
 
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
+If there are still stories with `passes: false`, **STOP IMMEDIATELY. Do not work on them.** End your response. Another iteration will be launched to pick up the next story.
 
 ## Important
 
-- Work on ONE story per iteration
+- **ONE story per invocation — then STOP.** This is the most important rule. Never implement more than one story.
 - Commit frequently
 - Keep builds green
 - Read the Codebase Patterns section in the progress file before starting
