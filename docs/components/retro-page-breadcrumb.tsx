@@ -16,7 +16,7 @@ export function RetroPageBreadcrumb() {
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="breadcrumb">
+    <nav aria-label="breadcrumb" className="mb-4">
       <ol className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
         {items.map((item, i) => (
           <li key={i} className="inline-flex items-center gap-1.5">
