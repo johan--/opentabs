@@ -47,8 +47,8 @@
   --color-fd-secondary: var(--secondary);
   --color-fd-secondary-foreground: var(--secondary-foreground);
   --color-fd-ring: var(--border);
-  --color-fd-popover: var(--background);
-  --color-fd-popover-foreground: var(--foreground);
+  --color-fd-popover: var(--card);
+  --color-fd-popover-foreground: var(--card-foreground);
   --color-fd-overlay: rgba(0, 0, 0, 0.8);
 }
 
@@ -66,7 +66,7 @@
 }
 
 :root {
-  --radius: 0;
+  --radius: 0.5rem;
   --background: #fff;
   --foreground: #000;
   --card: #fff;
@@ -76,7 +76,7 @@
   --primary-foreground: #000;
   --secondary: #000;
   --secondary-foreground: #fff;
-  --muted: #d5d5d5;
+  --muted: #cccccc;
   --muted-foreground: #5a5a5a;
   --accent: #fae583;
   --accent-foreground: #000;
@@ -211,7 +211,10 @@ body {
 
 /* TOC links: smooth transition on hover/active state changes */
 #nd-toc a {
-  transition: color 150ms, background-color 150ms, padding-left 150ms;
+  transition:
+    color 150ms,
+    background-color 150ms,
+    padding-left 150ms;
 }
 
 /* Active TOC heading: text-primary + font-semibold + subtle highlight */
@@ -231,31 +234,31 @@ body {
 
 /* Content container: sharp corners (override rounded-xl), 2px border, flat offset shadow
  * Targets the Radix DialogContent element which has role="dialog" + data-state. */
-[role="dialog"][data-state] {
+[role='dialog'][data-state] {
   border-radius: 0;
   border-width: 2px;
   box-shadow: var(--shadow-lg);
 }
 
 /* Child element separators: 2px bottom border (override Fumadocs *:border-b = 1px) */
-[role="dialog"][data-state] > * {
+[role='dialog'][data-state] > * {
   border-bottom-width: 2px;
 }
 
 /* Search result items: sharp corners, primary yellow active state.
  * Fumadocs sets aria-selected on active items and uses JS onPointerMove to activate on hover. */
-[role="dialog"] button[aria-selected] {
+[role='dialog'] button[aria-selected] {
   border-radius: 0;
 }
 
-[role="dialog"] button[aria-selected="true"] {
+[role='dialog'] button[aria-selected='true'] {
   background-color: var(--primary);
   color: var(--primary-foreground);
 }
 
 /* Close (ESC) button: RetroUI outline button press effect.
  * Selector targets button that is a direct child of the header div (direct child of the dialog). */
-[role="dialog"] > div > button[type="button"] {
+[role='dialog'] > div > button[type='button'] {
   border-radius: 0;
   border-width: 2px;
   box-shadow: var(--shadow-sm);
@@ -263,7 +266,7 @@ body {
   transition-duration: 150ms;
 }
 
-[role="dialog"] > div > button[type="button"]:hover {
+[role='dialog'] > div > button[type='button']:hover {
   box-shadow: none;
   transform: translateY(2px);
 }
@@ -305,7 +308,8 @@ body {
 }
 
 /* Code blocks ejected from Fumadocs: ensure font-mono is used */
-pre, code {
+pre,
+code {
   font-family: var(--font-mono);
 }
 

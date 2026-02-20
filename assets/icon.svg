@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="grad" x1="0" y1="26" x2="512" y2="486" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#D42872"/>
-      <stop offset="40%" stop-color="#F04080"/>
-      <stop offset="70%" stop-color="#FE7389"/>
-      <stop offset="100%" stop-color="#FFBFA8"/>
+      <stop offset="0%" stop-color="#E8582E"/>
+      <stop offset="40%" stop-color="#F49035"/>
+      <stop offset="70%" stop-color="#FCBF3A"/>
+      <stop offset="100%" stop-color="#FFE270"/>
     </linearGradient>
   </defs>
   <path fill="url(#grad)" fill-rule="evenodd" d="
