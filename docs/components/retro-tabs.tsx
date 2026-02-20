@@ -111,7 +111,7 @@ const RetroTab = ({ value, className, ...props }: RetroTabProps) => {
       value={escapeValue(resolved)}
       forceMount
       className={cn(
-        'border-border mt-0 w-full rounded-b border-x-2 border-b-2 p-4 font-sans data-[state=inactive]:hidden',
+        'border-border mt-0 w-full rounded-b border-x-2 border-b-2 p-3 font-sans data-[state=inactive]:hidden sm:p-4',
         className,
       )}
       {...props}

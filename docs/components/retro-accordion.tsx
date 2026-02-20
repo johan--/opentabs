@@ -36,7 +36,7 @@ const RetroAccordion = ({ className, title, id, value, children, ...props }: Ret
         </AccordionPrimitive.Trigger>
       </AccordionPrimitive.Header>
       <AccordionPrimitive.Content className="text-foreground bg-background data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up overflow-hidden font-sans">
-        <div className="px-4 pt-2 pb-4">{children}</div>
+        <div className="px-3 pt-2 pb-3 md:px-4 md:pb-4">{children}</div>
       </AccordionPrimitive.Content>
     </AccordionPrimitive.Item>
   );

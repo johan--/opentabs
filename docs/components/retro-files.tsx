@@ -21,7 +21,7 @@ interface RetroFileProps extends HTMLAttributes<HTMLDivElement> {
 const RetroFile = ({ name, icon = <FileIcon className="size-4 shrink-0" />, className, ...props }: RetroFileProps) => (
   <div
     className={cn(
-      'hover:bg-accent hover:text-accent-foreground flex cursor-default flex-row items-center gap-2 px-2 py-1.5 font-sans text-sm transition-colors',
+      'hover:bg-accent hover:text-accent-foreground flex min-h-9 cursor-default flex-row items-center gap-2 px-2 py-1.5 font-sans text-sm transition-colors',
       className,
     )}
     {...props}>
@@ -51,7 +51,7 @@ const RetroFolder = ({
       <CollapsiblePrimitive.Trigger
         disabled={disabled}
         className={cn(
-          'font-head hover:bg-accent flex w-full flex-row items-center gap-2 px-2 py-1.5 text-sm font-semibold transition-colors',
+          'font-head hover:bg-accent flex min-h-9 w-full flex-row items-center gap-2 px-2 py-1.5 text-sm font-semibold transition-colors',
           disabled && 'cursor-default opacity-50',
         )}>
         <span className="text-primary">
