@@ -30,7 +30,7 @@ const RetroCallout = ({ className, type = 'info', title, icon: _icon, children, 
   return (
     <div
       role="alert"
-      className={cn('relative my-6 w-full rounded border-2 p-4 md:p-5', statusClasses, className)}
+      className={cn('relative my-6 w-full rounded border-2 p-3 md:p-5', statusClasses, className)}
       {...props}>
       {title && <p className="font-head mb-2 text-lg font-semibold">{title}</p>}
       <div className="font-sans text-sm">{children}</div>
@@ -131,7 +131,7 @@ export const getMDXComponents = (components?: MDXComponents): MDXComponents => (
   blockquote: ({ className, ...props }: ComponentPropsWithoutRef<'blockquote'>) => (
     <blockquote
       className={cn(
-        'border-primary bg-accent/20 my-6 border-l-4 px-4 py-3 font-sans leading-relaxed italic',
+        'border-primary bg-accent/20 my-6 border-l-4 px-3 py-2 font-sans leading-relaxed italic md:px-4 md:py-3',
         className,
       )}
       {...props}
@@ -161,7 +161,7 @@ export const getMDXComponents = (components?: MDXComponents): MDXComponents => (
       />
     ),
   table: ({ className, ...props }: ComponentPropsWithoutRef<'table'>) => (
-    <div className="my-6 w-full overflow-auto rounded border-2 shadow-lg">
+    <div className="my-6 w-full overflow-auto rounded border-2 shadow-sm sm:shadow-lg">
       <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   ),
@@ -175,10 +175,13 @@ export const getMDXComponents = (components?: MDXComponents): MDXComponents => (
     <tr className={cn('hover:bg-primary/15 border-b-2 transition-colors', className)} {...props} />
   ),
   th: ({ className, ...props }: ComponentPropsWithoutRef<'th'>) => (
-    <th className={cn('text-primary-foreground h-12 px-4 text-left align-middle font-medium', className)} {...props} />
+    <th
+      className={cn('text-primary-foreground h-10 px-2 text-left align-middle font-medium md:h-12 md:px-4', className)}
+      {...props}
+    />
   ),
   td: ({ className, ...props }: ComponentPropsWithoutRef<'td'>) => (
-    <td className={cn('px-4 py-3 align-middle', className)} {...props} />
+    <td className={cn('px-2 py-2 align-middle md:px-4 md:py-3', className)} {...props} />
   ),
   // Fumadocs MDX special components — overridden with RetroUI styling
   Callout: RetroCallout,
