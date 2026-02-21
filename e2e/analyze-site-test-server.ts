@@ -10,6 +10,7 @@
  *
  * Scenarios:
  *   /cookie-session/    — Cookie-based session auth with CSRF meta tag and REST APIs
+ *   /jwt-localstorage/  — JWT token in localStorage with Bearer header API calls
  *
  * Start: `bun e2e/analyze-site-test-server.ts`
  * Default port: 0 (dynamic, override with PORT env var)
@@ -92,6 +93,90 @@ const COOKIE_SESSION_HTML = `<!DOCTYPE html>
         document.getElementById('status').textContent = 'Error: ' + e.message;
       }
     })();
+  </script>
+</body>
+</html>`;
+
+// ---------------------------------------------------------------------------
+// JWT localStorage scenario HTML
+// ---------------------------------------------------------------------------
+
+/**
+ * A valid JWT structure (base64url header.payload.signature).
+ * The payload contains user info for realistic detection.
+ */
+const JWT_TOKEN = [
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+  'eyJzdWIiOiJ1c2VyLTEiLCJuYW1lIjoiVGVzdCBVc2VyIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzA5MDAwMDAwLCJleHAiOjE3MDkwODY0MDB9',
+  'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+].join('.');
+
+/**
+ * Simulates a logged-in SPA with:
+ * - JWT stored in localStorage (key: "auth_token")
+ * - API calls with Authorization: Bearer <jwt> header
+ * - REST API endpoints for profile and items
+ */
+const JWT_LOCALSTORAGE_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JWT LocalStorage Test App</title>
+</head>
+<body>
+  <div id="app">
+    <h1>JWT Dashboard</h1>
+    <p id="status">Loading...</p>
+  </div>
+
+  <script>
+    // Simulate post-login state: store JWT in localStorage
+    var jwtToken = '${JWT_TOKEN}';
+    localStorage.setItem('auth_token', jwtToken);
+
+    // Delay API calls to allow the analyze-site orchestrator to enable
+    // network capture after opening the tab. Without this delay, the fetch
+    // calls fire before the CDP Network.enable command completes and are
+    // missed by the capture.
+    setTimeout(function() {
+      (async function() {
+        try {
+          var profileRes = await fetch('/jwt-localstorage/api/me', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + jwtToken
+            }
+          });
+          var tasksRes = await fetch('/jwt-localstorage/api/tasks', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + jwtToken
+            }
+          });
+
+          var profile = await profileRes.json();
+          var tasks = await tasksRes.json();
+
+          document.getElementById('status').textContent =
+            'Loaded: ' + profile.user.name + ', ' + tasks.tasks.length + ' tasks';
+
+          // POST request with Bearer auth
+          await fetch('/jwt-localstorage/api/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + jwtToken
+            },
+            body: JSON.stringify({ title: 'New Task', done: false })
+          });
+        } catch (e) {
+          document.getElementById('status').textContent = 'Error: ' + e.message;
+        }
+      })();
+    }, 1500);
   </script>
 </body>
 </html>`;
@@ -197,6 +282,89 @@ const server = Bun.serve({
       return new Response(JSON.stringify({ ok: true }), {
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // ===================================================================
+    // JWT localStorage scenario
+    // ===================================================================
+
+    // Page — serves HTML (JWT is stored client-side via localStorage)
+    if (path === '/jwt-localstorage/' || path === '/jwt-localstorage') {
+      return new Response(JWT_LOCALSTORAGE_HTML, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
+    // REST API — GET /jwt-localstorage/api/me (requires Bearer token)
+    if (path === '/jwt-localstorage/api/me' && req.method === 'GET') {
+      const authHeader = req.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          user: {
+            id: 'user-1',
+            name: 'Test User',
+            email: 'test@example.com',
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // REST API — GET /jwt-localstorage/api/tasks
+    if (path === '/jwt-localstorage/api/tasks' && req.method === 'GET') {
+      const authHeader = req.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          tasks: [
+            { id: 'task-1', title: 'Review PR', done: false },
+            { id: 'task-2', title: 'Deploy staging', done: true },
+          ],
+          total: 2,
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // REST API — POST /jwt-localstorage/api/tasks
+    if (path === '/jwt-localstorage/api/tasks' && req.method === 'POST') {
+      const authHeader = req.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      let body: Record<string, unknown> = {};
+      try {
+        body = (await req.json()) as Record<string, unknown>;
+      } catch {
+        // ignore parse errors
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          task: {
+            id: 'task-new',
+            title: body.title ?? 'Untitled',
+            done: body.done ?? false,
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     // --- 404 ---

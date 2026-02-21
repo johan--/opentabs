@@ -101,17 +101,18 @@ const analyzeSite = async (mcpClient: McpClient, url: string, waitSeconds = 3): 
 // Tests
 // ---------------------------------------------------------------------------
 
+// Use a shared server across all test groups to avoid spawning multiple processes
+let analyzeSiteServer: TestServer;
+
+test.beforeAll(async () => {
+  analyzeSiteServer = await startAnalyzeSiteServer();
+});
+
+test.afterAll(async () => {
+  await analyzeSiteServer.kill();
+});
+
 test.describe('plugin_analyze_site — cookie session auth', () => {
-  let analyzeSiteServer: TestServer;
-
-  test.beforeAll(async () => {
-    analyzeSiteServer = await startAnalyzeSiteServer();
-  });
-
-  test.afterAll(async () => {
-    await analyzeSiteServer.kill();
-  });
-
   test('detects cookie-based session auth and CSRF token', async ({
     mcpServer,
     extensionContext: _extensionContext,
@@ -176,5 +177,54 @@ test.describe('plugin_analyze_site — cookie session auth', () => {
 
     // --- Title ---
     expect(analysis.title).toBe('Cookie Session Test App');
+  });
+});
+
+test.describe('plugin_analyze_site — JWT localStorage auth', () => {
+  test('detects JWT in localStorage and Bearer header in API calls', async ({
+    mcpServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const siteUrl = `${analyzeSiteServer.url}/jwt-localstorage/`;
+    const analysis = await analyzeSite(mcpClient, siteUrl);
+
+    // --- Auth detection ---
+    expect(analysis.auth.authenticated).toBe(true);
+
+    // Verify JWT in localStorage detected
+    const jwtLocalMethods = analysis.auth.methods.filter(m => m.type === 'jwt-localstorage');
+    expect(jwtLocalMethods.length).toBeGreaterThanOrEqual(1);
+
+    // The auth_token key should be mentioned in details
+    const authTokenMethod = jwtLocalMethods.find(m => m.details.includes('auth_token'));
+    expect(authTokenMethod).toBeDefined();
+
+    // extractionHint should contain working JS code for localStorage access
+    expect(authTokenMethod?.extractionHint).toContain('localStorage');
+    expect(authTokenMethod?.extractionHint).toContain('auth_token');
+
+    // Verify Bearer header detected in network requests
+    const bearerMethods = analysis.auth.methods.filter(m => m.type === 'bearer-header');
+    expect(bearerMethods.length).toBeGreaterThanOrEqual(1);
+
+    // --- API detection ---
+    expect(analysis.apis.endpoints.length).toBeGreaterThanOrEqual(1);
+
+    // Should detect REST endpoints
+    const restEndpoints = analysis.apis.endpoints.filter(e => e.protocol === 'rest');
+    expect(restEndpoints.length).toBeGreaterThanOrEqual(1);
+
+    // --- Storage detection ---
+    // The JWT key should be reported in localStorage keys
+    const authStorageEntry = analysis.storage.localStorage.find(e => e.name === 'auth_token');
+    expect(authStorageEntry).toBeDefined();
+    expect(authStorageEntry?.isAuth).toBe(true);
+
+    // --- Title ---
+    expect(analysis.title).toBe('JWT LocalStorage Test App');
   });
 });
