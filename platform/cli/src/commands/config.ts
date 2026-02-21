@@ -3,6 +3,7 @@
  */
 
 import { atomicWriteConfig, getConfigPath, readConfig } from '../config.js';
+import { resolvePort } from '../parse-port.js';
 import pc from 'picocolors';
 import { resolve } from 'node:path';
 import type { Command } from 'commander';
@@ -97,11 +98,57 @@ const loadConfig = async (): Promise<{ config: Record<string, unknown>; configPa
   return { config, configPath };
 };
 
+interface HealthPluginDetail {
+  name: string;
+  displayName: string;
+  tools: string[];
+}
+
+const fetchToolNames = async (port: number): Promise<string[] | null> => {
+  try {
+    const res = await fetch(`http://localhost:${port}/health`, {
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { pluginDetails?: HealthPluginDetail[] };
+    if (!Array.isArray(data.pluginDetails)) return null;
+    return data.pluginDetails.flatMap(p => p.tools);
+  } catch {
+    return null;
+  }
+};
+
+const handleListTools = async (): Promise<void> => {
+  const port = resolvePort({});
+  const tools = await fetchToolNames(port);
+
+  if (!tools) {
+    console.error(pc.yellow('Cannot reach the MCP server to list available tools.'));
+    console.error(`Start it with: ${pc.bold('opentabs start')}`);
+    console.error('');
+    console.error('Tool names use the format <plugin>_<tool>, e.g. slack_send_message');
+    process.exit(1);
+  }
+
+  if (tools.length === 0) {
+    console.log(pc.dim('No tools available (no plugins installed).'));
+    return;
+  }
+
+  console.log(pc.bold('Available tools:'));
+  for (const name of tools) {
+    console.log(`  ${name}`);
+  }
+  console.log('');
+  console.log(pc.dim('Usage: opentabs config set tool.<name> enabled|disabled'));
+};
+
 const handleSetTool = async (key: string, value: string): Promise<void> => {
   const toolName = key.slice(TOOL_PREFIX.length);
   if (!toolName || !toolName.includes('_')) {
     console.error(pc.red(`Invalid tool name: ${toolName || '(empty)'}`));
     console.error('Tool names use the format <plugin>_<tool>, e.g. slack_send_message');
+    console.error(`Run ${pc.bold('opentabs config set tool.')} to list available tools.`);
     process.exit(1);
   }
 
@@ -181,7 +228,17 @@ const handleSetLocalPluginsRemove = async (value: string): Promise<void> => {
   console.log(`${pc.green('Removed:')} ${pluginPath}`);
 };
 
-const handleConfigSet = async (key: string, value: string): Promise<void> => {
+const handleConfigSet = async (key: string, value?: string): Promise<void> => {
+  if (key === TOOL_PREFIX) {
+    return handleListTools();
+  }
+
+  if (!value) {
+    console.error(pc.red('Missing value.'));
+    console.error(SUPPORTED_KEYS);
+    process.exit(1);
+  }
+
   if (key.startsWith(TOOL_PREFIX)) {
     return handleSetTool(key, value);
   }
@@ -235,19 +292,20 @@ const registerConfigCommand = (program: Command): void => {
     });
 
   configCmd
-    .command('set <key> <value>')
+    .command('set <key> [value]')
     .description('Set a config value')
     .addHelpText(
       'after',
       `
 Examples:
+  $ opentabs config set tool.                              List available tools
   $ opentabs config set tool.slack_send_message disabled
   $ opentabs config set tool.slack_send_message enabled
   $ opentabs config set port 9515
   $ opentabs config set localPlugins.add /path/to/plugin
   $ opentabs config set localPlugins.remove /path/to/plugin`,
     )
-    .action((key: string, value: string) => handleConfigSet(key, value));
+    .action((key: string, value?: string) => handleConfigSet(key, value));
 
   configCmd
     .command('path')

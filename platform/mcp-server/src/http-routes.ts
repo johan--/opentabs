@@ -21,7 +21,7 @@ import { createMcpServer, notifyToolListChanged } from './mcp-setup.js';
 import { performConfigReload } from './reload.js';
 import { sanitizeErrorMessage } from './sanitize-error.js';
 import { sdkVersion } from './sdk-version.js';
-import { getNextRequestId, STATE_SCHEMA_VERSION } from './state.js';
+import { getNextRequestId, prefixedToolName, STATE_SCHEMA_VERSION } from './state.js';
 import { version } from './version.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -283,6 +283,7 @@ const createHandleFetch =
         name: p.name,
         displayName: p.displayName,
         toolCount: p.tools.length,
+        tools: p.tools.map(t => prefixedToolName(p.name, t.name)),
         tabState: state.tabMapping.get(p.name)?.state ?? 'closed',
         source: p.source,
         sdkVersion: p.sdkVersion ?? null,
