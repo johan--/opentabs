@@ -1,0 +1,202 @@
+---
+title: Plugin Class
+description: API reference for OpenTabsPlugin — the abstract base class every plugin extends.
+lastUpdated: 2026-02-21
+---
+
+Every OpenTabs plugin extends `OpenTabsPlugin` from the SDK. This class defines your plugin's identity, URL matching, readiness probe, and tool/resource/prompt registrations.
+
+## Import
+
+```typescript
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+```
+
+## Class Signature
+
+```typescript
+abstract class OpenTabsPlugin {
+  abstract readonly name: string;
+  abstract readonly version: string;
+  abstract readonly description: string;
+  abstract readonly displayName: string;
+  abstract readonly urlPatterns: string[];
+  abstract readonly tools: ToolDefinition[];
+  readonly resources?: ResourceDefinition[];
+  readonly prompts?: PromptDefinition[];
+
+  abstract isReady(): Promise<boolean>;
+  teardown?(): void;
+
+  // Lifecycle hooks (optional)
+  onActivate?(): void;
+  onDeactivate?(): void;
+  onNavigate?(url: string): void;
+  onToolInvocationStart?(toolName: string): void;
+  onToolInvocationEnd?(toolName: string, success: boolean, durationMs: number): void;
+}
+```
+
+## Abstract Properties
+
+These properties are required — your subclass must define them.
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Property</Table.Head>
+      <Table.Head>Type</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`name`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Unique identifier. Lowercase alphanumeric with hyphens (e.g., `'my-app'`). Used as the tool name prefix and config key.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`version`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Semver version string (e.g., `'1.0.0'`). Shown in the side panel and health endpoint.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`description`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Brief description of the plugin's purpose. Shown to MCP clients.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`displayName`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Human-readable name shown in the side panel and health endpoint (e.g., `'My App'`).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`urlPatterns`</Table.Cell>
+      <Table.Cell>`string[]`</Table.Cell>
+      <Table.Cell>Chrome [match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns). Determines which tabs receive the adapter injection. Example: `['*://*.slack.com/*']`.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`tools`</Table.Cell>
+      <Table.Cell>`ToolDefinition[]`</Table.Cell>
+      <Table.Cell>Array of tool definitions. See [Tools](/docs/sdk/tools).</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+## Optional Properties
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Property</Table.Head>
+      <Table.Head>Type</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`resources`</Table.Cell>
+      <Table.Cell>`ResourceDefinition[]`</Table.Cell>
+      <Table.Cell>Read-only data exposed to AI agents. See [Resources](/docs/sdk/resources).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`prompts`</Table.Cell>
+      <Table.Cell>`PromptDefinition[]`</Table.Cell>
+      <Table.Cell>Prompt templates for AI agents. See [Prompts](/docs/sdk/prompts).</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+## Abstract Methods
+
+### `isReady()`
+
+Readiness probe called by the extension to determine if the current tab is ready to accept tool requests. Runs in the page context.
+
+```typescript
+abstract isReady(): Promise<boolean>;
+```
+
+Return `true` when the user is authenticated and the page is operational. Return `false` when the page is loading, logged out, or in an error state.
+
+The return value maps to the tab state machine:
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Condition</Table.Head>
+      <Table.Head>Tab State</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell>No matching tab exists</Table.Cell>
+      <Table.Cell>`closed`</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>Tab exists, `isReady()` returns `false`</Table.Cell>
+      <Table.Cell>`unavailable`</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>Tab exists, `isReady()` returns `true`</Table.Cell>
+      <Table.Cell>`ready`</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+**Example:**
+
+```typescript
+async isReady(): Promise<boolean> {
+  // Check for an auth token that the app stores on login
+  const token = getPageGlobal('__APP__.authToken') as string | undefined;
+  return token !== undefined;
+}
+```
+
+### `teardown()`
+
+Optional cleanup method called before re-injection on plugin updates. Remove any event listeners, timers, or global state set up by the previous adapter version.
+
+```typescript
+teardown?(): void;
+```
+
+Plugins that don't set up persistent side effects can omit this.
+
+## Lifecycle Hooks
+
+All lifecycle hooks are optional. They run in the page context and are wired automatically by the build process. Errors in hooks are caught and logged — they never affect adapter registration or tool execution.
+
+See [Lifecycle Hooks](/docs/sdk/lifecycle-hooks) for the complete reference.
+
+## Example
+
+```typescript
+import { OpenTabsPlugin, defineTool, getPageGlobal } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+
+import { listChannels } from './tools/list-channels.js';
+import { sendMessage } from './tools/send-message.js';
+
+class SlackPlugin extends OpenTabsPlugin {
+  readonly name = 'slack';
+  readonly version = '1.0.0';
+  readonly description = 'Interact with Slack through the browser';
+  readonly displayName = 'Slack';
+  readonly urlPatterns = ['*://*.slack.com/*'];
+  readonly tools: ToolDefinition[] = [listChannels, sendMessage];
+
+  async isReady(): Promise<boolean> {
+    const token = getPageGlobal('TS.boot_data.api_token') as string | undefined;
+    return token !== undefined;
+  }
+}
+
+export default new SlackPlugin();
+```
+
+<Alert variant="info">
+  The plugin file exports a **class instance** (`export default new SlackPlugin()`), not the class itself. The build process wraps this instance into an adapter IIFE.
+</Alert>

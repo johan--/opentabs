@@ -1,0 +1,169 @@
+---
+title: Tools
+description: API reference for defineTool — define type-safe MCP tools with Zod schemas and handlers that run in the browser.
+lastUpdated: 2026-02-21
+---
+
+Tools are the primary way plugins expose actions to AI agents. Each tool has a name, input/output Zod schemas, and a handler that runs in the browser page context with full access to the page's session.
+
+## Import
+
+```typescript
+import { defineTool } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition, ToolHandlerContext } from '@opentabs-dev/plugin-sdk';
+```
+
+## `defineTool(config)`
+
+Type-safe factory function that returns a `ToolDefinition`. It's an identity function — no runtime behavior, just generic inference for TypeScript.
+
+```typescript
+function defineTool<
+  TInput extends z.ZodObject<z.ZodRawShape>,
+  TOutput extends z.ZodType,
+>(config: ToolDefinition<TInput, TOutput>): ToolDefinition<TInput, TOutput>;
+```
+
+## `ToolDefinition`
+
+```typescript
+interface ToolDefinition<
+  TInput extends z.ZodObject<z.ZodRawShape>,
+  TOutput extends z.ZodType,
+> {
+  name: string;
+  displayName: string;
+  description: string;
+  icon: LucideIconName;
+  input: TInput;
+  output: TOutput;
+  handle(params: z.infer<TInput>, context?: ToolHandlerContext): Promise<z.infer<TOutput>>;
+}
+```
+
+### Properties
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Property</Table.Head>
+      <Table.Head>Type</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`name`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Tool name in `snake_case` (e.g., `'send_message'`). Auto-prefixed with the plugin name for MCP registration (`slack_send_message`).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`displayName`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Human-readable name shown in the side panel (e.g., `'Send Message'`).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`description`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>Description shown to AI agents. Be specific — this is how the agent decides when to use the tool.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`icon`</Table.Cell>
+      <Table.Cell>`LucideIconName`</Table.Cell>
+      <Table.Cell>Lucide icon in kebab-case (e.g., `'message-square'`). Displayed in the side panel. See [lucide.dev/icons](https://lucide.dev/icons).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`input`</Table.Cell>
+      <Table.Cell>`z.ZodObject`</Table.Cell>
+      <Table.Cell>Zod object schema for tool input. Serialized to JSON Schema for MCP registration and used for server-side validation.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`output`</Table.Cell>
+      <Table.Cell>`z.ZodType`</Table.Cell>
+      <Table.Cell>Zod schema describing the output shape. Used for manifest generation and MCP tool registration.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`handle`</Table.Cell>
+      <Table.Cell>`(params, context?) => Promise`</Table.Cell>
+      <Table.Cell>Async handler that executes in the browser page context. Input is pre-validated against the `input` schema. The optional `context` parameter provides progress reporting.</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+## `ToolHandlerContext`
+
+Optional second argument to `handle()`, injected by the adapter runtime. Provides progress reporting for long-running operations.
+
+```typescript
+interface ToolHandlerContext {
+  reportProgress(opts: ProgressOptions): void;
+}
+
+interface ProgressOptions {
+  progress: number;  // Current value (e.g., 3 of 10)
+  total: number;     // Total expected value (e.g., 10)
+  message?: string;  // Human-readable status (e.g., 'Processing page 3')
+}
+```
+
+The `context` parameter is optional — tools that don't need progress reporting can omit it. Always use optional chaining (`context?.reportProgress(...)`) for safety. See [Streaming & Progress](/docs/guides/streaming-progress) for the full guide.
+
+## Example
+
+```typescript
+import { defineTool, fetchJSON, ToolError } from '@opentabs-dev/plugin-sdk';
+import type { ToolHandlerContext } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+
+export const sendMessage = defineTool({
+  name: 'send_message',
+  displayName: 'Send Message',
+  description: 'Send a message to a Slack channel by name or ID.',
+  icon: 'message-square',
+
+  input: z.object({
+    channel: z.string().describe('Channel name or ID'),
+    text: z.string().describe('Message text'),
+  }),
+
+  output: z.object({
+    ok: z.boolean(),
+    ts: z.string().describe('Message timestamp ID'),
+  }),
+
+  async handle(params, context?: ToolHandlerContext) {
+    const result = await fetchJSON<{ ok: boolean; ts: string }>(
+      '/api/chat.postMessage',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: params.channel,
+          text: params.text,
+        }),
+      },
+    );
+
+    if (!result.ok) {
+      throw ToolError.internal('Failed to send message');
+    }
+
+    return { ok: result.ok, ts: result.ts };
+  },
+});
+```
+
+## Zod Schema Rules
+
+Tool schemas are serialized to JSON Schema via `z.toJSONSchema()` at build time. Keep schemas serialization-compatible:
+
+- **No `.transform()`** — transforms cannot be represented in JSON Schema. Normalize input in `handle()` instead.
+- **No `.pipe()` or `.preprocess()`** — these produce runtime-only behavior that breaks serialization.
+- **`.refine()` callbacks must not throw** — Zod 4 runs refine callbacks even when the base validator fails. Wrap any throwing logic in try-catch and return `false` on error.
+- **Stick to declarative types** — primitives, objects, arrays, unions, literals, enums, and standard validations (`.min()`, `.max()`, `.url()`, etc.) serialize cleanly.
+
+## Name Prefixing
+
+Tool names are automatically prefixed with the plugin name when registered with the MCP server. A tool named `send_message` in a plugin named `slack` becomes `slack_send_message` at the MCP level. You define just the unprefixed name.
+
+Tool names must match `^[a-z][a-z0-9]*(_[a-z0-9]+)*$` — lowercase snake_case, starting with a letter.
