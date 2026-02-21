@@ -122,7 +122,8 @@ const handleAudit = async (options: AuditOptions): Promise<void> => {
     for (const entry of entries) {
       const time = formatTimestamp(entry.timestamp).padEnd(timeCol);
       const tool = entry.tool.padEnd(toolCol);
-      const status = (entry.success ? pc.green('✓') : pc.red('✗')).padEnd(statusCol);
+      const statusIcon = entry.success ? pc.green('✓') : pc.red('✗');
+      const status = statusIcon + ' '.repeat(Math.max(0, statusCol - 1));
       const duration = formatDuration(entry.durationMs).padEnd(durationCol);
       console.log(`${time}${tool}${status}${duration}`);
     }
