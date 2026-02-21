@@ -40,6 +40,35 @@ const TEST_SERVER_ENTRY = path.join(ROOT, 'e2e/test-server.ts');
 const STRICT_CSP_SERVER_ENTRY = path.join(ROOT, 'e2e/strict-csp-test-server.ts');
 const ANALYZE_SITE_SERVER_ENTRY = path.join(ROOT, 'e2e/analyze-site-test-server.ts');
 const E2E_TEST_PLUGIN_DIR = path.join(ROOT, 'plugins/e2e-test');
+const PLUGIN_SDK_PKG_PATH = path.join(ROOT, 'platform/plugin-sdk/package.json');
+
+// ---------------------------------------------------------------------------
+// SDK version injection
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensure the e2e-test plugin's dist/tools.json contains an `sdkVersion` field.
+ *
+ * The published `@opentabs-dev/plugin-tools` may not yet include the
+ * `sdkVersion` feature, so `opentabs-plugin build` can produce a manifest
+ * without it. This function patches the manifest at the given directory so
+ * that E2E tests exercising SDK version behavior always have a valid field.
+ *
+ * Reads the version from platform/plugin-sdk/package.json (the workspace
+ * source of truth for the SDK version the server is built against).
+ */
+const ensureSdkVersionInManifest = (pluginDir: string): void => {
+  const toolsJsonPath = path.join(pluginDir, 'dist', 'tools.json');
+  if (!fs.existsSync(toolsJsonPath)) return;
+
+  const raw = JSON.parse(fs.readFileSync(toolsJsonPath, 'utf-8')) as Record<string, unknown>;
+  if (typeof raw.sdkVersion === 'string' && raw.sdkVersion.length > 0) return;
+
+  // Read the SDK version from the workspace plugin-sdk package.json
+  const sdkPkg = JSON.parse(fs.readFileSync(PLUGIN_SDK_PKG_PATH, 'utf-8')) as { version: string };
+  raw.sdkVersion = sdkPkg.version;
+  fs.writeFileSync(toolsJsonPath, JSON.stringify(raw, null, 2) + '\n', 'utf-8');
+};
 
 // ---------------------------------------------------------------------------
 // Health helper (MCP server)
@@ -132,6 +161,8 @@ interface OpentabsConfig {
  * Returns prefixed tool names (e.g., 'e2e-test_echo').
  */
 const readPluginToolNames = (): string[] => {
+  // Ensure the source plugin has sdkVersion before any test reads it
+  ensureSdkVersionInManifest(E2E_TEST_PLUGIN_DIR);
   const toolsPath = path.join(E2E_TEST_PLUGIN_DIR, 'dist', 'tools.json');
   const raw: unknown = JSON.parse(fs.readFileSync(toolsPath, 'utf-8'));
   // Support both legacy array format and current { tools: [...] } format
@@ -269,6 +300,8 @@ const createMinimalPlugin = (
  * for cleanup.
  */
 const copyE2eTestPlugin = (): { pluginDir: string; tmpDir: string } => {
+  // Ensure the source has sdkVersion before copying
+  ensureSdkVersionInManifest(E2E_TEST_PLUGIN_DIR);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-plugin-copy-'));
   const pluginDir = path.join(tmpDir, 'e2e-test');
   fs.cpSync(E2E_TEST_PLUGIN_DIR, pluginDir, { recursive: true });

@@ -2257,10 +2257,26 @@ test.describe('Browser tools — dialog handling', () => {
     // Register a Playwright dialog listener that accepts the dialog immediately
     // and signals when it has appeared. Without a listener, Playwright
     // auto-dismisses dialogs without recording them.
+    //
+    // Poll extensionContext.pages() until the /interactive page appears in
+    // Playwright's model. The page may not be registered yet when
+    // browser_open_tab returns — Playwright discovers pages asynchronously.
+    let foundPage: Awaited<ReturnType<typeof extensionContext.pages>>[number] | undefined;
+    await waitFor(
+      () => {
+        foundPage = extensionContext.pages().find(p => p.url().includes('/interactive'));
+        return foundPage !== undefined;
+      },
+      10_000,
+      200,
+      '/interactive page in extensionContext.pages()',
+    );
+    if (!foundPage) throw new Error('/interactive page not found in extensionContext.pages()');
+    const tabPage = foundPage;
+
     let dialogMessage = '';
     const dialogHandled = new Promise<void>(resolve => {
-      const tabPage = extensionContext.pages().find(p => p.url().includes('/interactive'));
-      tabPage?.on('dialog', dialog => {
+      tabPage.on('dialog', dialog => {
         dialogMessage = dialog.message();
         void dialog.accept();
         resolve();
