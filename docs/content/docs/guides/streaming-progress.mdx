@@ -1,0 +1,203 @@
+---
+title: Streaming & Progress
+description: Report incremental progress during long-running tool operations so AI agents see live updates and your tool never times out.
+lastUpdated: 2026-02-21
+---
+
+Long-running tools — bulk exports, multi-page scrapes, slow API calls — risk timing out before they finish. Progress reporting solves this: your tool tells the platform "I'm still working" at each step, the dispatch timeout resets, and the AI agent sees live progress updates.
+
+## The Timeout Problem
+
+Every tool dispatch has a **30-second timeout**. If your tool doesn't respond within 30 seconds, the platform kills the dispatch and returns a timeout error. For tools that process multiple items or call slow APIs, 30 seconds isn't enough.
+
+Progress reporting extends this: each time your tool reports progress, the 30-second timer resets. A tool that reports progress at least once every 30 seconds can run for up to **5 minutes** (the absolute maximum).
+
+## Reporting Progress
+
+The `handle` function receives an optional second argument — a `ToolHandlerContext` with a `reportProgress` method:
+
+```typescript
+import { defineTool, fetchJSON } from '@opentabs-dev/plugin-sdk';
+import type { ToolHandlerContext } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+
+export const exportMessages = defineTool({
+  name: 'export_messages',
+  displayName: 'Export Messages',
+  description: 'Export all messages from a channel',
+  icon: 'download',
+  input: z.object({
+    channelId: z.string().describe('Channel ID to export'),
+  }),
+  output: z.object({
+    messages: z.array(z.object({
+      text: z.string(),
+      author: z.string(),
+      timestamp: z.string(),
+    })),
+    total: z.number(),
+  }),
+  handle: async (params, context) => {
+    const messages: { text: string; author: string; timestamp: string }[] = [];
+    let cursor: string | undefined;
+    let page = 0;
+
+    do {
+      const result = await fetchJSON<{
+        messages: { text: string; author: string; timestamp: string }[];
+        nextCursor?: string;
+        totalPages: number;
+      }>(`/api/channels/${params.channelId}/messages?cursor=${cursor ?? ''}`);
+
+      messages.push(...result.messages);
+      cursor = result.nextCursor;
+      page++;
+
+      context?.reportProgress({
+        progress: page,
+        total: result.totalPages,
+        message: `Exported page ${page} of ${result.totalPages}`,
+      });
+    } while (cursor);
+
+    return { messages, total: messages.length };
+  },
+});
+```
+
+## The `ToolHandlerContext` Interface
+
+```typescript
+interface ToolHandlerContext {
+  reportProgress(opts: ProgressOptions): void;
+}
+
+interface ProgressOptions {
+  /** Current progress value (e.g., 3 of 10 items processed). */
+  progress: number;
+  /** Total expected value (e.g., 10 items total). */
+  total: number;
+  /** Optional human-readable message describing the current step. */
+  message?: string;
+}
+```
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Field</Table.Head>
+      <Table.Head>Type</Table.Head>
+      <Table.Head>Required</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell>`progress`</Table.Cell>
+      <Table.Cell>`number`</Table.Cell>
+      <Table.Cell>Yes</Table.Cell>
+      <Table.Cell>Current step (e.g., 3 of 10)</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>`total`</Table.Cell>
+      <Table.Cell>`number`</Table.Cell>
+      <Table.Cell>Yes</Table.Cell>
+      <Table.Cell>Total steps expected (e.g., 10)</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>`message`</Table.Cell>
+      <Table.Cell>`string`</Table.Cell>
+      <Table.Cell>No</Table.Cell>
+      <Table.Cell>Human-readable description of the current step</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+## How Progress Flows
+
+When your tool calls `context.reportProgress()`, the notification travels through the platform:
+
+1. **Tool handler** calls `reportProgress()` in the page context
+2. **Adapter IIFE** fires a `CustomEvent` on `window` (MAIN world → ISOLATED world)
+3. **Content script relay** forwards via `chrome.runtime.sendMessage`
+4. **Extension background** sends a `tool.progress` JSON-RPC notification over WebSocket
+5. **MCP server** resets the dispatch timeout and emits `notifications/progress` to the MCP client
+6. **AI agent** (e.g., Claude) sees the progress update in real time
+
+Progress notifications are **fire-and-forget** — if any step in the chain fails, the tool result is unaffected. Your tool keeps running normally.
+
+## Timeout Behavior
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Scenario</Table.Head>
+      <Table.Head>Timeout</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell>Tool with no progress reporting</Table.Cell>
+      <Table.Cell>30 seconds</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>Tool reporting progress every N seconds (N &lt; 30)</Table.Cell>
+      <Table.Cell>Up to 5 minutes</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>Tool reporting progress, but gap &gt; 30s between reports</Table.Cell>
+      <Table.Cell>Times out at the 30s gap</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell>Tool reporting progress for over 5 minutes</Table.Cell>
+      <Table.Cell>Killed at 5 minutes (absolute max)</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+Each `reportProgress` call resets a 30-second timer. As long as you report progress at least once every 30 seconds, the tool keeps running — up to the 5-minute absolute ceiling.
+
+## When to Use Progress
+
+**Use progress when:**
+
+- Processing multiple items (pages, records, files) in a loop
+- Making multiple API calls sequentially
+- Any operation that might take more than a few seconds
+
+**Skip progress when:**
+
+- The tool is a single fast operation (one API call, one DOM read)
+- The total work is unknown upfront and there are no meaningful intermediate steps
+
+## The `context` Parameter is Optional
+
+The `context` argument is injected by the adapter runtime — it's always present when your tool runs inside a browser tab. The parameter is typed as optional (`context?`) so tool handlers work in unit tests without mocking the adapter:
+
+```typescript
+handle: async (params, context) => {
+  // Always use optional chaining — context is undefined in tests
+  context?.reportProgress({ progress: 1, total: 2, message: 'Step 1' });
+
+  const result = await doWork(params);
+
+  context?.reportProgress({ progress: 2, total: 2, message: 'Done' });
+  return result;
+},
+```
+
+<Alert type="info">
+Always use `context?.reportProgress()` (optional chaining), never `context.reportProgress()`. This keeps your tool testable outside the adapter runtime.
+</Alert>
+
+## MCP Client Integration
+
+Progress notifications are only forwarded to the MCP client if the client includes a `progressToken` in the tool call request's `_meta` field. If no `progressToken` is provided, the server still resets the timeout on progress — the tool runs longer — but no notifications are sent to the client.
+
+Most MCP clients (including Claude) send `progressToken` automatically when calling tools.
+
+## Next Steps
+
+- [Plugin Development](/docs/guides/plugin-development) — full walkthrough of building a plugin
+- [Error Handling](/docs/guides/error-handling) — structured errors for intelligent retry
+- [SDK Reference: Tools](/docs/sdk/tools) — complete `defineTool` API reference
