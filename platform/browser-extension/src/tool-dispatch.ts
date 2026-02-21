@@ -42,7 +42,12 @@ const injectToolInvocationLog = async (
 };
 
 type ToolResult =
-  | { type: 'error'; code: number; message: string; data?: { code: string } }
+  | {
+      type: 'error';
+      code: number;
+      message: string;
+      data?: { code: string; retryable?: boolean; retryAfterMs?: number; category?: string };
+    }
   | { type: 'success'; output: unknown };
 
 /**
@@ -109,12 +114,34 @@ const executeToolOnTab = async (
         const output = await tool.handle(tInput);
         return { type: 'success' as const, output };
       } catch (err: unknown) {
-        const e = err as { message?: string; code?: string };
+        const e = err as {
+          message?: string;
+          code?: string;
+          retryable?: boolean;
+          retryAfterMs?: number;
+          category?: string;
+        };
+        if (typeof e.code !== 'string') {
+          return {
+            type: 'error' as const,
+            code: -32603,
+            message: e.message ?? 'Tool execution failed',
+          };
+        }
+        const data: {
+          code: string;
+          retryable?: boolean;
+          retryAfterMs?: number;
+          category?: string;
+        } = { code: e.code };
+        if (typeof e.retryable === 'boolean') data.retryable = e.retryable;
+        if (typeof e.retryAfterMs === 'number') data.retryAfterMs = e.retryAfterMs;
+        if (typeof e.category === 'string') data.category = e.category;
         return {
           type: 'error' as const,
           code: -32603,
           message: e.message ?? 'Tool execution failed',
-          data: typeof e.code === 'string' ? { code: e.code } : undefined,
+          data,
         };
       }
     },
@@ -226,7 +253,13 @@ export const handleToolDispatch = async (params: Record<string, unknown>, id: st
 
   // Try matching tabs in ranked order. If the best tab's adapter is not ready
   // (code -32002), fall back to the next matching tab.
-  let firstError: { code: number; message: string; data?: { code: string } } | undefined;
+  let firstError:
+    | {
+        code: number;
+        message: string;
+        data?: { code: string; retryable?: boolean; retryAfterMs?: number; category?: string };
+      }
+    | undefined;
 
   for (const tab of matchingTabs) {
     if (tab.id === undefined) continue;

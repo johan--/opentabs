@@ -150,6 +150,80 @@ describe('handleExtensionMessage — response settlement', () => {
     expect(err.data).toEqual({ code: 'CHANNEL_NOT_FOUND' });
   });
 
+  test('error response with structured ToolError fields propagates all fields in data', () => {
+    const state = createState();
+    state.extensionWs = createMockWs();
+
+    let rejected: unknown;
+    const pending: PendingDispatch = {
+      resolve: () => {},
+      reject: err => {
+        rejected = err;
+      },
+      label: 'test',
+      startTs: Date.now(),
+      timerId: setTimeout(() => {}, 60_000),
+    };
+    state.pendingDispatches.set(80, pending);
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 80,
+        error: {
+          code: -32603,
+          message: 'Too many requests',
+          data: { code: 'RATE_LIMITED', retryable: true, retryAfterMs: 5000, category: 'rate_limit' },
+        },
+      }),
+      noopCallbacks,
+    );
+
+    expect(rejected).toBeDefined();
+    expect(isDispatchError(rejected)).toBe(true);
+    const err = rejected as { name: string; message: string; code: number; data?: Record<string, unknown> };
+    expect(err.message).toBe('Too many requests');
+    expect(err.code).toBe(-32603);
+    expect(err.data).toEqual({ code: 'RATE_LIMITED', retryable: true, retryAfterMs: 5000, category: 'rate_limit' });
+  });
+
+  test('error response with partial structured fields propagates only present fields', () => {
+    const state = createState();
+    state.extensionWs = createMockWs();
+
+    let rejected: unknown;
+    const pending: PendingDispatch = {
+      resolve: () => {},
+      reject: err => {
+        rejected = err;
+      },
+      label: 'test',
+      startTs: Date.now(),
+      timerId: setTimeout(() => {}, 60_000),
+    };
+    state.pendingDispatches.set(81, pending);
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 81,
+        error: {
+          code: -32603,
+          message: 'Auth failed',
+          data: { code: 'AUTH_ERROR', category: 'auth' },
+        },
+      }),
+      noopCallbacks,
+    );
+
+    expect(rejected).toBeDefined();
+    expect(isDispatchError(rejected)).toBe(true);
+    const err = rejected as { name: string; message: string; code: number; data?: Record<string, unknown> };
+    expect(err.data).toEqual({ code: 'AUTH_ERROR', category: 'auth' });
+  });
+
   test('error response without data field has undefined data', () => {
     const state = createState();
     state.extensionWs = createMockWs();

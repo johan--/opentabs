@@ -460,6 +460,127 @@ describe('tools/call handler — dispatch success and error codes', () => {
     expect(result.content[0]?.text).toBe('[RATE_LIMITED] rate limited');
   });
 
+  test('DispatchError with structured fields produces human-readable prefix and JSON block', async () => {
+    state.extensionWs = createAutoRejectWs(state, {
+      code: -32603,
+      message: 'Too many requests',
+      data: { code: 'RATE_LIMITED', retryable: true, retryAfterMs: 5000, category: 'rate_limit' },
+    }) as unknown as typeof state.extensionWs;
+
+    const { server, getCallHandler } = createMockServer();
+    registerMcpHandlers(server, state);
+    const handler = getCallHandler();
+
+    const result = (await handler({ params: { name: 'slack_send_message' } })) as {
+      isError: boolean;
+      content: Array<{ text: string }>;
+    };
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0]?.text ?? '';
+
+    // Verify human-readable prefix
+    expect(text).toContain('[ERROR code=RATE_LIMITED category=rate_limit retryable=true retryAfterMs=5000]');
+    expect(text).toContain('Too many requests');
+
+    // Verify machine-readable JSON block is present and parseable
+    const jsonMatch = text.match(/```json\n(.+?)\n```/s);
+    expect(jsonMatch).toBeTruthy();
+    const jsonStr = (jsonMatch as RegExpMatchArray)[1] as string;
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    expect(parsed).toEqual({
+      code: 'RATE_LIMITED',
+      category: 'rate_limit',
+      retryable: true,
+      retryAfterMs: 5000,
+    });
+  });
+
+  test('DispatchError with partial structured fields omits undefined fields from output', async () => {
+    state.extensionWs = createAutoRejectWs(state, {
+      code: -32603,
+      message: 'Not authenticated',
+      data: { code: 'AUTH_ERROR', category: 'auth' },
+    }) as unknown as typeof state.extensionWs;
+
+    const { server, getCallHandler } = createMockServer();
+    registerMcpHandlers(server, state);
+    const handler = getCallHandler();
+
+    const result = (await handler({ params: { name: 'slack_send_message' } })) as {
+      isError: boolean;
+      content: Array<{ text: string }>;
+    };
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0]?.text ?? '';
+
+    // Verify prefix contains only present fields
+    expect(text).toContain('[ERROR code=AUTH_ERROR category=auth]');
+    expect(text).not.toContain('retryable');
+    expect(text).not.toContain('retryAfterMs');
+
+    // Verify JSON block contains only present fields
+    const jsonMatch = text.match(/```json\n(.+?)\n```/s);
+    expect(jsonMatch).toBeTruthy();
+    const jsonStr = (jsonMatch as RegExpMatchArray)[1] as string;
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    expect(parsed).toEqual({ code: 'AUTH_ERROR', category: 'auth' });
+  });
+
+  test('DispatchError with retryable only (no category) produces structured output', async () => {
+    state.extensionWs = createAutoRejectWs(state, {
+      code: -32603,
+      message: 'Service overloaded',
+      data: { code: 'OVERLOADED', retryable: true },
+    }) as unknown as typeof state.extensionWs;
+
+    const { server, getCallHandler } = createMockServer();
+    registerMcpHandlers(server, state);
+    const handler = getCallHandler();
+
+    const result = (await handler({ params: { name: 'slack_send_message' } })) as {
+      isError: boolean;
+      content: Array<{ text: string }>;
+    };
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0]?.text ?? '';
+
+    expect(text).toContain('[ERROR code=OVERLOADED retryable=true]');
+    expect(text).not.toContain('category');
+
+    const jsonMatch = text.match(/```json\n(.+?)\n```/s);
+    expect(jsonMatch).toBeTruthy();
+    const jsonStr = (jsonMatch as RegExpMatchArray)[1] as string;
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    expect(parsed).toEqual({ code: 'OVERLOADED', retryable: true });
+  });
+
+  test('DispatchError with only code (no structured fields) uses legacy [CODE] format', async () => {
+    state.extensionWs = createAutoRejectWs(state, {
+      code: -32603,
+      message: 'Something went wrong',
+      data: { code: 'SOME_ERROR' },
+    }) as unknown as typeof state.extensionWs;
+
+    const { server, getCallHandler } = createMockServer();
+    registerMcpHandlers(server, state);
+    const handler = getCallHandler();
+
+    const result = (await handler({ params: { name: 'slack_send_message' } })) as {
+      isError: boolean;
+      content: Array<{ text: string }>;
+    };
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0]?.text ?? '';
+
+    // Legacy format: [CODE] message (no JSON block)
+    expect(text).toBe('[SOME_ERROR] Something went wrong');
+    expect(text).not.toContain('```json');
+  });
+
   test('generic dispatch error returns "Tool dispatch error:" with message', async () => {
     // Use a WS whose send() throws — dispatchToExtension wraps this as a generic Error
     state.extensionWs = {

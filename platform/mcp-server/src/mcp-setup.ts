@@ -91,6 +91,40 @@ const getServerCtor = async (): Promise<ServerModuleShape['Server']> => {
   return mod.Server;
 };
 
+/**
+ * Format a structured error response for MCP clients.
+ *
+ * When the error data contains structured fields (category, retryable, retryAfterMs),
+ * produces a human-readable prefix line followed by a machine-readable JSON block.
+ * When only the code is present (legacy), produces [CODE] message.
+ */
+const formatStructuredError = (code: string, message: string, data?: Record<string, unknown>): string => {
+  const category = typeof data?.category === 'string' ? data.category : undefined;
+  const retryable = typeof data?.retryable === 'boolean' ? data.retryable : undefined;
+  const retryAfterMs = typeof data?.retryAfterMs === 'number' ? data.retryAfterMs : undefined;
+
+  const hasStructuredFields = category !== undefined || retryable !== undefined || retryAfterMs !== undefined;
+
+  if (!hasStructuredFields) {
+    return `[${code}] ${message}`;
+  }
+
+  // Build the human-readable prefix with only present fields
+  const parts = [`code=${code}`];
+  if (category !== undefined) parts.push(`category=${category}`);
+  if (retryable !== undefined) parts.push(`retryable=${String(retryable)}`);
+  if (retryAfterMs !== undefined) parts.push(`retryAfterMs=${retryAfterMs}`);
+  const prefix = `[ERROR ${parts.join(' ')}] ${message}`;
+
+  // Build the machine-readable JSON block with only present fields
+  const jsonObj: Record<string, unknown> = { code };
+  if (category !== undefined) jsonObj.category = category;
+  if (retryable !== undefined) jsonObj.retryable = retryable;
+  if (retryAfterMs !== undefined) jsonObj.retryAfterMs = retryAfterMs;
+
+  return `${prefix}\n\n\`\`\`json\n${JSON.stringify(jsonObj)}\n\`\`\``;
+};
+
 /** Format a ZodError into a readable validation message listing each failing field */
 const formatZodError = (err: ZodError): string => {
   const issues = err.issues.map(issue => {
@@ -305,7 +339,7 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
 
         const toolErrorCode = err.data?.code;
         if (typeof toolErrorCode === 'string') {
-          errorMsg = `[${toolErrorCode}] ${errorMsg}`;
+          errorMsg = formatStructuredError(toolErrorCode, errorMsg, err.data);
         }
 
         return {
