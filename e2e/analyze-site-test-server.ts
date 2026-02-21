@@ -12,6 +12,7 @@
  *   /cookie-session/    — Cookie-based session auth with CSRF meta tag and REST APIs
  *   /jwt-localstorage/  — JWT token in localStorage with Bearer header API calls
  *   /graphql/           — GraphQL API endpoint with queries and a mutation
+ *   /jsonrpc-app/       — JSON-RPC 2.0 API endpoint with methods
  *
  * Start: `bun e2e/analyze-site-test-server.ts`
  * Default port: 0 (dynamic, override with PORT env var)
@@ -247,6 +248,71 @@ const GRAPHQL_HTML = `<!DOCTYPE html>
             'Loaded: ' + usersData.data.users.length + ' users, ' +
             itemsData.data.items.length + ' items, created: ' +
             createData.data.createItem.title;
+        } catch (e) {
+          document.getElementById('status').textContent = 'Error: ' + e.message;
+        }
+      })();
+    }, 1500);
+  </script>
+</body>
+</html>`;
+
+// ---------------------------------------------------------------------------
+// JSON-RPC scenario HTML
+// ---------------------------------------------------------------------------
+
+/**
+ * Simulates a web app backed by a JSON-RPC 2.0 API:
+ * - POST /rpc endpoint accepting { jsonrpc: '2.0', method, params, id }
+ * - Client-side JS fires 2 RPC calls on load: getItems and createItem
+ */
+const JSONRPC_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JSON-RPC Test App</title>
+</head>
+<body>
+  <div id="app">
+    <h1>JSON-RPC Dashboard</h1>
+    <p id="status">Loading...</p>
+  </div>
+
+  <script>
+    // Delay API calls so the orchestrator's network capture is active
+    setTimeout(function() {
+      (async function() {
+        try {
+          // RPC call 1: getItems
+          var itemsRes = await fetch('/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'getItems',
+              params: { limit: 10 },
+              id: 1
+            })
+          });
+          var itemsData = await itemsRes.json();
+
+          // RPC call 2: createItem
+          var createRes = await fetch('/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'createItem',
+              params: { title: 'New Item', description: 'Created via JSON-RPC' },
+              id: 2
+            })
+          });
+          var createData = await createRes.json();
+
+          document.getElementById('status').textContent =
+            'Loaded: ' + itemsData.result.items.length + ' items, created: ' +
+            createData.result.item.title;
         } catch (e) {
           document.getElementById('status').textContent = 'Error: ' + e.message;
         }
@@ -520,6 +586,79 @@ const server = Bun.serve({
           errors: [{ message: `Unknown query: ${query.slice(0, 100)}` }],
         }),
         { headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // ===================================================================
+    // JSON-RPC scenario
+    // ===================================================================
+
+    // Page — serves HTML
+    if (path === '/jsonrpc-app/' || path === '/jsonrpc-app') {
+      return new Response(JSONRPC_HTML, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
+    // JSON-RPC API — POST /rpc
+    if (path === '/rpc' && req.method === 'POST') {
+      let body: Record<string, unknown> = {};
+      try {
+        body = (await req.json()) as Record<string, unknown>;
+      } catch {
+        return new Response(
+          JSON.stringify({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      const method = typeof body.method === 'string' ? body.method : '';
+      const id = body.id ?? null;
+      const params = (body.params ?? {}) as Record<string, unknown>;
+
+      if (method === 'getItems') {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            result: {
+              items: [
+                { id: 'item-1', title: 'Widget A', description: 'First widget' },
+                { id: 'item-2', title: 'Widget B', description: 'Second widget' },
+                { id: 'item-3', title: 'Widget C', description: 'Third widget' },
+              ],
+              total: 3,
+            },
+            id,
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (method === 'createItem') {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            result: {
+              item: {
+                id: 'item-new',
+                title: params.title ?? 'Unnamed',
+                description: params.description ?? '',
+              },
+            },
+            id,
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // Unknown method
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: { code: -32601, message: `Method not found: ${method}` },
+          id,
+        }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } },
       );
     }
 

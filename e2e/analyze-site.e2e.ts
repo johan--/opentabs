@@ -274,3 +274,35 @@ test.describe('plugin_analyze_site — GraphQL API', () => {
     expect(analysis.title).toBe('GraphQL Test App');
   });
 });
+
+test.describe('plugin_analyze_site — JSON-RPC API', () => {
+  test('detects JSON-RPC protocol in API calls', async ({
+    mcpServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const siteUrl = `${analyzeSiteServer.url}/jsonrpc-app/`;
+    const analysis = await analyzeSite(mcpClient, siteUrl);
+
+    // --- API detection ---
+    // The page makes POST requests to /rpc with { jsonrpc: '2.0' } bodies
+    const jsonrpcEndpoints = analysis.apis.endpoints.filter(e => e.protocol === 'jsonrpc');
+    expect(jsonrpcEndpoints.length).toBeGreaterThanOrEqual(1);
+
+    // The endpoint URL should contain /rpc
+    const rpcEndpoint = jsonrpcEndpoints.find(e => e.url.includes('/rpc'));
+    expect(rpcEndpoint).toBeDefined();
+    expect(rpcEndpoint?.method).toBe('POST');
+
+    // Should have captured the request body with jsonrpc field
+    if (rpcEndpoint?.requestBodySample) {
+      expect(rpcEndpoint.requestBodySample).toContain('jsonrpc');
+    }
+
+    // --- Title ---
+    expect(analysis.title).toBe('JSON-RPC Test App');
+  });
+});
