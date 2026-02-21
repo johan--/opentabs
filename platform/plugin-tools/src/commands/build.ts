@@ -253,16 +253,103 @@ const bundleIIFE = async (sourceEntry: string, outDir: string, pluginName: strin
   const wrapperPath = join(outDir, `_adapter_entry_${crypto.randomUUID()}.ts`);
   const relativeImport = './' + relative(outDir, sourceEntry).replace(/\.ts$/, '.js');
 
+  const name = JSON.stringify(pluginName);
   const wrapperCode = `import plugin from ${JSON.stringify(relativeImport)};
 (globalThis as any).__openTabs = (globalThis as any).__openTabs || {};
 (globalThis as any).__openTabs.adapters = (globalThis as any).__openTabs.adapters || {};
 const adapters = (globalThis as any).__openTabs.adapters;
-const existing = adapters[${JSON.stringify(pluginName)}];
-if (existing && typeof existing.teardown === 'function') {
-  try { existing.teardown(); } catch (e) { console.warn('[OpenTabs] teardown failed for ' + ${JSON.stringify(pluginName)} + ':', e); }
+const existing = adapters[${name}];
+if (existing) {
+  if (typeof existing.onDeactivate === 'function') {
+    try { existing.onDeactivate(); } catch (e) { console.warn('[OpenTabs] onDeactivate failed for ' + ${name} + ':', e); }
+  }
+  if (typeof existing.teardown === 'function') {
+    try { existing.teardown(); } catch (e) { console.warn('[OpenTabs] teardown failed for ' + ${name} + ':', e); }
+  }
 }
-Reflect.deleteProperty(adapters, ${JSON.stringify(pluginName)});
-adapters[${JSON.stringify(pluginName)}] = plugin;
+Reflect.deleteProperty(adapters, ${name});
+
+// Wire onToolInvocationStart / onToolInvocationEnd around each tool.handle()
+if (typeof plugin.onToolInvocationStart === 'function' || typeof plugin.onToolInvocationEnd === 'function') {
+  for (const tool of plugin.tools) {
+    const origHandle = tool.handle;
+    tool.handle = async function(params: any) {
+      const startTime = performance.now();
+      if (typeof plugin.onToolInvocationStart === 'function') {
+        try { plugin.onToolInvocationStart(tool.name); } catch (e) { console.warn('[OpenTabs] onToolInvocationStart failed:', e); }
+      }
+      let success = true;
+      try {
+        return await origHandle.call(this, params);
+      } catch (err) {
+        success = false;
+        throw err;
+      } finally {
+        const durationMs = performance.now() - startTime;
+        if (typeof plugin.onToolInvocationEnd === 'function') {
+          try { plugin.onToolInvocationEnd(tool.name, success, durationMs); } catch (e) { console.warn('[OpenTabs] onToolInvocationEnd failed:', e); }
+        }
+      }
+    };
+  }
+}
+
+adapters[${name}] = plugin;
+
+// Wire onActivate
+if (typeof plugin.onActivate === 'function') {
+  try { plugin.onActivate(); } catch (e) { console.warn('[OpenTabs] onActivate failed for ' + ${name} + ':', e); }
+}
+
+// Wire onNavigate — intercept history methods and listen for popstate/hashchange
+if (typeof plugin.onNavigate === 'function') {
+  let lastUrl = location.href;
+  const checkUrl = () => {
+    const newUrl = location.href;
+    if (newUrl !== lastUrl) {
+      lastUrl = newUrl;
+      try { plugin.onNavigate!(newUrl); } catch (e) { console.warn('[OpenTabs] onNavigate failed:', e); }
+    }
+  };
+  const origPushState = history.pushState.bind(history);
+  const origReplaceState = history.replaceState.bind(history);
+  history.pushState = function(...args: Parameters<typeof history.pushState>) {
+    origPushState(...args);
+    checkUrl();
+  };
+  history.replaceState = function(...args: Parameters<typeof history.replaceState>) {
+    origReplaceState(...args);
+    checkUrl();
+  };
+  window.addEventListener('popstate', checkUrl);
+  window.addEventListener('hashchange', checkUrl);
+
+  // Wrap teardown to restore navigation listeners when this adapter is later replaced
+  const origTeardown = typeof plugin.teardown === 'function' ? plugin.teardown.bind(plugin) : undefined;
+  const origOnDeactivate = typeof plugin.onDeactivate === 'function' ? plugin.onDeactivate.bind(plugin) : undefined;
+  plugin.teardown = function() {
+    if (origOnDeactivate) {
+      try { origOnDeactivate(); } catch (e) { console.warn('[OpenTabs] onDeactivate failed for ' + ${name} + ':', e); }
+    }
+    history.pushState = origPushState;
+    history.replaceState = origReplaceState;
+    window.removeEventListener('popstate', checkUrl);
+    window.removeEventListener('hashchange', checkUrl);
+    if (origTeardown) origTeardown();
+  };
+  plugin.onDeactivate = undefined as any;
+} else {
+  // No onNavigate — still wrap teardown for onDeactivate ordering
+  const origTeardown = typeof plugin.teardown === 'function' ? plugin.teardown.bind(plugin) : undefined;
+  const origOnDeactivate = typeof plugin.onDeactivate === 'function' ? plugin.onDeactivate.bind(plugin) : undefined;
+  if (origOnDeactivate) {
+    plugin.teardown = function() {
+      try { origOnDeactivate(); } catch (e) { console.warn('[OpenTabs] onDeactivate failed for ' + ${name} + ':', e); }
+      if (origTeardown) origTeardown();
+    };
+    plugin.onDeactivate = undefined as any;
+  }
+}
 `;
   await Bun.write(wrapperPath, wrapperCode);
 
