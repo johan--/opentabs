@@ -113,3 +113,9 @@ export type { RetryOptions, WaitUntilOptions } from './timing.js';
 // ---------------------------------------------------------------------------
 
 export { getLocalStorage, setLocalStorage, getSessionStorage, getCookie } from './storage.js';
+
+// ---------------------------------------------------------------------------
+// SDK utilities — Page State
+// ---------------------------------------------------------------------------
+
+export { getPageGlobal, getCurrentUrl, getPageTitle } from './page-state.js';
