@@ -100,3 +100,10 @@ export type { WaitForSelectorOptions, ObserveDOMOptions } from './dom.js';
 
 export { fetchFromPage, fetchJSON, postJSON } from './fetch.js';
 export type { FetchFromPageOptions } from './fetch.js';
+
+// ---------------------------------------------------------------------------
+// SDK utilities — Timing
+// ---------------------------------------------------------------------------
+
+export { retry, sleep, waitUntil } from './timing.js';
+export type { RetryOptions, WaitUntilOptions } from './timing.js';

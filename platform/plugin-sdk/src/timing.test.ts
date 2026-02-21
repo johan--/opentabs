@@ -1,0 +1,222 @@
+import { retry, sleep, waitUntil } from './timing.js';
+import { describe, expect, test } from 'bun:test';
+
+// ---------------------------------------------------------------------------
+// sleep
+// ---------------------------------------------------------------------------
+
+describe('sleep', () => {
+  test('resolves after the specified delay', async () => {
+    const start = performance.now();
+    await sleep(50);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+  });
+
+  test('resolves with undefined', async () => {
+    await sleep(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// retry
+// ---------------------------------------------------------------------------
+
+describe('retry', () => {
+  test('returns result on first success', async () => {
+    const result = await retry(() => Promise.resolve(42));
+    expect(result).toBe(42);
+  });
+
+  test('retries on failure and returns on eventual success', async () => {
+    let calls = 0;
+    const result = await retry(
+      () => {
+        calls++;
+        if (calls < 3) return Promise.reject(new Error(`fail #${calls}`));
+        return Promise.resolve('ok');
+      },
+      { maxAttempts: 5, delay: 10 },
+    );
+    expect(result).toBe('ok');
+    expect(calls).toBe(3);
+  });
+
+  test('throws last error after exhausting all attempts', async () => {
+    let calls = 0;
+    try {
+      await retry(
+        () => {
+          calls++;
+          return Promise.reject(new Error(`fail #${calls}`));
+        },
+        { maxAttempts: 3, delay: 10 },
+      );
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('fail #3');
+    }
+    expect(calls).toBe(3);
+  });
+
+  test('uses default maxAttempts of 3', async () => {
+    let calls = 0;
+    try {
+      await retry(
+        () => {
+          calls++;
+          return Promise.reject(new Error('fail'));
+        },
+        { delay: 10 },
+      );
+    } catch {
+      // Expected
+    }
+    expect(calls).toBe(3);
+  });
+
+  test('supports exponential backoff', async () => {
+    let calls = 0;
+    const timestamps: number[] = [];
+    try {
+      await retry(
+        () => {
+          calls++;
+          timestamps.push(performance.now());
+          return Promise.reject(new Error('fail'));
+        },
+        { maxAttempts: 3, delay: 50, backoff: true },
+      );
+    } catch {
+      // Expected
+    }
+    expect(calls).toBe(3);
+    // First delay: 50ms, second delay: 100ms
+    expect(timestamps).toHaveLength(3);
+    const [t0, t1, t2] = timestamps as [number, number, number];
+    const delay1 = t1 - t0;
+    const delay2 = t2 - t1;
+    expect(delay1).toBeGreaterThanOrEqual(40);
+    expect(delay2).toBeGreaterThanOrEqual(80);
+  });
+
+  test('respects AbortSignal that is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('cancelled'));
+    try {
+      await retry(() => Promise.resolve('should not run'), { signal: controller.signal });
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('cancelled');
+    }
+  });
+
+  test('respects AbortSignal aborted between retries', async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    try {
+      await retry(
+        () => {
+          calls++;
+          if (calls === 1) controller.abort(new Error('user cancelled'));
+          return Promise.reject(new Error('fail'));
+        },
+        { maxAttempts: 5, delay: 10, signal: controller.signal },
+      );
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('user cancelled');
+    }
+    expect(calls).toBe(1);
+  });
+
+  test('throws DOMException when signal is aborted without a custom reason', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    try {
+      await retry(() => Promise.resolve('nope'), { signal: controller.signal });
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe('AbortError');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// waitUntil
+// ---------------------------------------------------------------------------
+
+describe('waitUntil', () => {
+  test('resolves immediately when predicate is true', async () => {
+    const start = performance.now();
+    await waitUntil(() => true, { interval: 10, timeout: 1_000 });
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(100);
+  });
+
+  test('polls until predicate becomes true', async () => {
+    let count = 0;
+    await waitUntil(
+      () => {
+        count++;
+        return count >= 3;
+      },
+      { interval: 20, timeout: 2_000 },
+    );
+    expect(count).toBeGreaterThanOrEqual(3);
+  });
+
+  test('rejects on timeout with descriptive error', async () => {
+    try {
+      await waitUntil(() => false, { interval: 10, timeout: 100 });
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain('timed out after 100ms');
+      expect((error as Error).message).toContain('predicate');
+    }
+  });
+
+  test('supports async predicates', async () => {
+    let count = 0;
+    await waitUntil(
+      async () => {
+        count++;
+        await sleep(5);
+        return count >= 2;
+      },
+      { interval: 20, timeout: 2_000 },
+    );
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  test('keeps polling when predicate throws', async () => {
+    let count = 0;
+    await waitUntil(
+      () => {
+        count++;
+        if (count < 3) throw new Error('not ready');
+        return true;
+      },
+      { interval: 20, timeout: 2_000 },
+    );
+    expect(count).toBeGreaterThanOrEqual(3);
+  });
+
+  test('uses default interval of 200ms and timeout of 10000ms', async () => {
+    const start = performance.now();
+    let count = 0;
+    await waitUntil(() => {
+      count++;
+      return count >= 2;
+    });
+    const elapsed = performance.now() - start;
+    // With default 200ms interval, second call happens around 200ms
+    expect(elapsed).toBeGreaterThanOrEqual(100);
+    expect(elapsed).toBeLessThan(2_000);
+  });
+});
