@@ -4,6 +4,7 @@
 
 import { atomicWriteConfig, getConfigPath, readConfig } from '../config.js';
 import pc from 'picocolors';
+import { resolve } from 'node:path';
 import type { Command } from 'commander';
 
 const REDACTED = '***';
@@ -75,14 +76,28 @@ const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
 };
 
 const TOOL_PREFIX = 'tool.';
+const LOCAL_PLUGINS_ADD = 'localPlugins.add';
+const LOCAL_PLUGINS_REMOVE = 'localPlugins.remove';
+const PORT_KEY = 'port';
 
-const handleConfigSet = async (key: string, value: string): Promise<void> => {
-  if (!key.startsWith(TOOL_PREFIX)) {
-    console.error(pc.red(`Unknown config key: ${key}`));
-    console.error(`Supported keys: tool.<plugin>_<tool>`);
+const SUPPORTED_KEYS = `Supported keys:
+  tool.<plugin>_<tool>    Enable/disable a tool (value: enabled | disabled)
+  port                    Set the server port (value: 1-65535)
+  localPlugins.add        Add a local plugin path (value: absolute or relative path)
+  localPlugins.remove     Remove a local plugin path (value: path to remove)`;
+
+const loadConfig = async (): Promise<{ config: Record<string, unknown>; configPath: string }> => {
+  const configPath = getConfigPath();
+  const config = await readConfig(configPath);
+  if (!config) {
+    console.error(pc.red(`No config found at ${configPath}`));
+    console.error('Run opentabs start to auto-create config.');
     process.exit(1);
   }
+  return { config, configPath };
+};
 
+const handleSetTool = async (key: string, value: string): Promise<void> => {
   const toolName = key.slice(TOOL_PREFIX.length);
   if (!toolName || !toolName.includes('_')) {
     console.error(pc.red(`Invalid tool name: ${toolName || '(empty)'}`));
@@ -96,14 +111,7 @@ const handleConfigSet = async (key: string, value: string): Promise<void> => {
     process.exit(1);
   }
 
-  const configPath = getConfigPath();
-  const config = await readConfig(configPath);
-
-  if (!config) {
-    console.error(pc.red(`No config found at ${configPath}`));
-    console.error('Run opentabs start to auto-create config.');
-    process.exit(1);
-  }
+  const { config, configPath } = await loadConfig();
 
   if (!config.tools || typeof config.tools !== 'object' || Array.isArray(config.tools)) {
     config.tools = {};
@@ -116,6 +124,80 @@ const handleConfigSet = async (key: string, value: string): Promise<void> => {
 
   const indicator = enabled ? pc.green('enabled') : pc.red('disabled');
   console.log(`${toolName}: ${indicator}`);
+};
+
+const handleSetPort = async (value: string): Promise<void> => {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error(pc.red(`Invalid port: ${value}`));
+    console.error('Port must be an integer between 1 and 65535.');
+    process.exit(1);
+  }
+
+  const { config, configPath } = await loadConfig();
+  config.port = port;
+
+  await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`port: ${pc.cyan(String(port))}`);
+};
+
+const handleSetLocalPluginsAdd = async (value: string): Promise<void> => {
+  const pluginPath = resolve(value);
+  const { config, configPath } = await loadConfig();
+
+  if (!Array.isArray(config.localPlugins)) {
+    config.localPlugins = [];
+  }
+  const plugins = config.localPlugins as string[];
+
+  if (plugins.includes(pluginPath)) {
+    console.log(`${pc.dim('Already registered:')} ${pluginPath}`);
+    return;
+  }
+
+  plugins.push(pluginPath);
+  await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`${pc.green('Added:')} ${pluginPath}`);
+};
+
+const handleSetLocalPluginsRemove = async (value: string): Promise<void> => {
+  const pluginPath = resolve(value);
+  const { config, configPath } = await loadConfig();
+
+  if (!Array.isArray(config.localPlugins)) {
+    console.error(pc.red(`Path not found in localPlugins: ${pluginPath}`));
+    process.exit(1);
+  }
+  const plugins = config.localPlugins as string[];
+  const index = plugins.indexOf(pluginPath);
+
+  if (index === -1) {
+    console.error(pc.red(`Path not found in localPlugins: ${pluginPath}`));
+    process.exit(1);
+  }
+
+  plugins.splice(index, 1);
+  await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`${pc.green('Removed:')} ${pluginPath}`);
+};
+
+const handleConfigSet = async (key: string, value: string): Promise<void> => {
+  if (key.startsWith(TOOL_PREFIX)) {
+    return handleSetTool(key, value);
+  }
+  if (key === PORT_KEY) {
+    return handleSetPort(value);
+  }
+  if (key === LOCAL_PLUGINS_ADD) {
+    return handleSetLocalPluginsAdd(value);
+  }
+  if (key === LOCAL_PLUGINS_REMOVE) {
+    return handleSetLocalPluginsRemove(value);
+  }
+
+  console.error(pc.red(`Unknown config key: ${key}`));
+  console.error(SUPPORTED_KEYS);
+  process.exit(1);
 };
 
 interface ConfigResetOptions {
@@ -154,13 +236,16 @@ const registerConfigCommand = (program: Command): void => {
 
   configCmd
     .command('set <key> <value>')
-    .description('Set a config value (e.g. tool.slack_send_message enabled)')
+    .description('Set a config value')
     .addHelpText(
       'after',
       `
 Examples:
   $ opentabs config set tool.slack_send_message disabled
-  $ opentabs config set tool.slack_send_message enabled`,
+  $ opentabs config set tool.slack_send_message enabled
+  $ opentabs config set port 9515
+  $ opentabs config set localPlugins.add /path/to/plugin
+  $ opentabs config set localPlugins.remove /path/to/plugin`,
     )
     .action((key: string, value: string) => handleConfigSet(key, value));
 
