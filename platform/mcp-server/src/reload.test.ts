@@ -13,10 +13,11 @@ import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprot
  *
  * Uses a real temp config directory (via OPENTABS_CONFIG_DIR) to exercise the
  * full reload path: config loading → plugin discovery → state swap → pruning →
- * file watcher restart → extension sync → client notification.
+ * extension sync → client notification.
  *
- * The extension WebSocket is null so sync.full is skipped. File watchers are
- * started on real plugin directories and stopped in afterEach to prevent leaks.
+ * These tests run in production mode (no OPENTABS_DEV env var), so file watchers
+ * and config watching are NOT started. Dev-mode file watcher behavior is covered
+ * by E2E tests that start the server with --dev.
  */
 
 const originalConfigDir = Bun.env.OPENTABS_CONFIG_DIR;
@@ -176,14 +177,14 @@ describe('performReload', () => {
     expect(entry?.toolName).toBe('test_tool');
   });
 
-  test('starts file watchers for local plugins', async () => {
+  test('does not start file watchers in production mode', async () => {
     const pluginDir = createPluginDir(configDir, 'my-plugin');
     writeConfig(configDir, [pluginDir]);
 
     await performReload(state, [], emptyTransports(), false);
 
-    expect(state.fileWatcherEntries.length).toBeGreaterThanOrEqual(1);
-    expect(state.fileWatcherEntries.some(e => e.pluginName === 'my-plugin')).toBe(true);
+    // File watchers are dev-only — production mode discovers once at startup
+    expect(state.fileWatcherEntries).toHaveLength(0);
   });
 
   test('does NOT throw when extension is disconnected (sync skipped)', async () => {
@@ -350,7 +351,7 @@ describe('performConfigReload', () => {
     expect(state.tabMapping.has('removed-plugin')).toBe(false);
   });
 
-  test('restarts file watchers', async () => {
+  test('does not start file watchers in production mode', async () => {
     const pluginDir = createPluginDir(configDir, 'my-plugin');
     writeConfig(configDir, [pluginDir]);
 
@@ -358,7 +359,8 @@ describe('performConfigReload', () => {
 
     await performConfigReload(state, [], emptyTransports());
 
-    expect(state.fileWatcherEntries.length).toBeGreaterThanOrEqual(1);
+    // File watchers are dev-only — production mode discovers once at startup
+    expect(state.fileWatcherEntries).toHaveLength(0);
   });
 
   test('notifies all sessions of tool list changes', async () => {

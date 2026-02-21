@@ -13,6 +13,7 @@
 
 import { browserTools } from './browser-tools/index.js';
 import { loadConfig, getConfigDir } from './config.js';
+import { isDev } from './dev-mode.js';
 import { discoverPlugins } from './discovery.js';
 import { ensureExtensionInstalled } from './extension-install.js';
 import { sendSyncFull, sendPluginUpdate, cleanupStaleExecFiles } from './extension-protocol.js';
@@ -148,16 +149,15 @@ const createFileWatcherCallbacks = (
 };
 
 /**
- * Shared reload core: discovery, state swap, pruning, file watcher restart,
- * and extension sync. Callers notify MCP clients of tool list changes after
- * this returns. File watchers are always restarted regardless of discovery
- * success or failure.
+ * Shared reload core: discovery, state swap, pruning, and extension sync.
+ * Callers notify MCP clients of tool list changes after this returns.
+ * In dev mode, file watchers and config watching are started after discovery.
+ * In production mode, no watchers are created — restart to reload.
  */
 const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs): Promise<void> => {
+  // Always stop existing watchers (cleans up handles from previous hot reload iteration)
   stopFileWatching(state);
   sweepStaleSessions(state, transports, sessionServers);
-
-  const callbacks = createFileWatcherCallbacks(state, sessionServers, transports);
 
   try {
     const config = await loadConfig();
@@ -187,9 +187,14 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     log.error('Reload failed, keeping previous state:', err);
   }
 
-  const failedPaths = state.registry.failures.map(f => f.path);
-  startFileWatching(state, callbacks, failedPaths);
-  startConfigWatching(state, callbacks);
+  // File watchers, config watching, and mtime polling are dev-only features.
+  // Production mode discovers plugins once at startup; restart to reload.
+  if (isDev()) {
+    const callbacks = createFileWatcherCallbacks(state, sessionServers, transports);
+    const failedPaths = state.registry.failures.map(f => f.path);
+    startFileWatching(state, callbacks, failedPaths);
+    startConfigWatching(state, callbacks);
+  }
 
   if (state.extensionWs) {
     await sendSyncFull(state);
@@ -217,14 +222,14 @@ const restartSweepTimer = (
 /**
  * Run the full reload sequence.
  *
- * On first load: discovers plugins, starts file watchers, kicks off version check.
+ * On first load: discovers plugins, kicks off version check. In dev mode,
+ * also starts file watchers for local plugins and config.json.
  * On hot reload: additionally re-registers MCP handlers on existing sessions,
  * refreshes browser tools, installs/updates the managed extension, and notifies
  * all MCP clients.
  *
  * If discovery fails, the server continues with whatever plugins were in state
- * before the reload attempt. File watchers are always restarted at the end so
- * they are never left dead after a partial failure.
+ * before the reload attempt.
  *
  * A globalThis-based guard prevents concurrent reloads: if a previous reload
  * is still running (e.g., bun --hot fires twice in quick succession), this
