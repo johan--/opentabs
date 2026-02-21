@@ -25,7 +25,7 @@
                                                              └──────────────────┘
 ```
 
-**MCP Server** (`platform/mcp-server`): Discovers plugins, registers their tools as MCP tools, dispatches tool calls to the Chrome extension via WebSocket, and serves health/config endpoints.
+**MCP Server** (`platform/mcp-server`): Discovers plugins, registers their tools as MCP tools, dispatches tool calls to the Chrome extension via WebSocket, receives plugin log entries and forwards them to MCP clients via the logging capability, and serves health/config endpoints.
 
 **Chrome Extension** (`platform/browser-extension`): Receives plugin definitions from the MCP server via `sync.full`, dynamically registers content scripts for URL patterns, injects adapter IIFEs into matching tabs, and dispatches tool calls to the correct tab's adapter. The `debugger` permission in the manifest is required for network capture via the Chrome DevTools Protocol (`chrome.debugger.attach`, `Network.enable`, `Runtime.enable`) in `network-capture.ts`.
 
@@ -33,7 +33,7 @@
 
 **Plugin Tools** (`platform/plugin-tools`): Plugin developer CLI (`opentabs-plugin`). The `opentabs-plugin build` command bundles the plugin adapter into an IIFE, generates `dist/tools.json`, auto-registers the plugin in `~/.opentabs/config.json` (under `localPlugins`), and calls `POST /reload` to notify the running MCP server. Supports `--watch` mode for development.
 
-**CLI** (`platform/cli`): User-facing CLI (`opentabs`). Commands: `start`, `status`, `doctor`, `logs`, `plugin create`, `config show/set/path`. The `opentabs start` command auto-initializes config and the Chrome extension on first run, then launches the MCP server.
+**CLI** (`platform/cli`): User-facing CLI (`opentabs`). Commands: `start`, `status`, `doctor`, `logs`, `plugin create`, `config show/set/path`. The `opentabs start` command auto-initializes config and the Chrome extension on first run, then launches the MCP server. The `opentabs logs --plugin <name>` flag filters output to only show logs from a specific plugin.
 
 **create-plugin** (`platform/create-plugin`): Scaffolding CLI (`create-opentabs-plugin`) for new plugin projects.
 
@@ -63,6 +63,7 @@ opentabs/
 │   │       ├── extension-protocol.ts  # JSON-RPC protocol with Chrome extension
 │   │       ├── mcp-setup.ts       # MCP tool registration from discovered plugins
 │   │       ├── state.ts           # In-memory server state (PluginRegistry)
+│   │       ├── log-buffer.ts      # Per-plugin circular log buffer (last 1000 entries)
 │   │       ├── file-watcher.ts    # Watches local plugin dist/ directories (dev mode only)
 │   │       └── version-check.ts   # npm update checks for installed plugins
 │   ├── browser-extension/         # Chrome extension (MV3)
@@ -74,7 +75,8 @@ opentabs/
 │   │   └── build-side-panel.ts    # Bun.build script for side panel
 │   ├── plugin-sdk/                # Plugin authoring SDK
 │   │   └── src/
-│   │       └── index.ts           # OpenTabsPlugin, defineTool exports
+│   │       ├── index.ts           # OpenTabsPlugin, defineTool, log exports
+│   │       └── log.ts             # Structured logging API (sdk.log namespace)
 │   ├── plugin-tools/              # Plugin developer CLI (opentabs-plugin)
 │   │   └── src/
 │   │       ├── cli.ts             # Entry point — `opentabs-plugin` binary
@@ -98,6 +100,7 @@ opentabs/
 │   ├── tool-dispatch.e2e.ts       # Full-stack tool dispatch tests
 │   ├── lifecycle.e2e.ts           # Hot reload and reconnection tests
 │   ├── lifecycle-hooks.e2e.ts     # Plugin lifecycle hooks tests
+│   ├── plugin-logging.e2e.ts     # Plugin logging pipeline tests
 │   └── test-server.ts             # Controllable test web server
 ├── eslint.config.ts               # ESLint flat config
 ├── knip.ts                        # Knip unused code detection config
@@ -127,7 +130,9 @@ All hooks run in the page context. Errors in hooks are caught and logged — the
 
 **Hot reload** (dev mode): In dev mode, the MCP server runs under `bun --hot`. On file changes, Bun re-evaluates the module while preserving `globalThis`. The server uses a `globalThis`-based cleanup pattern to tear down the previous instance (close WebSocket, stop file watchers, free the port) and reinitialize cleanly. In production mode, the server starts once and serves until manually restarted. In both modes, the `POST /reload` endpoint triggers plugin rediscovery without restarting the process.
 
-**SDK utilities**: The plugin SDK (`@opentabs-dev/plugin-sdk`) provides utility functions that run in the page context, reducing boilerplate for common plugin operations. All utilities are exported from the SDK's public API and organized into five categories:
+**Plugin logging**: The plugin SDK exports a `log` namespace (`log.debug`, `log.info`, `log.warn`, `log.error`) that routes structured log entries from plugin tool handlers and lifecycle hooks through the platform to MCP clients and the CLI. The transport chain is: adapter IIFE (page context) → `window.postMessage` → ISOLATED world relay script → `chrome.runtime.sendMessage` → background service worker → WebSocket `plugin.log` JSON-RPC → MCP server → `sendLoggingMessage` to MCP clients + `console.log` to `server.log`. The MCP server maintains a per-plugin circular buffer (1000 entries) for log entries, exposed via the `/health` endpoint's `pluginDetails[].logBufferSize` field. When running outside the adapter runtime (e.g., unit tests), the logger falls back to `console` methods. The adapter IIFE wrapper sets up the log transport via `_setLogTransport()` (accessed through `globalThis.__openTabs._setLogTransport` to avoid SDK version mismatches) and batches entries (flush every 100ms or 50 entries).
+
+**SDK utilities**: The plugin SDK (`@opentabs-dev/plugin-sdk`) provides utility functions that run in the page context, reducing boilerplate for common plugin operations. All utilities are exported from the SDK's public API and organized into six categories:
 
 _DOM utilities_ (`platform/plugin-sdk/src/dom.ts`):
 
@@ -162,16 +167,26 @@ _Timing utilities_ (`platform/plugin-sdk/src/timing.ts`):
 - `sleep(ms)` → `Promise<void>` — promisified setTimeout
 - `waitUntil(predicate, opts?)` → `Promise<void>` — polls predicate at interval (default 200ms) until true, rejects on timeout (default 10s)
 
+_Logging utilities_ (`platform/plugin-sdk/src/log.ts`):
+
+- `log.debug(message, ...args)` → `void` — logs at debug level
+- `log.info(message, ...args)` → `void` — logs at info level
+- `log.warn(message, ...args)` → `void` — logs at warning level (maps to MCP `warning`)
+- `log.error(message, ...args)` → `void` — logs at error level
+
+The `log` object is frozen. Args are safely serialized (handles circular refs, DOM nodes, functions, symbols, bigints, errors). When running inside the adapter runtime, entries flow to the MCP server; otherwise they fall back to `console` methods.
+
 Usage in a tool handler:
 
 ```typescript
-import { waitForSelector, fetchJSON, getLocalStorage, getPageGlobal, retry } from '@opentabs-dev/plugin-sdk';
+import { waitForSelector, fetchJSON, getLocalStorage, getPageGlobal, retry, log } from '@opentabs-dev/plugin-sdk';
 
 // Wait for a DOM element, then fetch data using the page's session
 const el = await waitForSelector('.dashboard-loaded');
 const data = await retry(() => fetchJSON<ApiResponse>('/api/data'), { maxAttempts: 3, delay: 500 });
 const token = getLocalStorage('auth_token');
 const teamId = getPageGlobal('App.config.teamId') as string | undefined;
+log.info('Fetched data', { items: data.length, teamId });
 ```
 
 ### Commands
