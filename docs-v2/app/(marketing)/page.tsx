@@ -55,7 +55,7 @@ function HeroIllustration() {
       />
 
       {/* Traffic-light dots */}
-      <circle cx="26" cy="24" r="7" fill="#FFDB33" />
+      <circle cx="26" cy="24" r="7" fill="var(--color-primary)" />
       <circle cx="50" cy="24" r="7" fill="var(--color-background)" />
       <circle cx="74" cy="24" r="7" fill="var(--color-background)" />
 
@@ -81,13 +81,13 @@ function HeroIllustration() {
       </text>
 
       {/* Tab strip */}
-      <rect x="2" y="46" width="120" height="28" fill="#FFDB33" />
+      <rect x="2" y="46" width="120" height="28" fill="var(--color-primary)" />
       <text
         x="12"
         y="65"
         fontSize="11"
         fontFamily="var(--font-mono), monospace"
-        fill="#000"
+        fill="var(--color-primary-foreground)"
         fontWeight="bold"
       >
         #general
@@ -183,7 +183,7 @@ function HeroIllustration() {
         y="114"
         width="196"
         height="210"
-        fill="#FFDB33"
+        fill="var(--color-primary)"
         stroke="var(--color-foreground)"
         strokeWidth="4"
       />
@@ -201,7 +201,7 @@ function HeroIllustration() {
         y="137"
         fontSize="11"
         fontFamily="var(--font-mono), monospace"
-        fill="#FFDB33"
+        fill="var(--color-primary)"
         fontWeight="bold"
       >
         AI Agent
@@ -214,7 +214,7 @@ function HeroIllustration() {
         width="18"
         height="18"
         rx="3"
-        fill="#FFDB33"
+        fill="var(--color-primary)"
         opacity="0.3"
       />
       <rect
@@ -223,7 +223,7 @@ function HeroIllustration() {
         width="10"
         height="10"
         rx="2"
-        fill="#FFDB33"
+        fill="var(--color-primary)"
         opacity="0.6"
       />
 
@@ -279,7 +279,7 @@ function HeroIllustration() {
         y="229"
         fontSize="10"
         fontFamily="var(--font-mono), monospace"
-        fill="#FFDB33"
+        fill="var(--color-primary)"
       >
         slack_send_message(...)
       </text>

@@ -24,7 +24,7 @@ export function Login() {
           <Input id="password" type="password" placeholder="password" />
         </div>
         <div className="flex flex-col items-center justify-center py-4 gap-1">
-          <Button className="rounded-full active:shadow-none active:scale-95">
+          <Button className="rounded-(--radius) active:shadow-none active:scale-95">
             Submit
           </Button>
           <div className="px-4 py-2 space-x-1">

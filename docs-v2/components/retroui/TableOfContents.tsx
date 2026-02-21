@@ -184,7 +184,7 @@ export function TableOfContents({
   return (
     <div
       className={cn(
-        "border-2 shadow-md p-4 rounded w-52 h-60 overflow-y-auto sidebar-scroll",
+        "border-2 shadow-md p-4 rounded-(--radius) w-52 h-60 overflow-y-auto sidebar-scroll",
         className,
       )}
     >

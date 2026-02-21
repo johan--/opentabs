@@ -19,7 +19,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-muted group-[.toast]:text-foreground py-1 px-2 text-sm bg-background border-border shadow hover:shadow-xs hover:translate-[2px] duration-200 transition-all focus:shadow-none border-2 ml-auto h-fit min-w-fit",
           title: "ml-2 font-sans",
           closeButton:
-            "absolute bg-background -top-1 -left-1 rounded-full p-0.5",
+            "absolute bg-background -top-1 -left-1 rounded-(--radius) p-0.5",
         },
         unstyled: true,
       }}
