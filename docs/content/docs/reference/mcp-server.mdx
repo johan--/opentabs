@@ -1,12 +1,12 @@
 ---
 title: MCP Server
-description: HTTP endpoints, WebSocket protocol, authentication, and MCP client configuration for the OpenTabs server.
-lastUpdated: 2026-02-20
+description: HTTP endpoints, WebSocket protocol, authentication, MCP capabilities, and client configuration for the OpenTabs server.
+lastUpdated: 2026-02-21
 ---
 
 ## HTTP Endpoints
 
-The server runs on port 9515 by default (override with the `PORT` environment variable).
+The server runs on port 9515 by default (override with the `PORT` environment variable or `--port` flag).
 
 <Table>
   <Table.Header>
@@ -43,10 +43,16 @@ The server runs on port 9515 by default (override with the `PORT` environment va
       <Table.Cell>Server health, plugin status, and metrics.</Table.Cell>
     </Table.Row>
     <Table.Row>
+      <Table.Cell className="font-medium">`/audit`</Table.Cell>
+      <Table.Cell>GET</Table.Cell>
+      <Table.Cell>Bearer token</Table.Cell>
+      <Table.Cell>Tool invocation history (last 500 entries).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
       <Table.Cell className="font-medium">`/reload`</Table.Cell>
       <Table.Cell>POST</Table.Cell>
       <Table.Cell>Bearer token, rate-limited</Table.Cell>
-      <Table.Cell>Trigger config reload and plugin re-discovery. **Dev mode only.**</Table.Cell>
+      <Table.Cell>Trigger config reload and plugin rediscovery.</Table.Cell>
     </Table.Row>
     <Table.Row>
       <Table.Cell className="font-medium">`/extension/reload`</Table.Cell>
@@ -56,6 +62,8 @@ The server runs on port 9515 by default (override with the `PORT` environment va
     </Table.Row>
   </Table.Body>
 </Table>
+
+---
 
 ## /mcp — MCP Streamable HTTP
 
@@ -85,6 +93,18 @@ The primary endpoint for MCP clients. Implements the [MCP Streamable HTTP transp
 
 Multiple concurrent MCP clients are supported — each gets an independent session. DELETE closes a session.
 
+### MCP Capabilities
+
+The server exposes these MCP capabilities:
+
+- **Tools** — plugin tools (prefixed as `<plugin>_<tool>`) and built-in browser tools (`browser_*`, `extension_*`)
+- **Resources** — plugin resources with URI prefix `opentabs+<plugin>://`. Read via the `resources/read` MCP method.
+- **Prompts** — plugin prompts (prefixed as `<plugin>_<prompt>`). Rendered via the `prompts/get` MCP method.
+- **Logging** — plugin log entries forwarded as `notifications/message` to connected clients
+- **Progress** — tool progress notifications forwarded as `notifications/progress` (requires `progressToken` in request `_meta`)
+
+---
+
 ## /ws — WebSocket
 
 The Chrome extension connects here for full-duplex JSON-RPC 2.0 communication. Only one active extension connection is allowed — a new connection replaces the previous one.
@@ -97,35 +117,129 @@ Sec-WebSocket-Protocol: opentabs, <secret>
 
 Max payload: 10 MB.
 
+---
+
 ## /health — Health check
 
-Returns server status, plugin details, and metrics. No authentication required. Includes a `mode` field (`"dev"` or `"production"`) indicating which mode the server is running in.
+Returns server status, plugin details, and metrics. No authentication required.
 
 ```json
 {
   "status": "ok",
   "version": "0.0.4",
-  "mode": "dev",
+  "sdkVersion": "0.0.4",
+  "mode": "production",
   "extensionConnected": true,
   "mcpClients": 1,
-  "plugins": 1,
-  "pluginDetails": [{ "name": "slack", "displayName": "Slack", "toolCount": 22, "tabState": "ready" }],
+  "plugins": 2,
+  "pluginDetails": [
+    {
+      "name": "slack",
+      "displayName": "Slack",
+      "toolCount": 22,
+      "tabState": "ready",
+      "source": "local",
+      "sdkVersion": "0.0.4",
+      "logBufferSize": 42
+    }
+  ],
+  "failedPlugins": [],
   "toolCount": 58,
   "uptime": 3600,
-  "reloadCount": 2
+  "reloadCount": 2,
+  "auditSummary": {
+    "totalInvocations": 150,
+    "successCount": 142,
+    "failureCount": 8
+  }
 }
 ```
 
-## /reload and /extension/reload
+Key fields:
 
-Both require Bearer token authentication and are rate-limited to 10 requests/minute. **`/reload` is only available in dev mode** — it returns 405 in production mode (restart the server to pick up plugin changes instead).
+- `mode` — `"dev"` or `"production"`
+- `sdkVersion` — server-level SDK version
+- `pluginDetails[].sdkVersion` — per-plugin SDK version (null if missing)
+- `pluginDetails[].logBufferSize` — number of log entries in the per-plugin ring buffer
+- `failedPlugins` — plugins that failed to load (path + error message)
+- `auditSummary` — aggregate stats from the in-memory audit log
+
+---
+
+## /audit — Tool invocation history
+
+Returns the last 500 tool invocations as a JSON array, newest first. Requires Bearer token authentication.
 
 ```bash
-curl -X POST http://localhost:9515/reload -H "Authorization: Bearer <secret>"
-curl -X POST http://localhost:9515/extension/reload -H "Authorization: Bearer <secret>"
+curl -s http://localhost:9515/audit \
+  -H "Authorization: Bearer <secret>" | jq
 ```
 
-`/extension/reload` returns 503 if the extension is not connected.
+Query parameters:
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Parameter</Table.Head>
+      <Table.Head>Default</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`limit`</Table.Cell>
+      <Table.Cell>`500`</Table.Cell>
+      <Table.Cell>Maximum number of entries to return.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`plugin`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Filter by plugin name.</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+Each entry contains:
+
+```json
+{
+  "timestamp": "2026-02-21T10:30:00.000Z",
+  "tool": "slack_send_message",
+  "plugin": "slack",
+  "success": true,
+  "durationMs": 245
+}
+```
+
+Failed entries include an `error` object with `code`, `message`, and optional `category`.
+
+---
+
+## /reload and /extension/reload
+
+Both require Bearer token authentication and are rate-limited to 10 requests/minute.
+
+`/reload` triggers config reload and plugin rediscovery. It is available in both production and dev mode. The `opentabs-plugin build` command calls this endpoint automatically after each build.
+
+```bash
+curl -X POST http://localhost:9515/reload \
+  -H "Authorization: Bearer <secret>"
+```
+
+Response:
+
+```json
+{ "ok": true, "plugins": 3, "durationMs": 45 }
+```
+
+`/extension/reload` signals the Chrome extension to reload. Returns 503 if the extension is not connected.
+
+```bash
+curl -X POST http://localhost:9515/extension/reload \
+  -H "Authorization: Bearer <secret>"
+```
+
+---
 
 ## Authentication
 
@@ -156,13 +270,19 @@ All authenticated endpoints use the same `secret` from `~/.opentabs/config.json`
 
 When no secret is configured, authentication checks are skipped.
 
+---
+
 ## CORS
 
 The server rejects all HTTP requests with a browser `Origin` header, except those from `chrome-extension://` origins. MCP clients (Claude Code, Cursor) run as native processes and don't send Origin headers. This prevents DNS rebinding attacks on the localhost server.
 
+---
+
 ## Rate Limiting
 
 Admin endpoints (`/ws-info`, `/reload`, `/extension/reload`) are rate-limited to 10 requests/minute. Exceeding the limit returns HTTP 429 with `Retry-After: 60`.
+
+---
 
 ## WebSocket Protocol
 
@@ -196,6 +316,16 @@ Admin endpoints (`/ws-info`, `/reload`, `/extension/reload`) are rate-limited to
       <Table.Cell className="font-medium">`tool.dispatch`</Table.Cell>
       <Table.Cell>Request</Table.Cell>
       <Table.Cell>Dispatch a tool call to the correct tab's adapter.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`resource.read`</Table.Cell>
+      <Table.Cell>Request</Table.Cell>
+      <Table.Cell>Read a resource from the adapter in the correct tab.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`prompt.get`</Table.Cell>
+      <Table.Cell>Request</Table.Cell>
+      <Table.Cell>Render a prompt template in the adapter in the correct tab.</Table.Cell>
     </Table.Row>
     <Table.Row>
       <Table.Cell className="font-medium">`tool.invocationStart`</Table.Cell>
@@ -237,6 +367,16 @@ Admin endpoints (`/ws-info`, `/reload`, `/extension/reload`) are rate-limited to
       <Table.Cell>Plugin tab state changed (closed/unavailable/ready).</Table.Cell>
     </Table.Row>
     <Table.Row>
+      <Table.Cell className="font-medium">`tool.progress`</Table.Cell>
+      <Table.Cell>Notification</Table.Cell>
+      <Table.Cell>Progress update from a running tool (dispatchId, progress, total, message).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`plugin.log`</Table.Cell>
+      <Table.Cell>Notification</Table.Cell>
+      <Table.Cell>Batched plugin log entries from adapter runtime.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
       <Table.Cell className="font-medium">`config.getState`</Table.Cell>
       <Table.Cell>Request</Table.Cell>
       <Table.Cell>Fetch current config state (used by side panel).</Table.Cell>
@@ -254,6 +394,8 @@ Admin endpoints (`/ws-info`, `/reload`, `/extension/reload`) are rate-limited to
   </Table.Body>
 </Table>
 
+---
+
 ## Tool Dispatch
 
 1. Server validates input against the tool's JSON Schema (pre-compiled with Ajv)
@@ -262,11 +404,15 @@ Admin endpoints (`/ws-info`, `/reload`, `/extension/reload`) are rate-limited to
 4. Extension executes `handle()` via `chrome.scripting.executeScript` in MAIN world
 5. Result flows back: Extension → WebSocket → MCP Server → MCP Client
 
-Timeouts: 30 seconds server-side, 25 seconds extension-side (deliberately shorter to guarantee a response). Up to 5 concurrent tool calls per plugin; additional calls are queued.
+Timeouts: 30 seconds by default, extended by progress reports (up to 5 minutes maximum). Up to 5 concurrent tool calls per plugin; additional calls are queued.
+
+---
 
 ## MCP Client Configuration
 
 ### Claude Code
+
+Add to `~/.claude/settings/mcp.json`:
 
 ```json
 {
@@ -274,7 +420,9 @@ Timeouts: 30 seconds server-side, 25 seconds extension-side (deliberately shorte
     "opentabs": {
       "type": "streamable-http",
       "url": "http://localhost:9515/mcp",
-      "headers": { "Authorization": "Bearer <secret>" }
+      "headers": {
+        "Authorization": "Bearer <secret>"
+      }
     }
   }
 }
@@ -287,10 +435,16 @@ Timeouts: 30 seconds server-side, 25 seconds extension-side (deliberately shorte
   "mcpServers": {
     "opentabs": {
       "url": "http://localhost:9515/mcp",
-      "headers": { "Authorization": "Bearer <secret>" }
+      "headers": {
+        "Authorization": "Bearer <secret>"
+      }
     }
   }
 }
 ```
 
-Replace `<secret>` with the value from `~/.opentabs/config.json`.
+Replace `<secret>` with the value from your config:
+
+```bash
+opentabs config show --json | jq -r .secret
+```

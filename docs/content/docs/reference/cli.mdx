@@ -1,8 +1,14 @@
 ---
 title: CLI Commands
-description: Complete reference for all opentabs CLI commands — server management, plugin operations, diagnostics, and configuration.
-lastUpdated: 2026-02-20
+description: Complete reference for the opentabs CLI — start the server, manage plugins, view logs, run diagnostics, and configure settings.
+lastUpdated: 2026-02-21
 ---
+
+The `opentabs` CLI is the primary interface for managing the OpenTabs platform. Install it globally:
+
+```bash
+npm install -g @opentabs-dev/cli
+```
 
 ## Global options
 
@@ -29,12 +35,14 @@ lastUpdated: 2026-02-20
   </Table.Body>
 </Table>
 
-## opentabs dev
+---
 
-Start the MCP server with hot reload.
+## opentabs start
+
+Start the MCP server in production mode.
 
 ```bash
-opentabs dev [options]
+opentabs start [options]
 ```
 
 <Table>
@@ -51,67 +59,28 @@ opentabs dev [options]
       <Table.Cell>`9515`</Table.Cell>
       <Table.Cell>Server port.</Table.Cell>
     </Table.Row>
-    <Table.Row>
-      <Table.Cell className="font-medium">`--verbose`</Table.Cell>
-      <Table.Cell>—</Table.Cell>
-      <Table.Cell>Enable debug logging (shorthand for `--log-level debug`).</Table.Cell>
-    </Table.Row>
-    <Table.Row>
-      <Table.Cell className="font-medium">`--log-level <level>`</Table.Cell>
-      <Table.Cell>`info`</Table.Cell>
-      <Table.Cell>Log level: `debug`, `info`, `warn`, `error`, or `silent`. Cannot be combined with `--verbose`.</Table.Cell>
-    </Table.Row>
   </Table.Body>
 </Table>
 
-The server runs under `bun --hot` for automatic module re-evaluation on file changes. Output is teed to the terminal and `~/.opentabs/server.log`. The process exits if the port is already in use.
+On first run, `opentabs start` auto-initializes the `~/.opentabs/` directory:
+
+1. Creates `~/.opentabs/config.json` with a generated secret
+2. Installs the Chrome extension files to `~/.opentabs/extension/`
+3. Prints first-time setup instructions (load the extension, configure your MCP client)
+
+On subsequent runs, the extension is updated if the CLI version has changed.
+
+Server output is written to both the terminal and `~/.opentabs/server.log`. The process exits if the port is already in use.
 
 ```bash
 # Start on default port
-opentabs dev
+opentabs start
 
-# Custom port with debug logging
-opentabs dev --port 3000 --verbose
+# Custom port
+opentabs start --port 3000
 ```
 
-## opentabs build
-
-Build the current plugin directory. Must be run from a plugin project root (a directory with `package.json` and a compiled `dist/index.js`).
-
-```bash
-opentabs build [options]
-```
-
-<Table>
-  <Table.Header>
-    <Table.Row>
-      <Table.Head>Option</Table.Head>
-      <Table.Head>Description</Table.Head>
-    </Table.Row>
-  </Table.Header>
-  <Table.Body>
-    <Table.Row>
-      <Table.Cell className="font-medium">`-w, --watch`</Table.Cell>
-      <Table.Cell>Watch `dist/` for `.js` changes and rebuild automatically (100ms debounce).</Table.Cell>
-    </Table.Row>
-  </Table.Body>
-</Table>
-
-The build process:
-
-1. Dynamically imports the compiled plugin from `dist/index.js`
-2. Validates plugin metadata (name, version, urlPatterns, tools, Zod schemas)
-3. Bundles the adapter as an IIFE to `dist/adapter.iife.js`
-4. Computes a SHA-256 hash of the adapter and appends integrity verification
-5. Generates `dist/tools.json` with serialized JSON Schema tool definitions
-
-```bash
-# One-time build
-opentabs build
-
-# Watch mode for development
-opentabs build --watch
-```
+---
 
 ## opentabs status
 
@@ -140,15 +109,69 @@ opentabs status [options]
   </Table.Body>
 </Table>
 
-Displays server version, uptime, extension connection, MCP client count, plugin count, total tool count, and per-plugin details (tab state, tool count).
+Displays server version, SDK version, uptime, extension connection, MCP client count, plugin count, total tool count, and per-plugin details (tab state, tool count, source).
 
-Tab states are color-coded: ready (green), unavailable (yellow), closed (dim).
+Tab states are color-coded: ready (green), unavailable (yellow), closed (dim). Failed plugins are listed separately with their error messages.
 
 ```bash
 opentabs status
 opentabs status --json
 opentabs status --port 3000
 ```
+
+---
+
+## opentabs audit
+
+Show recent tool invocation history from the server's in-memory audit log.
+
+```bash
+opentabs audit [options]
+```
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Option</Table.Head>
+      <Table.Head>Default</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--limit <number>`</Table.Cell>
+      <Table.Cell>`20`</Table.Cell>
+      <Table.Cell>Number of entries to show.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--plugin <name>`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Filter by plugin name.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--json`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Output raw JSON from the audit endpoint.</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+Each entry shows the timestamp, tool name, success/failure status, and duration. Failed entries include the error code, category, and message when using `--json`.
+
+The server maintains the last 500 tool invocations in memory. The audit log resets when the server restarts.
+
+```bash
+# Show last 20 invocations
+opentabs audit
+
+# Show last 50, filtered to one plugin
+opentabs audit --limit 50 --plugin slack
+
+# Raw JSON output
+opentabs audit --json
+```
+
+---
 
 ## opentabs doctor
 
@@ -177,31 +200,20 @@ Performs the following checks:
 
 1. **Bun runtime** — verifies Bun is installed
 2. **Config file** — checks `~/.opentabs/config.json` exists
-3. **MCP server health** — fetches `/health` endpoint (3s timeout)
-4. **Extension connection** — checks if the Chrome extension is connected
+3. **MCP server health** — fetches the `/health` endpoint (3s timeout)
+4. **Extension connection** — checks if the Chrome extension is connected via WebSocket
 5. **Extension installed** — verifies `~/.opentabs/extension/manifest.json` exists
 6. **Extension version** — compares installed extension version to CLI version
-7. **Plugins** — for each configured plugin, checks for manifest and IIFE bundle
+7. **Local plugins** — for each local plugin, checks that `dist/tools.json` and `dist/adapter.iife.js` exist
 
 Results are shown as a checklist with pass (✓), warning (!), and error (✗) indicators. Exits with code 1 if any fatal check fails.
 
 ```bash
 opentabs doctor
+opentabs doctor --port 3000
 ```
 
-## opentabs setup
-
-Install the Chrome extension files to `~/.opentabs/extension/`.
-
-```bash
-opentabs setup
-```
-
-Copies the browser extension source to `~/.opentabs/extension/`, creates the `adapters/` directory for plugin injection, and writes a `.opentabs-version` marker file. After running, load the extension as an unpacked extension from `chrome://extensions`.
-
-```bash
-opentabs setup
-```
+---
 
 ## opentabs logs
 
@@ -230,10 +242,15 @@ opentabs logs [options]
       <Table.Cell>—</Table.Cell>
       <Table.Cell>Print recent lines and exit instead of following new output.</Table.Cell>
     </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--plugin <name>`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Show only logs from a specific plugin.</Table.Cell>
+    </Table.Row>
   </Table.Body>
 </Table>
 
-Reads from `~/.opentabs/server.log`. By default, follows the file for new output (like `tail -f`). Handles file truncation gracefully.
+Reads from `~/.opentabs/server.log`. By default, follows the file for new output (like `tail -f`). The `--plugin` flag filters to lines containing `[plugin:<name>]`, showing only log entries from that plugin.
 
 ```bash
 # Follow logs in real time
@@ -241,140 +258,54 @@ opentabs logs
 
 # Show last 100 lines and exit
 opentabs logs --lines 100 --no-follow
+
+# Show only Slack plugin logs
+opentabs logs --plugin slack
 ```
 
-## opentabs reload
-
-Reload server configuration and plugins, or trigger an extension reload.
-
-```bash
-opentabs reload [options]
-```
-
-<Table>
-  <Table.Header>
-    <Table.Row>
-      <Table.Head>Option</Table.Head>
-      <Table.Head>Description</Table.Head>
-    </Table.Row>
-  </Table.Header>
-  <Table.Body>
-    <Table.Row>
-      <Table.Cell className="font-medium">`--port <number>`</Table.Cell>
-      <Table.Cell>Server port (default: `9515`).</Table.Cell>
-    </Table.Row>
-    <Table.Row>
-      <Table.Cell className="font-medium">`--extension`</Table.Cell>
-      <Table.Cell>Reload the Chrome extension instead of server config.</Table.Cell>
-    </Table.Row>
-  </Table.Body>
-</Table>
-
-**Default behavior**: sends `POST /reload` to the server, which rediscovers plugins and reloads configuration. Returns plugin count and duration.
-
-**With `--extension`**: sends `POST /extension/reload` to signal the connected Chrome extension to reload.
-
-```bash
-# Reload server config and plugins
-opentabs reload
-
-# Reload the Chrome extension
-opentabs reload --extension
-```
-
-## opentabs config
-
-View and manage configuration. Has four subcommands.
-
-### opentabs config show
-
-Display the current configuration (secret redacted).
-
-```bash
-opentabs config show [options]
-```
-
-<Table>
-  <Table.Header>
-    <Table.Row>
-      <Table.Head>Option</Table.Head>
-      <Table.Head>Description</Table.Head>
-    </Table.Row>
-  </Table.Header>
-  <Table.Body>
-    <Table.Row>
-      <Table.Cell className="font-medium">`--json`</Table.Cell>
-      <Table.Cell>Output config as JSON.</Table.Cell>
-    </Table.Row>
-  </Table.Body>
-</Table>
-
-```bash
-opentabs config show
-opentabs config show --json
-```
-
-### opentabs config init
-
-Create a config file with defaults.
-
-```bash
-opentabs config init [options]
-```
-
-<Table>
-  <Table.Header>
-    <Table.Row>
-      <Table.Head>Option</Table.Head>
-      <Table.Head>Description</Table.Head>
-    </Table.Row>
-  </Table.Header>
-  <Table.Body>
-    <Table.Row>
-      <Table.Cell className="font-medium">`--force`</Table.Cell>
-      <Table.Cell>Overwrite existing config.</Table.Cell>
-    </Table.Row>
-  </Table.Body>
-</Table>
-
-Creates `~/.opentabs/config.json` with `plugins: []`, `tools: {}`, and an auto-generated `secret`. Exits with a warning if the config already exists (unless `--force` is passed).
-
-```bash
-opentabs config init
-opentabs config init --force
-```
-
-### opentabs config path
-
-Print the config file path.
-
-```bash
-opentabs config path
-```
-
-### opentabs config set
-
-Set a config value.
-
-```bash
-opentabs config set <key> <value>
-```
-
-Currently supports enabling/disabling tools:
-
-```bash
-# Disable a tool
-opentabs config set tool.slack_send_message disabled
-
-# Re-enable a tool
-opentabs config set tool.slack_send_message enabled
-```
-
-The key format is `tool.<plugin>_<tool>` and value must be `enabled` or `disabled`.
+---
 
 ## opentabs plugin
 
-Manage plugins. Has four subcommands.
+Manage plugins. Has two subcommands: `search` and `create`.
+
+### opentabs plugin search
+
+Search the npm registry for available OpenTabs plugins.
+
+```bash
+opentabs plugin search [query]
+```
+
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Argument</Table.Head>
+      <Table.Head>Required</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`[query]`</Table.Cell>
+      <Table.Cell>No</Table.Cell>
+      <Table.Cell>Search term. Lists all plugins if omitted.</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
+Results are labeled as `[official]` (packages under the `@opentabs-dev` scope) or `[community]`. Install a found plugin globally to enable auto-discovery:
+
+```bash
+# Search for plugins
+opentabs plugin search slack
+
+# List all available plugins
+opentabs plugin search
+
+# Install a discovered plugin
+npm install -g opentabs-plugin-slack
+```
 
 ### opentabs plugin create
 
@@ -416,7 +347,7 @@ opentabs plugin create <name> --domain <domain> [options]
   </Table.Body>
 </Table>
 
-Generates a standalone npm package with TypeScript config, `package.json` (with `@opentabs-dev/plugin-sdk` and `@opentabs-dev/cli` dependencies), a scaffolded plugin class, and an example tool. Auto-registers the plugin in `~/.opentabs/config.json`.
+Generates a standalone npm package with TypeScript config, a scaffolded plugin class, and an example tool. The plugin is auto-registered in `~/.opentabs/config.json` on first build.
 
 The standalone `create-opentabs-plugin` package provides the same functionality:
 
@@ -424,12 +355,18 @@ The standalone `create-opentabs-plugin` package provides the same functionality:
 bunx create-opentabs-plugin my-plugin --domain .example.com --display "My App"
 ```
 
-### opentabs plugin list
+---
 
-List configured plugins and their status.
+## opentabs config
+
+View and manage configuration. Has three subcommands: `show`, `set`, and `path`.
+
+### opentabs config show
+
+Display the current configuration (secret redacted).
 
 ```bash
-opentabs plugin list [options]
+opentabs config show [options]
 ```
 
 <Table>
@@ -442,67 +379,44 @@ opentabs plugin list [options]
   <Table.Body>
     <Table.Row>
       <Table.Cell className="font-medium">`--json`</Table.Cell>
-      <Table.Cell>Output plugin info as JSON.</Table.Cell>
-    </Table.Row>
-  </Table.Body>
-</Table>
-
-Each plugin shows a status indicator:
-
-<Table>
-  <Table.Header>
-    <Table.Row>
-      <Table.Head>Indicator</Table.Head>
-      <Table.Head>Meaning</Table.Head>
-    </Table.Row>
-  </Table.Header>
-  <Table.Body>
-    <Table.Row>
-      <Table.Cell className="font-medium">`+` (green)</Table.Cell>
-      <Table.Cell>Ready — manifest and IIFE bundle present.</Table.Cell>
-    </Table.Row>
-    <Table.Row>
-      <Table.Cell className="font-medium">`~` (yellow)</Table.Cell>
-      <Table.Cell>Not built — manifest missing.</Table.Cell>
-    </Table.Row>
-    <Table.Row>
-      <Table.Cell className="font-medium">`!` (red)</Table.Cell>
-      <Table.Cell>Not found — directory missing.</Table.Cell>
+      <Table.Cell>Output config as JSON (includes the actual secret value).</Table.Cell>
     </Table.Row>
   </Table.Body>
 </Table>
 
 ```bash
-opentabs plugin list
-opentabs plugin list --json
+opentabs config show
+opentabs config show --json
+
+# Retrieve the secret for MCP client configuration
+opentabs config show --json | jq -r .secret
 ```
 
-### opentabs plugin add
+### opentabs config set
 
-Add a plugin path to the config.
+Set a configuration value.
 
 ```bash
-opentabs plugin add <path>
+opentabs config set <key> <value>
 ```
 
-Resolves the path, normalizes it relative to the config directory, checks for duplicates, and appends to the `plugins` array in `config.json`. Warns if the directory or build artifacts are missing. The MCP server detects the change automatically.
+Supports enabling and disabling individual tools:
 
 ```bash
-opentabs plugin add ./my-plugin
-opentabs plugin add /absolute/path/to/plugin
+# Disable a tool
+opentabs config set tool.slack_send_message disabled
+
+# Re-enable a tool
+opentabs config set tool.slack_send_message enabled
 ```
 
-### opentabs plugin remove
+The key format is `tool.<plugin>_<tool>` and value must be `enabled` or `disabled`.
 
-Remove a plugin from the config.
+### opentabs config path
 
-```bash
-opentabs plugin remove <path-or-name>
-```
-
-Matches against the plugins array by exact path, suffix match (e.g., `/my-plugin`), or directory name. The MCP server detects the change automatically.
+Print the config file path.
 
 ```bash
-opentabs plugin remove ./my-plugin
-opentabs plugin remove my-plugin
+opentabs config path
+# Output: /Users/you/.opentabs/config.json
 ```
