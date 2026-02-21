@@ -52,6 +52,7 @@ describe('create-opentabs-plugin CLI', () => {
       expect(existsSync(join(projectDir, '.gitignore'))).toBe(true);
       expect(existsSync(join(projectDir, 'src', 'index.ts'))).toBe(true);
       expect(existsSync(join(projectDir, 'src', 'tools', 'example.ts'))).toBe(true);
+      expect(existsSync(join(projectDir, 'README.md'))).toBe(true);
     });
 
     test('package.json has correct name and dependencies', async () => {
@@ -75,6 +76,18 @@ describe('create-opentabs-plugin CLI', () => {
       expect(indexContent).toContain('class MyPluginPlugin');
       expect(indexContent).toContain('"*://example.com/*"');
       expect(indexContent).toContain('export default new MyPluginPlugin()');
+    });
+
+    test('README.md explains the package.json opentabs field', async () => {
+      runCli(['my-plugin', '--domain', 'example.com'], { cwd: tmpDir, configDir });
+
+      const readme = await Bun.file(join(tmpDir, 'my-plugin', 'README.md')).text();
+      expect(readme).toContain('opentabs-plugin-my-plugin');
+      expect(readme).toContain('"opentabs"');
+      expect(readme).toContain('urlPatterns');
+      expect(readme).toContain('displayName');
+      expect(readme).toContain('dist/adapter.iife.js');
+      expect(readme).toContain('tools.json');
     });
 
     test('src/tools/example.ts contains a defineTool call with Zod schemas', async () => {

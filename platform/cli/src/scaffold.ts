@@ -187,6 +187,85 @@ node_modules/
 bun.lock
 `;
 
+const generateReadme = (args: ScaffoldArgs, urlPattern: string): string => {
+  const displayName = args.display ?? toTitleCase(args.name);
+  const desc = args.description ?? `OpenTabs plugin for ${displayName}`;
+
+  return `# opentabs-plugin-${args.name}
+
+${desc}
+
+## Project Structure
+
+\`\`\`
+${args.name}/
+├── package.json          # Plugin metadata (name, opentabs field, dependencies)
+├── src/
+│   ├── index.ts          # Plugin class (extends OpenTabsPlugin)
+│   └── tools/            # One file per tool (using defineTool)
+│       └── example.ts
+└── dist/                 # Build output (generated)
+    ├── adapter.iife.js   # Bundled adapter injected into matching tabs
+    └── tools.json        # Tool schemas for MCP registration
+\`\`\`
+
+## Configuration
+
+Plugin metadata is defined in \`package.json\` under the \`opentabs\` field:
+
+\`\`\`json
+{
+  "name": "opentabs-plugin-${args.name}",
+  "main": "dist/adapter.iife.js",
+  "opentabs": {
+    "displayName": "${displayName}",
+    "description": "${desc}",
+    "urlPatterns": ["${urlPattern}"]
+  }
+}
+\`\`\`
+
+- **\`main\`** — entry point for the bundled adapter IIFE
+- **\`opentabs.displayName\`** — human-readable name shown in the side panel
+- **\`opentabs.description\`** — short description of what the plugin does
+- **\`opentabs.urlPatterns\`** — Chrome match patterns for tabs where the adapter is injected
+
+## Development
+
+\`\`\`bash
+bun install
+bun run build       # tsc && opentabs build
+bun run dev         # watch mode (tsc --watch + opentabs build --watch)
+bun run type-check  # tsc --noEmit
+bun run lint        # eslint
+\`\`\`
+
+## Adding Tools
+
+Create a new file in \`src/tools/\` using \`defineTool\`:
+
+\`\`\`ts
+import { z } from 'zod';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
+
+export const myTool = defineTool({
+  name: 'my_tool',
+  displayName: 'My Tool',
+  description: 'What this tool does',
+  icon: 'wrench',
+  input: z.object({ /* ... */ }),
+  output: z.object({ /* ... */ }),
+  handle: async (params) => {
+    // Tool implementation runs in the browser tab context
+    return { /* ... */ };
+  },
+});
+\`\`\`
+
+Then register it in \`src/index.ts\` by adding it to the \`tools\` array.
+`;
+};
+
 const generatePluginIndex = (args: ScaffoldArgs, urlPattern: string): string => {
   const displayName = args.display ?? toTitleCase(args.name);
   const desc = args.description ?? `OpenTabs plugin for ${displayName}`;
@@ -324,6 +403,9 @@ const scaffoldPlugin = async (args: ScaffoldArgs): Promise<string> => {
 
   await Bun.write(join(projectDir, 'src', 'tools', 'example.ts'), generateExampleTool(args));
   console.log(`  ${pc.dim('Created:')} ${pc.bold('src/tools/example.ts')}`);
+
+  await Bun.write(join(projectDir, 'README.md'), generateReadme(args, urlPattern));
+  console.log(`  ${pc.dim('Created:')} ${pc.bold('README.md')}`);
 
   console.log('');
   console.log(pc.green(`Plugin scaffolded in ./${args.name}/`));
