@@ -10,23 +10,12 @@
 import { log } from './logger.js';
 import { prefixedToolName, isToolEnabled } from './state.js';
 import AjvValidator from 'ajv';
-import type { LoadedPlugin } from './loader.js';
-import type { FailedPlugin, ServerState, ToolLookupEntry } from './state.js';
+import type { FailedPlugin, PluginRegistry, RegisteredPlugin, ServerState, ToolLookupEntry } from './state.js';
 import type { ManifestTool, TrustTier } from '@opentabs-dev/shared';
-
-/** Immutable registry of discovered plugins */
-interface PluginRegistry {
-  /** All successfully loaded plugins, keyed by internal plugin name */
-  readonly plugins: ReadonlyMap<string, LoadedPlugin>;
-  /** O(1) tool lookup: prefixed tool name → plugin/tool names + validator */
-  readonly toolLookup: ReadonlyMap<string, ToolLookupEntry>;
-  /** Plugin paths that failed discovery */
-  readonly failures: readonly FailedPlugin[];
-}
 
 /** Result of looking up a tool in the registry */
 interface ToolLookupResult {
-  readonly plugin: LoadedPlugin;
+  readonly plugin: RegisteredPlugin;
   readonly tool: ManifestTool;
   readonly lookup: ToolLookupEntry;
 }
@@ -85,9 +74,12 @@ const compileToolValidator = (
  *
  * All returned objects are frozen to prevent accidental mutation.
  */
-const buildRegistry = (loadedPlugins: readonly LoadedPlugin[], failures: readonly FailedPlugin[]): PluginRegistry => {
+const buildRegistry = (
+  loadedPlugins: readonly RegisteredPlugin[],
+  failures: readonly FailedPlugin[],
+): PluginRegistry => {
   const ajv = new AjvValidator({ allErrors: false });
-  const plugins = new Map<string, LoadedPlugin>();
+  const plugins = new Map<string, RegisteredPlugin>();
   const toolLookup = new Map<string, ToolLookupEntry>();
 
   for (const plugin of loadedPlugins) {
@@ -112,7 +104,7 @@ const buildRegistry = (loadedPlugins: readonly LoadedPlugin[], failures: readonl
 const emptyRegistry = (): PluginRegistry => buildRegistry([], []);
 
 /** Get a plugin by internal name, or undefined if not found */
-const getPlugin = (registry: PluginRegistry, name: string): LoadedPlugin | undefined => registry.plugins.get(name);
+const getPlugin = (registry: PluginRegistry, name: string): RegisteredPlugin | undefined => registry.plugins.get(name);
 
 /** Get a tool by prefixed name, or undefined if not found */
 const getTool = (registry: PluginRegistry, prefixedName: string): ToolLookupResult | undefined => {
@@ -156,4 +148,4 @@ const listEnabledTools = (
 };
 
 export { buildRegistry, emptyRegistry, getPlugin, getTool, listEnabledTools, trustTierPrefix };
-export type { PluginRegistry, ToolLookupResult };
+export type { ToolLookupResult };

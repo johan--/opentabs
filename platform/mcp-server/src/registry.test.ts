@@ -1,7 +1,6 @@
 import { buildRegistry, emptyRegistry, getPlugin, getTool, listEnabledTools } from './registry.js';
 import { describe, expect, test } from 'bun:test';
-import type { LoadedPlugin } from './loader.js';
-import type { FailedPlugin, ServerState } from './state.js';
+import type { FailedPlugin, RegisteredPlugin, ServerState } from './state.js';
 
 /**
  * Unit tests for the immutable PluginRegistry module.
@@ -10,12 +9,11 @@ import type { FailedPlugin, ServerState } from './state.js';
  * immutability guarantees, and tool filtering by config.
  */
 
-/** Create a minimal LoadedPlugin for testing */
-const makePlugin = (overrides: Partial<LoadedPlugin> = {}): LoadedPlugin => ({
+/** Create a minimal RegisteredPlugin for testing */
+const makePlugin = (overrides: Partial<RegisteredPlugin> = {}): RegisteredPlugin => ({
   name: 'test',
   version: '1.0.0',
   displayName: 'Test Plugin',
-  description: 'A test plugin',
   urlPatterns: ['http://localhost/*'],
   trustTier: 'local',
   iife: '(function(){})()',

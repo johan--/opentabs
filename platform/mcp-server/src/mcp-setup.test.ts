@@ -1,11 +1,11 @@
 import {
   checkToolCallable,
   getEnabledToolsList,
-  rebuildToolLookups,
+  rebuildCachedBrowserTools,
   registerMcpHandlers,
   sanitizeOutput,
-  trustTierPrefix,
 } from './mcp-setup.js';
+import { buildRegistry, trustTierPrefix } from './registry.js';
 import { createState } from './state.js';
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
@@ -31,16 +31,17 @@ const createPlugin = (name: string, toolNames: string[]): RegisteredPlugin => ({
   })),
 });
 
-describe('rebuildToolLookups — plugin tool lookup', () => {
+describe('buildRegistry — plugin tool lookup', () => {
   test('populates toolLookup with correct prefixed names', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages']));
+    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
 
-    rebuildToolLookups(state);
-
-    expect(state.toolLookup.size).toBe(2);
-    expect(state.toolLookup.get('slack_send_message')).toMatchObject({ pluginName: 'slack', toolName: 'send_message' });
-    expect(state.toolLookup.get('slack_read_messages')).toMatchObject({
+    expect(state.registry.toolLookup.size).toBe(2);
+    expect(state.registry.toolLookup.get('slack_send_message')).toMatchObject({
+      pluginName: 'slack',
+      toolName: 'send_message',
+    });
+    expect(state.registry.toolLookup.get('slack_read_messages')).toMatchObject({
       pluginName: 'slack',
       toolName: 'read_messages',
     });
@@ -48,49 +49,51 @@ describe('rebuildToolLookups — plugin tool lookup', () => {
 
   test('empty plugins produces empty toolLookup', () => {
     const state = createState();
+    state.registry = buildRegistry([], []);
 
-    rebuildToolLookups(state);
-
-    expect(state.toolLookup.size).toBe(0);
+    expect(state.registry.toolLookup.size).toBe(0);
   });
 
   test('multiple plugins produces correct entries for all tools', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    state.plugins.set('github', createPlugin('github', ['create_issue', 'list_prs']));
+    state.registry = buildRegistry(
+      [createPlugin('slack', ['send_message']), createPlugin('github', ['create_issue', 'list_prs'])],
+      [],
+    );
 
-    rebuildToolLookups(state);
-
-    expect(state.toolLookup.size).toBe(3);
-    expect(state.toolLookup.get('slack_send_message')).toMatchObject({ pluginName: 'slack', toolName: 'send_message' });
-    expect(state.toolLookup.get('github_create_issue')).toMatchObject({
+    expect(state.registry.toolLookup.size).toBe(3);
+    expect(state.registry.toolLookup.get('slack_send_message')).toMatchObject({
+      pluginName: 'slack',
+      toolName: 'send_message',
+    });
+    expect(state.registry.toolLookup.get('github_create_issue')).toMatchObject({
       pluginName: 'github',
       toolName: 'create_issue',
     });
-    expect(state.toolLookup.get('github_list_prs')).toMatchObject({ pluginName: 'github', toolName: 'list_prs' });
+    expect(state.registry.toolLookup.get('github_list_prs')).toMatchObject({
+      pluginName: 'github',
+      toolName: 'list_prs',
+    });
   });
 
   test('replaces previous toolLookup entries on rebuild', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
-    expect(state.toolLookup.size).toBe(1);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    expect(state.registry.toolLookup.size).toBe(1);
 
     // Change plugins and rebuild
-    state.plugins.clear();
-    state.plugins.set('github', createPlugin('github', ['create_issue']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('github', ['create_issue'])], []);
 
-    expect(state.toolLookup.size).toBe(1);
-    expect(state.toolLookup.has('slack_send_message')).toBe(false);
-    expect(state.toolLookup.get('github_create_issue')).toMatchObject({
+    expect(state.registry.toolLookup.size).toBe(1);
+    expect(state.registry.toolLookup.has('slack_send_message')).toBe(false);
+    expect(state.registry.toolLookup.get('github_create_issue')).toMatchObject({
       pluginName: 'github',
       toolName: 'create_issue',
     });
   });
 });
 
-describe('rebuildToolLookups — cached browser tools', () => {
+describe('rebuildCachedBrowserTools — cached browser tools', () => {
   test('populates cachedBrowserTools with pre-computed JSON schemas', () => {
     const state = createState();
     const browserTool: BrowserToolDefinition = {
@@ -101,7 +104,7 @@ describe('rebuildToolLookups — cached browser tools', () => {
     };
     state.browserTools = [browserTool];
 
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     expect(state.cachedBrowserTools).toHaveLength(1);
     const cachedRaw = state.cachedBrowserTools[0];
@@ -118,7 +121,7 @@ describe('rebuildToolLookups — cached browser tools', () => {
     const state = createState();
     state.browserTools = [];
 
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     expect(state.cachedBrowserTools).toHaveLength(0);
   });
@@ -140,7 +143,7 @@ describe('rebuildToolLookups — cached browser tools', () => {
       },
     ];
 
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     expect(state.cachedBrowserTools).toHaveLength(2);
     const firstCached = state.cachedBrowserTools[0];
@@ -155,7 +158,7 @@ describe('rebuildToolLookups — cached browser tools', () => {
   });
 });
 
-describe('rebuildToolLookups — input validation', () => {
+describe('buildRegistry — input validation', () => {
   test('lookup entries include a working validate function', () => {
     const state = createState();
     const plugin: RegisteredPlugin = {
@@ -176,11 +179,9 @@ describe('rebuildToolLookups — input validation', () => {
         },
       ],
     };
-    state.plugins.set('test', plugin);
+    state.registry = buildRegistry([plugin], []);
 
-    rebuildToolLookups(state);
-
-    const entry = state.toolLookup.get('test_greet');
+    const entry = state.registry.toolLookup.get('test_greet');
     expect(entry).toBeDefined();
     if (!entry?.validate) throw new Error('Expected validate function');
     expect(entry.validate).toBeInstanceOf(Function);
@@ -210,10 +211,9 @@ describe('rebuildToolLookups — input validation', () => {
         },
       ],
     };
-    state.plugins.set('test', plugin);
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([plugin], []);
 
-    const entry = state.toolLookup.get('test_greet');
+    const entry = state.registry.toolLookup.get('test_greet');
     if (!entry?.validate) throw new Error('Expected entry with validate');
     // Pass wrong type for name
     entry.validate({ name: 123 });
@@ -224,10 +224,9 @@ describe('rebuildToolLookups — input validation', () => {
 
   test('validate compiles for trivial schemas and passes empty args', () => {
     const state = createState();
-    state.plugins.set('test', createPlugin('test', ['ping']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('test', ['ping'])], []);
 
-    const entry = state.toolLookup.get('test_ping');
+    const entry = state.registry.toolLookup.get('test_ping');
     expect(entry).toBeDefined();
     if (!entry?.validate) throw new Error('Expected validate function');
     // { type: 'object' } compiles successfully — validate should still be a function
@@ -255,10 +254,9 @@ describe('rebuildToolLookups — input validation', () => {
         },
       ],
     };
-    state.plugins.set('test', plugin);
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([plugin], []);
 
-    const entry = state.toolLookup.get('test_strict');
+    const entry = state.registry.toolLookup.get('test_strict');
     if (!entry?.validate) throw new Error('Expected entry with validate');
     expect(entry.validate({ a: 'ok' })).toBe(true);
     expect(entry.validate({ a: 'ok', b: 'extra' })).toBe(false);
@@ -315,8 +313,7 @@ const getListToolsHandler = (
 describe('registerMcpHandlers — disabled tool filtering', () => {
   test('disabled tools are excluded from tools/list response', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages', 'list_channels']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages', 'list_channels'])], []);
 
     // Disable one tool via toolConfig
     state.toolConfig = { slack_read_messages: false };
@@ -336,8 +333,7 @@ describe('registerMcpHandlers — disabled tool filtering', () => {
 
   test('re-enabling a disabled tool makes it reappear in tools/list', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
 
     // Disable a tool
     state.toolConfig = { slack_send_message: false };
@@ -376,9 +372,9 @@ const createBrowserTool = (name: string, description: string): BrowserToolDefini
 describe('getEnabledToolsList — all tools enabled (default)', () => {
   test('returns all plugin tools and browser tools when no toolConfig is set', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages']));
+    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const tools = getEnabledToolsList(state);
     const names = tools.map(t => t.name);
@@ -393,9 +389,9 @@ describe('getEnabledToolsList — all tools enabled (default)', () => {
 describe('getEnabledToolsList — disabled tool filtering', () => {
   test('one plugin tool disabled via toolConfig is excluded, others remain', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages']));
+    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
     state.toolConfig = { slack_read_messages: false };
 
     const tools = getEnabledToolsList(state);
@@ -409,9 +405,9 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
 
   test('all plugin tools disabled — only browser tools appear', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages']));
+    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
     state.toolConfig = { slack_send_message: false, slack_read_messages: false };
 
     const tools = getEnabledToolsList(state);
@@ -425,9 +421,9 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
 
   test('browser tools always appear regardless of toolConfig entries matching their names', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
     // Attempt to disable a browser tool via toolConfig — should have no effect
     state.toolConfig = { browser_list_tabs: false };
 
@@ -441,10 +437,12 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
 
   test('multiple plugins with mixed enabled/disabled tools — correct filtering per plugin', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message', 'read_messages']));
-    state.plugins.set('github', createPlugin('github', ['create_issue', 'list_prs']));
+    state.registry = buildRegistry(
+      [createPlugin('slack', ['send_message', 'read_messages']), createPlugin('github', ['create_issue', 'list_prs'])],
+      [],
+    );
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
     state.toolConfig = { slack_read_messages: false, github_create_issue: false };
 
     const tools = getEnabledToolsList(state);
@@ -464,7 +462,7 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
       createBrowserTool('browser_list_tabs', 'List tabs'),
       createBrowserTool('browser_open_tab', 'Open a tab'),
     ];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const tools = getEnabledToolsList(state);
     const names = tools.map(t => t.name);
@@ -478,8 +476,7 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
 describe('getEnabledToolsList — tool entry shape', () => {
   test('plugin tools have correct name, description with trust tier prefix, and inputSchema', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
 
     const tools = getEnabledToolsList(state);
 
@@ -494,7 +491,7 @@ describe('getEnabledToolsList — tool entry shape', () => {
   test('browser tools have correct name, description, and inputSchema', () => {
     const state = createState();
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List all open tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const tools = getEnabledToolsList(state);
 
@@ -510,8 +507,7 @@ describe('getEnabledToolsList — tool entry shape', () => {
 describe('checkToolCallable', () => {
   test('returns ok with correct pluginName and toolName when tool exists and is enabled', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
 
     const result = checkToolCallable(state, 'slack_send_message');
 
@@ -524,8 +520,7 @@ describe('checkToolCallable', () => {
 
   test('returns error containing "disabled" when tool exists but is disabled', () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.toolConfig = { slack_send_message: false };
 
     const result = checkToolCallable(state, 'slack_send_message');
@@ -538,7 +533,6 @@ describe('checkToolCallable', () => {
 
   test('returns error containing "not found" when tool does not exist', () => {
     const state = createState();
-    rebuildToolLookups(state);
 
     const result = checkToolCallable(state, 'nonexistent_tool');
 
@@ -551,7 +545,7 @@ describe('checkToolCallable', () => {
   test('browser tool names are not in toolLookup (handled separately)', () => {
     const state = createState();
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const result = checkToolCallable(state, 'browser_list_tabs');
 

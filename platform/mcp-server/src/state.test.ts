@@ -6,8 +6,8 @@ describe('createState', () => {
     const state = createState();
 
     expect(state._schemaVersion).toBe(STATE_SCHEMA_VERSION);
-    expect(state.plugins).toBeInstanceOf(Map);
-    expect(state.plugins.size).toBe(0);
+    expect(state.registry.plugins).toBeInstanceOf(Map);
+    expect(state.registry.plugins.size).toBe(0);
     expect(state.tabMapping).toBeInstanceOf(Map);
     expect(state.tabMapping.size).toBe(0);
     expect(state.toolConfig).toEqual({});
@@ -21,8 +21,8 @@ describe('createState', () => {
     expect(state.fileWatcherTimers).toBeInstanceOf(Map);
     expect(state.fileWatcherTimers.size).toBe(0);
     expect(state.wsSecret).toBeNull();
-    expect(state.toolLookup).toBeInstanceOf(Map);
-    expect(state.toolLookup.size).toBe(0);
+    expect(state.registry.toolLookup).toBeInstanceOf(Map);
+    expect(state.registry.toolLookup.size).toBe(0);
     expect(state.cachedBrowserTools).toEqual([]);
     expect(state.activeDispatches).toBeInstanceOf(Map);
     expect(state.activeDispatches.size).toBe(0);
@@ -33,7 +33,6 @@ describe('createState', () => {
     const b = createState();
 
     expect(a).not.toBe(b);
-    expect(a.plugins).not.toBe(b.plugins);
     expect(a.tabMapping).not.toBe(b.tabMapping);
     expect(a.pendingDispatches).not.toBe(b.pendingDispatches);
   });

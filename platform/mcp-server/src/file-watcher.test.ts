@@ -1,4 +1,5 @@
 import { handleManifestChange, startConfigWatching, startFileWatching, stopFileWatching } from './file-watcher.js';
+import { buildRegistry } from './registry.js';
 import { createState } from './state.js';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -112,7 +113,7 @@ describe('file watcher lifecycle with real plugins', () => {
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), '(function(){})()');
 
     state = createState();
-    state.plugins.set('test-plugin', makePlugin({ sourcePath: pluginDir }));
+    state.registry = buildRegistry([makePlugin({ sourcePath: pluginDir })], []);
 
     expect(state.fileWatcherGeneration).toBe(0);
     expect(state.fileWatcherEntries).toHaveLength(0);
@@ -134,7 +135,7 @@ describe('file watcher lifecycle with real plugins', () => {
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), '(function(){})()');
 
     state = createState();
-    state.plugins.set('test-plugin', makePlugin({ sourcePath: pluginDir }));
+    state.registry = buildRegistry([makePlugin({ sourcePath: pluginDir })], []);
 
     startFileWatching(state, noopCallbacks);
     expect(state.fileWatcherGeneration).toBe(1);
@@ -160,7 +161,7 @@ describe('file watcher lifecycle with real plugins', () => {
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), '(function(){})()');
 
     state = createState();
-    state.plugins.set('test-plugin', makePlugin({ sourcePath: pluginDir }));
+    state.registry = buildRegistry([makePlugin({ sourcePath: pluginDir })], []);
 
     // Start file watching (generation becomes 1)
     startFileWatching(state, noopCallbacks);
@@ -195,7 +196,7 @@ describe('file watcher lifecycle with real plugins', () => {
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), '(function(){})()');
 
     state = createState();
-    state.plugins.set('test-plugin', makePlugin({ sourcePath: pluginDir }));
+    state.registry = buildRegistry([makePlugin({ sourcePath: pluginDir })], []);
 
     // Start file watching (generation becomes 1)
     startFileWatching(state, noopCallbacks);
@@ -384,7 +385,7 @@ describe('handleManifestChange', () => {
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), makeIifeWithHash());
 
     const state = createState();
-    state.plugins.set('test-plugin', makePlugin({ adapterHash: 'old-hash' }));
+    state.registry = buildRegistry([makePlugin({ adapterHash: 'old-hash' })], []);
     let manifestChangedFor = '';
     const callbacks = {
       ...noopCallbacks,
@@ -395,7 +396,7 @@ describe('handleManifestChange', () => {
 
     await handleManifestChange(state, 'test-plugin', pluginDir, callbacks);
 
-    const plugin = state.plugins.get('test-plugin');
+    const plugin = state.registry.plugins.get('test-plugin');
     expect(plugin?.version).toBe('2.0.0');
     expect(plugin?.displayName).toBe('Test Plugin Updated');
     expect(plugin?.urlPatterns).toEqual(['https://test.example.com/*']);
@@ -409,7 +410,7 @@ describe('handleManifestChange', () => {
     // No opentabs-plugin.json written
 
     const state = createState();
-    state.plugins.set('test-plugin', makePlugin());
+    state.registry = buildRegistry([makePlugin()], []);
     let onManifestChangedCalled = false;
     const callbacks = {
       ...noopCallbacks,
@@ -430,7 +431,7 @@ describe('handleManifestChange', () => {
     writeFileSync(join(pluginDir, 'opentabs-plugin.json'), makeManifestJson('different-name'));
 
     const state = createState();
-    state.plugins.set('test-plugin', makePlugin({ version: '1.0.0' }));
+    state.registry = buildRegistry([makePlugin({ version: '1.0.0' })], []);
     let onManifestChangedCalled = false;
     const callbacks = {
       ...noopCallbacks,
@@ -442,7 +443,7 @@ describe('handleManifestChange', () => {
     await handleManifestChange(state, 'test-plugin', pluginDir, callbacks);
 
     // Plugin version should remain unchanged
-    expect(state.plugins.get('test-plugin')?.version).toBe('1.0.0');
+    expect(state.registry.plugins.get('test-plugin')?.version).toBe('1.0.0');
     expect(onManifestChangedCalled).toBe(false);
   });
 
@@ -456,7 +457,7 @@ describe('handleManifestChange', () => {
     );
 
     const state = createState();
-    state.plugins.set('test-plugin', makePlugin({ version: '1.0.0' }));
+    state.registry = buildRegistry([makePlugin({ version: '1.0.0' })], []);
     let onManifestChangedCalled = false;
     const callbacks = {
       ...noopCallbacks,
@@ -468,7 +469,7 @@ describe('handleManifestChange', () => {
     await handleManifestChange(state, 'test-plugin', pluginDir, callbacks);
 
     // Plugin should not be updated
-    expect(state.plugins.get('test-plugin')?.version).toBe('1.0.0');
+    expect(state.registry.plugins.get('test-plugin')?.version).toBe('1.0.0');
     expect(onManifestChangedCalled).toBe(false);
   });
 
@@ -503,11 +504,11 @@ describe('handleManifestChange', () => {
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), makeIifeWithHash(EMBEDDED_HASH));
 
     const state = createState();
-    state.plugins.set('test-plugin', makePlugin({ adapterHash: 'old-hash' }));
+    state.registry = buildRegistry([makePlugin({ adapterHash: 'old-hash' })], []);
 
     await handleManifestChange(state, 'test-plugin', pluginDir, noopCallbacks);
 
     // The embedded hash from the IIFE should override the manifest's adapterHash
-    expect(state.plugins.get('test-plugin')?.adapterHash).toBe(EMBEDDED_HASH);
+    expect(state.registry.plugins.get('test-plugin')?.adapterHash).toBe(EMBEDDED_HASH);
   });
 });

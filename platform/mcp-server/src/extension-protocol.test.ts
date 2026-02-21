@@ -5,6 +5,7 @@ import {
   sendSyncFull,
   writeAdapterFile,
 } from './extension-protocol.js';
+import { buildRegistry } from './registry.js';
 import { createState, DISPATCH_TIMEOUT_MS } from './state.js';
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -276,7 +277,7 @@ describe('handleExtensionMessage — tab.stateChanged', () => {
   test('updates a single entry in state.tabMapping', () => {
     const state = createState();
     state.extensionWs = createMockWs();
-    state.plugins.set('slack', makePlugin('slack'));
+    state.registry = buildRegistry([makePlugin('slack')], []);
 
     handleExtensionMessage(
       state,
@@ -295,8 +296,7 @@ describe('handleExtensionMessage — tab.stateChanged', () => {
   test('does not affect other entries in tabMapping', () => {
     const state = createState();
     state.extensionWs = createMockWs();
-    state.plugins.set('slack', makePlugin('slack'));
-    state.plugins.set('github', makePlugin('github'));
+    state.registry = buildRegistry([makePlugin('slack'), makePlugin('github')], []);
     state.tabMapping.set('github', { state: 'ready', tabId: 10, url: 'https://github.com' });
 
     handleExtensionMessage(
@@ -341,7 +341,7 @@ describe('handleExtensionMessage — tab.stateChanged', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
-    state.plugins.set('slack', makePlugin('slack'));
+    state.registry = buildRegistry([makePlugin('slack')], []);
 
     handleExtensionMessage(
       state,
@@ -462,45 +462,44 @@ describe('sendSyncFull', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'alpha',
-      makePlugin({
-        name: 'alpha',
-        version: '1.0.0',
-        urlPatterns: ['http://alpha.com/*'],
-        trustTier: 'community',
-        iife: '// alpha iife',
-        tools: [
-          {
-            name: 'ping',
-            displayName: 'Ping',
-            description: 'Ping',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
-    );
-    state.plugins.set(
-      'beta',
-      makePlugin({
-        name: 'beta',
-        version: '2.0.0',
-        urlPatterns: ['http://beta.com/*'],
-        trustTier: 'local',
-        iife: '// beta iife',
-        tools: [
-          {
-            name: 'pong',
-            displayName: 'Pong',
-            description: 'Pong',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'alpha',
+          version: '1.0.0',
+          urlPatterns: ['http://alpha.com/*'],
+          trustTier: 'community',
+          iife: '// alpha iife',
+          tools: [
+            {
+              name: 'ping',
+              displayName: 'Ping',
+              description: 'Ping',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+        makePlugin({
+          name: 'beta',
+          version: '2.0.0',
+          urlPatterns: ['http://beta.com/*'],
+          trustTier: 'local',
+          iife: '// beta iife',
+          tools: [
+            {
+              name: 'pong',
+              displayName: 'Pong',
+              description: 'Pong',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     // alpha_ping enabled (default), beta_pong explicitly disabled
@@ -568,22 +567,24 @@ describe('sendSyncFull', () => {
     const state = createState();
     state.extensionWs = createMockWs();
 
-    state.plugins.set(
-      'test-plugin',
-      makePlugin({
-        name: 'test-plugin',
-        iife: '(function(){/* adapter */})()',
-        tools: [
-          {
-            name: 'echo',
-            displayName: 'Echo',
-            description: 'Echo',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'test-plugin',
+          iife: '(function(){/* adapter */})()',
+          tools: [
+            {
+              name: 'echo',
+              displayName: 'Echo',
+              description: 'Echo',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     await sendSyncFull(state);
@@ -598,7 +599,7 @@ describe('sendSyncFull', () => {
     const state = createState();
     state.extensionWs = null;
 
-    state.plugins.set('alpha', makePlugin({ name: 'alpha', iife: '// alpha' }));
+    state.registry = buildRegistry([makePlugin({ name: 'alpha', iife: '// alpha' })], []);
 
     // Should not throw
     await sendSyncFull(state);
@@ -697,33 +698,35 @@ describe('handleExtensionMessage — config.getState', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'test-plugin',
-      makePlugin({
-        name: 'test-plugin',
-        displayName: 'Test Plugin',
-        version: '2.1.0',
-        trustTier: 'local',
-        urlPatterns: ['http://test.com/*'],
-        tools: [
-          {
-            name: 'ping',
-            displayName: 'Ping',
-            description: 'Ping tool',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-          {
-            name: 'pong',
-            displayName: 'Pong',
-            description: 'Pong tool',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'test-plugin',
+          displayName: 'Test Plugin',
+          version: '2.1.0',
+          trustTier: 'local',
+          urlPatterns: ['http://test.com/*'],
+          tools: [
+            {
+              name: 'ping',
+              displayName: 'Ping',
+              description: 'Ping tool',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+            {
+              name: 'pong',
+              displayName: 'Pong',
+              description: 'Pong tool',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
     state.tabMapping.set('test-plugin', { state: 'ready', tabId: 10, url: 'http://test.com' });
 
@@ -788,29 +791,31 @@ describe('handleExtensionMessage — config.getState', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'enabled-tool',
-            displayName: 'Enabled Tool',
-            description: 'Enabled',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-          {
-            name: 'disabled-tool',
-            displayName: 'Disabled Tool',
-            description: 'Disabled',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'enabled-tool',
+              displayName: 'Enabled Tool',
+              description: 'Enabled',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+            {
+              name: 'disabled-tool',
+              displayName: 'Disabled Tool',
+              description: 'Disabled',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
     state.toolConfig = { 'my-plugin_disabled-tool': false };
 
@@ -885,21 +890,23 @@ describe('handleExtensionMessage — config.getState', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'unmapped-plugin',
-      makePlugin({
-        name: 'unmapped-plugin',
-        tools: [
-          {
-            name: 'test',
-            displayName: 'Test',
-            description: 'Test',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'unmapped-plugin',
+          tools: [
+            {
+              name: 'test',
+              displayName: 'Test',
+              description: 'Test',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
     // No tabMapping entry for 'unmapped-plugin'
 
@@ -921,7 +928,7 @@ describe('handleExtensionMessage — config.getState', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set('no-display', makePlugin({ name: 'no-display' }));
+    state.registry = buildRegistry([makePlugin({ name: 'no-display' })], []);
 
     handleExtensionMessage(state, JSON.stringify({ jsonrpc: '2.0', method: 'config.getState', id: 5 }), noopCallbacks);
 
@@ -970,21 +977,23 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'send',
-            displayName: 'Send',
-            description: 'Send',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'send',
+              displayName: 'Send',
+              description: 'Send',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     let configChangedCalled = false;
@@ -1028,21 +1037,23 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     state.extensionWs = ws;
     state.toolConfig = { 'my-plugin_send': false };
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'send',
-            displayName: 'Send',
-            description: 'Send',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'send',
+              displayName: 'Send',
+              description: 'Send',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     handleExtensionMessage(
@@ -1204,21 +1215,23 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'send',
-            displayName: 'Send',
-            description: 'Send',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'send',
+              displayName: 'Send',
+              description: 'Send',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     handleExtensionMessage(
@@ -1283,21 +1296,23 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'send',
-            displayName: 'Send',
-            description: 'Send',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'send',
+              displayName: 'Send',
+              description: 'Send',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     handleExtensionMessage(
@@ -1331,37 +1346,39 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'alpha',
-            displayName: 'Alpha',
-            description: 'Alpha',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-          {
-            name: 'beta',
-            displayName: 'Beta',
-            description: 'Beta',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-          {
-            name: 'gamma',
-            displayName: 'Gamma',
-            description: 'Gamma',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'alpha',
+              displayName: 'Alpha',
+              description: 'Alpha',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+            {
+              name: 'beta',
+              displayName: 'Beta',
+              description: 'Beta',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+            {
+              name: 'gamma',
+              displayName: 'Gamma',
+              description: 'Gamma',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
     state.toolConfig = { 'my-plugin_alpha': false, 'my-plugin_beta': false, 'my-plugin_gamma': false };
 
@@ -1393,29 +1410,31 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'alpha',
-            displayName: 'Alpha',
-            description: 'Alpha',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-          {
-            name: 'beta',
-            displayName: 'Beta',
-            description: 'Beta',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'alpha',
+              displayName: 'Alpha',
+              description: 'Alpha',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+            {
+              name: 'beta',
+              displayName: 'Beta',
+              description: 'Beta',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
     state.toolConfig = { 'my-plugin_alpha': true, 'my-plugin_beta': true };
 
@@ -1439,21 +1458,23 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
     const ws = createMockWs();
     state.extensionWs = ws;
 
-    state.plugins.set(
-      'my-plugin',
-      makePlugin({
-        name: 'my-plugin',
-        tools: [
-          {
-            name: 'alpha',
-            displayName: 'Alpha',
-            description: 'Alpha',
-            icon: 'wrench',
-            input_schema: {},
-            output_schema: {},
-          },
-        ],
-      }),
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'my-plugin',
+          tools: [
+            {
+              name: 'alpha',
+              displayName: 'Alpha',
+              description: 'Alpha',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
     );
 
     let configChangedCalled = false;

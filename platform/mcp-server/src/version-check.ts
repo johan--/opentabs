@@ -78,7 +78,9 @@ export const isNewer = (current: string, latest: string): boolean => {
  * Skips local plugins (filesystem paths).
  */
 export const checkForUpdates = async (state: ServerState): Promise<void> => {
-  const npmPlugins = Array.from(state.plugins.values()).filter(p => p.trustTier !== 'local' && p.npmPackageName);
+  const npmPlugins = Array.from(state.registry.plugins.values()).filter(
+    p => p.trustTier !== 'local' && p.npmPackageName,
+  );
 
   if (npmPlugins.length === 0) return;
 

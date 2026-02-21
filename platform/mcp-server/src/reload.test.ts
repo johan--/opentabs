@@ -113,8 +113,8 @@ describe('performReload', () => {
 
     await performReload(state, [], emptyTransports(), false);
 
-    expect(state.plugins.has('my-plugin')).toBe(true);
-    const plugin = state.plugins.get('my-plugin');
+    expect(state.registry.plugins.has('my-plugin')).toBe(true);
+    const plugin = state.registry.plugins.get('my-plugin');
     expect(plugin?.version).toBe('1.0.0');
     expect(plugin?.tools).toHaveLength(1);
   });
@@ -164,8 +164,8 @@ describe('performReload', () => {
 
     await performReload(state, [], emptyTransports(), false);
 
-    expect(state.toolLookup.has('my-plugin_test_tool')).toBe(true);
-    const entry = state.toolLookup.get('my-plugin_test_tool');
+    expect(state.registry.toolLookup.has('my-plugin_test_tool')).toBe(true);
+    const entry = state.registry.toolLookup.get('my-plugin_test_tool');
     expect(entry?.pluginName).toBe('my-plugin');
     expect(entry?.toolName).toBe('test_tool');
   });

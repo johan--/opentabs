@@ -24,6 +24,7 @@ import { getConfigDir } from './config.js';
 import { loadPluginFromDir } from './discovery-legacy.js';
 import { log } from './logger.js';
 import { parseManifest } from './manifest-schema.js';
+import { buildRegistry } from './registry.js';
 import { validateUrlPattern } from '@opentabs-dev/shared';
 import { statSync, watch } from 'node:fs';
 import { join } from 'node:path';
@@ -168,13 +169,13 @@ const handleIifeChange = async (
 
   try {
     const iife = await readFileWithRetry(iifePath);
-    const plugin = state.plugins.get(pluginName);
+    const plugin = state.registry.plugins.get(pluginName);
     if (!plugin) {
       log.warn(`File watcher: Plugin "${pluginName}" not found in state — skipping IIFE update`);
       return;
     }
 
-    // Update in-memory state
+    // Update in-memory plugin state
     plugin.iife = iife;
 
     // Use the hash embedded in the IIFE by the CLI's hash-setter snippet. The
@@ -233,7 +234,7 @@ const handleManifestChange = async (
       return;
     }
 
-    const plugin = state.plugins.get(pluginName);
+    const plugin = state.registry.plugins.get(pluginName);
     if (!plugin) {
       log.warn(`File watcher: Plugin "${pluginName}" not found in state — skipping manifest update`);
       return;
@@ -315,15 +316,17 @@ const handlePendingPluginChange = async (
   try {
     const plugin = await loadPluginFromDir(pluginDir, 'local', null, pluginDir);
 
-    // Plugin loaded successfully — add to state
-    if (state.plugins.has(plugin.name)) {
+    // Plugin loaded successfully — add to registry
+    if (state.registry.plugins.has(plugin.name)) {
       log.warn(
         `File watcher: Pending plugin "${plugin.name}" at ${pluginDir} conflicts with existing plugin — skipping`,
       );
       return;
     }
 
-    state.plugins.set(plugin.name, plugin);
+    // Build a new registry that includes the newly discovered plugin
+    const updatedPlugins = [...state.registry.plugins.values(), plugin];
+    state.registry = buildRegistry(updatedPlugins, [...state.registry.failures]);
 
     // Update mtimes for polling fallback
     const entry = findEntry(state, pluginDir);
@@ -632,7 +635,7 @@ const startFileWatching = (
   const loadedPaths = new Set<string>();
 
   // Watch successfully loaded local plugins
-  const localPlugins = Array.from(state.plugins.values()).filter(p => p.trustTier === 'local' && p.sourcePath);
+  const localPlugins = Array.from(state.registry.plugins.values()).filter(p => p.trustTier === 'local' && p.sourcePath);
   for (const plugin of localPlugins) {
     const srcPath = plugin.sourcePath;
     if (!srcPath) continue;

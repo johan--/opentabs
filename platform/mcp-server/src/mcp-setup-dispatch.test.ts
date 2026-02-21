@@ -11,7 +11,8 @@
  */
 
 import { handleExtensionMessage } from './extension-protocol.js';
-import { registerMcpHandlers, rebuildToolLookups } from './mcp-setup.js';
+import { registerMcpHandlers, rebuildCachedBrowserTools } from './mcp-setup.js';
+import { buildRegistry } from './registry.js';
 import { createState } from './state.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, test, beforeEach } from 'bun:test';
@@ -121,7 +122,7 @@ describe('tools/call handler — browser tool path', () => {
         handler: () => Promise.resolve({}),
       },
     ];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const { server, getCallHandler } = createMockServer();
     registerMcpHandlers(server, state);
@@ -146,7 +147,7 @@ describe('tools/call handler — browser tool path', () => {
         handler: () => Promise.resolve({ tab: 'result', safe: true }),
       },
     ];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const { server, getCallHandler } = createMockServer();
     registerMcpHandlers(server, state);
@@ -172,7 +173,7 @@ describe('tools/call handler — browser tool path', () => {
         handler: () => Promise.reject(new Error('tab not found')),
       },
     ];
-    rebuildToolLookups(state);
+    rebuildCachedBrowserTools(state);
 
     const { server, getCallHandler } = createMockServer();
     registerMcpHandlers(server, state);
@@ -191,7 +192,7 @@ describe('tools/call handler — browser tool path', () => {
 describe('tools/call handler — plugin tool not found / disabled', () => {
   test('plugin tool not found returns isError', async () => {
     const state = createState();
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([], []);
 
     const { server, getCallHandler } = createMockServer();
     registerMcpHandlers(server, state);
@@ -208,8 +209,7 @@ describe('tools/call handler — plugin tool not found / disabled', () => {
 
   test('plugin tool disabled returns isError', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.toolConfig = { slack_send_message: false };
 
     const { server, getCallHandler } = createMockServer();
@@ -229,9 +229,8 @@ describe('tools/call handler — plugin tool not found / disabled', () => {
 describe('tools/call handler — schema validation path', () => {
   test('schema compilation failure (validate is null) returns descriptive error', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
-    const entry = state.toolLookup.get('slack_send_message');
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    const entry = state.registry.toolLookup.get('slack_send_message');
     if (!entry) throw new Error('Expected entry');
     entry.validate = null;
 
@@ -250,9 +249,8 @@ describe('tools/call handler — schema validation path', () => {
 
   test('validator throws returns "validation failed unexpectedly" message', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
-    const entry = state.toolLookup.get('slack_send_message');
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    const entry = state.registry.toolLookup.get('slack_send_message');
     if (!entry) throw new Error('Expected entry');
     entry.validate = () => {
       throw new Error('catastrophic backtracking');
@@ -273,9 +271,7 @@ describe('tools/call handler — schema validation path', () => {
 
   test('validation failure returns "Invalid arguments" with error details', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    const plugin = state.plugins.get('slack');
-    if (!plugin) throw new Error('Expected plugin');
+    const plugin = createPlugin('slack', ['send_message']);
     plugin.tools = [
       {
         name: 'send_message',
@@ -291,7 +287,7 @@ describe('tools/call handler — schema validation path', () => {
         output_schema: { type: 'object' },
       },
     ];
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([plugin], []);
 
     const { server, getCallHandler } = createMockServer();
     registerMcpHandlers(server, state);
@@ -310,8 +306,7 @@ describe('tools/call handler — schema validation path', () => {
 describe('tools/call handler — concurrency and extension connection', () => {
   test('concurrency limit exceeded returns "Too many concurrent dispatches"', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.activeDispatches.set('slack', 5);
 
     const { server, getCallHandler } = createMockServer();
@@ -329,8 +324,7 @@ describe('tools/call handler — concurrency and extension connection', () => {
 
   test('extension not connected returns "Extension not connected"', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     // extensionWs is null by default in createState()
 
     const { server, getCallHandler } = createMockServer();
@@ -348,8 +342,7 @@ describe('tools/call handler — concurrency and extension connection', () => {
 
   test('activeDispatches counter decrements in finally block even on error', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.extensionWs = createAutoRejectWs(state, {
       code: -32603,
       message: 'internal error',
@@ -366,8 +359,7 @@ describe('tools/call handler — concurrency and extension connection', () => {
 
   test('activeDispatches counter reaches 0 and entry is deleted from map', async () => {
     const state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.extensionWs = createAutoResolveWs(state, {
       output: { ok: true },
     }) as unknown as typeof state.extensionWs;
@@ -386,8 +378,7 @@ describe('tools/call handler — dispatch success and error codes', () => {
 
   beforeEach(() => {
     state = createState();
-    state.plugins.set('slack', createPlugin('slack', ['send_message']));
-    rebuildToolLookups(state);
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
   });
 
   test('dispatch success returns sanitized output', async () => {

@@ -164,14 +164,14 @@ const createHandleFetch =
     if (url.pathname === '/health' && req.method === 'GET') {
       const hs = getHotState();
 
-      const pluginDetails = [...state.plugins.values()].map(p => ({
+      const pluginDetails = [...state.registry.plugins.values()].map(p => ({
         name: p.name,
         displayName: p.displayName,
         toolCount: p.tools.length,
         tabState: state.tabMapping.get(p.name)?.state ?? 'closed',
       }));
 
-      const toolCount = state.toolLookup.size + state.cachedBrowserTools.length;
+      const toolCount = state.registry.toolLookup.size + state.cachedBrowserTools.length;
       const uptimeSeconds = Math.floor((Date.now() - state.startedAt) / 1000);
 
       const pendingPlugins = state.fileWatcherEntries.filter(e => e.pluginName.startsWith('(pending:')).length;
@@ -182,9 +182,9 @@ const createHandleFetch =
         version,
         extensionConnected: state.extensionWs !== null,
         mcpClients: transports.size,
-        plugins: state.plugins.size,
+        plugins: state.registry.plugins.size,
         pluginDetails,
-        failedPlugins: state.failedPlugins,
+        failedPlugins: [...state.registry.failures],
         toolCount,
         uptime: uptimeSeconds,
         reloadCount: hs?.reloadCount ?? 0,

@@ -93,6 +93,22 @@ export interface OutdatedPlugin {
   updateCommand: string;
 }
 
+/**
+ * Immutable registry of discovered plugins.
+ *
+ * Holds all successfully loaded plugins, a pre-built O(1) tool lookup map
+ * with compiled Ajv validators, and a list of discovery failures. Built once
+ * per reload cycle and swapped atomically on ServerState.
+ */
+export interface PluginRegistry {
+  /** All successfully loaded plugins, keyed by internal plugin name */
+  readonly plugins: ReadonlyMap<string, RegisteredPlugin>;
+  /** O(1) tool lookup: prefixed tool name → plugin/tool names + validator */
+  readonly toolLookup: ReadonlyMap<string, ToolLookupEntry>;
+  /** Plugin paths that failed discovery */
+  readonly failures: readonly FailedPlugin[];
+}
+
 /** Server state singleton — shared across hot reloads via globalThis */
 export interface ServerState {
   /**
@@ -102,8 +118,8 @@ export interface ServerState {
    * a process restart is needed for full consistency.
    */
   _schemaVersion: number;
-  /** All registered plugins (from discovery) */
-  plugins: Map<string, RegisteredPlugin>;
+  /** Immutable plugin registry — replaced atomically on each reload */
+  registry: PluginRegistry;
   /** Tab-to-plugin mapping from extension */
   tabMapping: Map<string, TabMapping>;
   /** Tool enabled/disabled config (in-memory, synced from ~/.opentabs/config.json) */
@@ -114,8 +130,6 @@ export interface ServerState {
   pendingDispatches: Map<string | number, PendingDispatch>;
   /** Extension WebSocket connection (single connection) */
   extensionWs: WsHandle | null;
-  /** Plugin paths that failed discovery, with human-readable errors */
-  failedPlugins: FailedPlugin[];
   /** Outdated npm plugins detected on startup */
   outdatedPlugins: OutdatedPlugin[];
   /** Browser tools — updated on each hot reload so existing session handlers see fresh definitions */
@@ -126,8 +140,6 @@ export interface ServerState {
   fileWatcherTimers: Map<string, ReturnType<typeof setTimeout>>;
   /** Shared secret for WebSocket authentication (loaded from config) */
   wsSecret: string | null;
-  /** O(1) tool lookup: prefixed tool name → plugin/tool names. Rebuilt on each reload. */
-  toolLookup: Map<string, ToolLookupEntry>;
   /** Cached browser tools with pre-computed JSON Schema. Rebuilt on each reload. */
   cachedBrowserTools: CachedBrowserTool[];
   /** Maps each MCP session server to its transport ID for accurate stale session sweeping */
@@ -159,23 +171,28 @@ export interface ServerState {
 }
 
 /** Increment when changing the type of an existing ServerState field */
-export const STATE_SCHEMA_VERSION = 1;
+export const STATE_SCHEMA_VERSION = 2;
+
+/** Frozen empty registry for initializing ServerState */
+export const EMPTY_REGISTRY: PluginRegistry = Object.freeze({
+  plugins: new Map<string, RegisteredPlugin>(),
+  toolLookup: new Map<string, ToolLookupEntry>(),
+  failures: [] as FailedPlugin[],
+});
 
 export const createState = (): ServerState => ({
   _schemaVersion: STATE_SCHEMA_VERSION,
-  plugins: new Map(),
+  registry: EMPTY_REGISTRY,
   tabMapping: new Map(),
   toolConfig: {},
   pluginPaths: [],
   pendingDispatches: new Map(),
   extensionWs: null,
-  failedPlugins: [],
   outdatedPlugins: [],
   browserTools: [],
   fileWatcherEntries: [],
   fileWatcherTimers: new Map(),
   wsSecret: null,
-  toolLookup: new Map(),
   cachedBrowserTools: [],
   sessionTransportIds: new WeakMap(),
   configWriteMutex: Promise.resolve(),

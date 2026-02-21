@@ -1,3 +1,4 @@
+import { buildRegistry } from './registry.js';
 import { createState } from './state.js';
 import { fetchLatestVersion, isNewer, checkForUpdates } from './version-check.js';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -203,7 +204,7 @@ describe('checkForUpdates', () => {
     }) as unknown as typeof globalThis.fetch;
 
     const state = createState();
-    state.plugins.set('local-plugin', makePlugin('local-plugin', { trustTier: 'local', npmPackageName: undefined }));
+    state.registry = buildRegistry([makePlugin('local-plugin', { trustTier: 'local', npmPackageName: undefined })], []);
 
     await checkForUpdates(state);
 
@@ -215,7 +216,10 @@ describe('checkForUpdates', () => {
     mockFetch('2.0.0');
 
     const state = createState();
-    state.plugins.set('my-plugin', makePlugin('my-plugin', { version: '1.0.0', npmPackageName: 'opentabs-plugin-my' }));
+    state.registry = buildRegistry(
+      [makePlugin('my-plugin', { version: '1.0.0', npmPackageName: 'opentabs-plugin-my' })],
+      [],
+    );
 
     await checkForUpdates(state);
 
@@ -229,7 +233,10 @@ describe('checkForUpdates', () => {
     mockFetch('1.0.0');
 
     const state = createState();
-    state.plugins.set('my-plugin', makePlugin('my-plugin', { version: '1.0.0', npmPackageName: 'opentabs-plugin-my' }));
+    state.registry = buildRegistry(
+      [makePlugin('my-plugin', { version: '1.0.0', npmPackageName: 'opentabs-plugin-my' })],
+      [],
+    );
 
     await checkForUpdates(state);
 
@@ -241,7 +248,10 @@ describe('checkForUpdates', () => {
       Promise.reject(new Error('network failure'))) as unknown as typeof globalThis.fetch;
 
     const state = createState();
-    state.plugins.set('my-plugin', makePlugin('my-plugin', { version: '1.0.0', npmPackageName: 'opentabs-plugin-my' }));
+    state.registry = buildRegistry(
+      [makePlugin('my-plugin', { version: '1.0.0', npmPackageName: 'opentabs-plugin-my' })],
+      [],
+    );
 
     await checkForUpdates(state);
 
@@ -265,8 +275,13 @@ describe('checkForUpdates', () => {
     }) as unknown as typeof globalThis.fetch;
 
     const state = createState();
-    state.plugins.set('plugin-a', makePlugin('plugin-a', { version: '1.0.0', npmPackageName: 'opentabs-plugin-a' }));
-    state.plugins.set('plugin-b', makePlugin('plugin-b', { version: '1.0.0', npmPackageName: 'opentabs-plugin-b' }));
+    state.registry = buildRegistry(
+      [
+        makePlugin('plugin-a', { version: '1.0.0', npmPackageName: 'opentabs-plugin-a' }),
+        makePlugin('plugin-b', { version: '1.0.0', npmPackageName: 'opentabs-plugin-b' }),
+      ],
+      [],
+    );
 
     await checkForUpdates(state);
 

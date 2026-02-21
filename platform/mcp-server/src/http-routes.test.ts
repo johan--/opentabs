@@ -1,4 +1,5 @@
 import { checkBearerAuth, createHandlers, sweepStaleSessions } from './http-routes.js';
+import { buildRegistry } from './registry.js';
 import { createState, STATE_SCHEMA_VERSION } from './state.js';
 import { version } from './version.js';
 import { describe, expect, test } from 'bun:test';
@@ -239,24 +240,29 @@ describe('/health endpoint', () => {
   test('reflects registered plugins in pluginDetails', async () => {
     const { handlers, state } = createTestHandlers();
 
-    state.plugins.set('test-plugin', {
-      name: 'test-plugin',
-      version: '1.0.0',
-      displayName: 'Test Plugin',
-      urlPatterns: ['*://example.com/*'],
-      trustTier: 'local',
-      iife: '(function(){})()',
-      tools: [
+    state.registry = buildRegistry(
+      [
         {
-          name: 'do_thing',
-          displayName: 'Do Thing',
-          description: 'Does a thing',
-          icon: 'wrench',
-          input_schema: {},
-          output_schema: {},
+          name: 'test-plugin',
+          version: '1.0.0',
+          displayName: 'Test Plugin',
+          urlPatterns: ['*://example.com/*'],
+          trustTier: 'local',
+          iife: '(function(){})()',
+          tools: [
+            {
+              name: 'do_thing',
+              displayName: 'Do Thing',
+              description: 'Does a thing',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
         },
       ],
-    });
+      [],
+    );
     state.tabMapping.set('test-plugin', { state: 'ready', tabId: 1, url: 'https://example.com' });
 
     const body = await fetchJson<HealthResponse>(handlers, 'http://localhost:9876/health');

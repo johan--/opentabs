@@ -137,7 +137,7 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
   // Write all adapter IIFEs to disk so the extension can inject them as files.
   // Uses allSettled so a single plugin's write failure doesn't block the sync notification.
   // Races against a timeout so stalled writes don't hang hot reload indefinitely.
-  const pluginList = Array.from(state.plugins.values());
+  const pluginList = Array.from(state.registry.plugins.values());
   await ensureAdaptersDir();
 
   // Remove stale adapter files from plugins that are no longer in the current set
@@ -286,7 +286,7 @@ const sendInvocationEnd = (
  * processes the update and re-injects the adapter into matching tabs.
  */
 const sendPluginUpdate = async (state: ServerState, pluginName: string, iife: string): Promise<void> => {
-  const plugin = state.plugins.get(pluginName);
+  const plugin = state.registry.plugins.get(pluginName);
   if (!plugin) return;
 
   await ensureAdaptersDir();
@@ -522,7 +522,7 @@ const handleTabStateChanged = (
     return;
   }
 
-  if (!state.plugins.has(plugin)) {
+  if (!state.registry.plugins.has(plugin)) {
     sendError(`Unknown plugin: ${plugin}`);
     return;
   }
@@ -548,7 +548,7 @@ const handleTabStateChanged = (
 };
 
 const handleConfigGetState = (state: ServerState, id: string | number): void => {
-  const plugins = Array.from(state.plugins.values())
+  const plugins = Array.from(state.registry.plugins.values())
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(p => {
       const tabInfo = state.tabMapping.get(p.name);
@@ -605,7 +605,7 @@ const handleConfigSetToolEnabled = (
     return;
   }
 
-  const plugin = state.plugins.get(pluginName);
+  const plugin = state.registry.plugins.get(pluginName);
   if (!plugin) {
     sendToExtension(state, {
       jsonrpc: '2.0',
@@ -660,7 +660,7 @@ const handleConfigSetAllToolsEnabled = (
     return;
   }
 
-  const plugin = state.plugins.get(pluginName);
+  const plugin = state.registry.plugins.get(pluginName);
   if (!plugin) {
     sendToExtension(state, {
       jsonrpc: '2.0',

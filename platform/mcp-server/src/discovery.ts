@@ -13,8 +13,7 @@ import { buildRegistry } from './registry.js';
 import { isLocalPath, resolvePluginPath } from './resolver.js';
 import { isErr } from '@opentabs-dev/shared';
 import type { LoadedPlugin } from './loader.js';
-import type { PluginRegistry } from './registry.js';
-import type { FailedPlugin } from './state.js';
+import type { FailedPlugin, PluginRegistry } from './state.js';
 import type { TrustTier } from '@opentabs-dev/shared';
 
 /** Result of full plugin discovery */
@@ -97,7 +96,7 @@ const discoverPlugins = async (specifiers: string[], configDir: string): Promise
   for (const plugin of registry.plugins.values()) {
     const toolNames = plugin.tools.map(t => t.name).join(', ');
     log.info(
-      `Discovered plugin: ${plugin.name} v${plugin.version} (${plugin.trustTier}) from ${plugin.sourcePath} — tools: [${toolNames}]`,
+      `Discovered plugin: ${plugin.name} v${plugin.version} (${plugin.trustTier}) from ${plugin.sourcePath ?? '(npm)'} — tools: [${toolNames}]`,
     );
   }
 

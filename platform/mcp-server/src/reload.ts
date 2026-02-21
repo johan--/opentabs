@@ -19,7 +19,8 @@ import { sendSyncFull, sendPluginUpdate, cleanupStaleExecFiles } from './extensi
 import { startConfigWatching, startFileWatching, stopFileWatching } from './file-watcher.js';
 import { sweepStaleSessions } from './http-routes.js';
 import { log } from './logger.js';
-import { registerMcpHandlers, rebuildToolLookups, notifyToolListChanged } from './mcp-setup.js';
+import { registerMcpHandlers, rebuildCachedBrowserTools, notifyToolListChanged } from './mcp-setup.js';
+import { buildRegistry } from './registry.js';
 import { prefixedToolName } from './state.js';
 import { checkForUpdates } from './version-check.js';
 import { isAbsolute, resolve } from 'node:path';
@@ -87,9 +88,10 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
   // previous state so they aren't left dead).
   const fileWatcherCallbacks = {
     onManifestChanged: (pluginName: string) => {
-      rebuildToolLookups(state);
+      // Rebuild registry from current plugins to recompile Ajv validators
+      state.registry = buildRegistry(Array.from(state.registry.plugins.values()), [...state.registry.failures]);
       notifyAllClients();
-      const plugin = state.plugins.get(pluginName);
+      const plugin = state.registry.plugins.get(pluginName);
       if (plugin) {
         void sendPluginUpdate(state, pluginName, plugin.iife).catch((err: unknown) => {
           log.error(`Failed to write adapter file for ${pluginName}:`, err);
@@ -108,7 +110,8 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     },
     onPluginDiscovered: (pluginName: string) => {
       log.info(`Plugin "${pluginName}" discovered by file watcher — rebuilding tools and syncing extension`);
-      rebuildToolLookups(state);
+      // Rebuild registry from current plugins to include the newly discovered plugin
+      state.registry = buildRegistry(Array.from(state.registry.plugins.values()), [...state.registry.failures]);
       notifyAllClients();
       if (state.extensionWs) {
         void sendSyncFull(state).catch((err: unknown) => {
@@ -133,9 +136,8 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     resolvedPaths = config.plugins.map(p => (isAbsolute(p) ? p : resolve(configDir, p)));
     const { plugins: newPlugins, failures } = await discoverPluginsLegacy(resolvedPaths, []);
 
-    // Atomic swap
-    state.plugins = newPlugins;
-    state.failedPlugins = failures;
+    // Build immutable registry from discovery results and swap atomically
+    state.registry = buildRegistry(Array.from(newPlugins.values()), failures);
     state.toolConfig = { ...config.tools };
     state.pluginPaths = [...config.plugins];
     state.wsSecret = config.secret ?? null;
@@ -144,19 +146,19 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
       `Config loaded: ${config.plugins.length} plugin path(s), ${Object.keys(config.tools).length} tool setting(s)`,
     );
 
-    // Rebuild O(1) tool lookup map and cached browser tool JSON schemas
-    rebuildToolLookups(state);
+    // Rebuild cached browser tool JSON schemas
+    rebuildCachedBrowserTools(state);
 
     // Prune stale tabMapping entries for plugins that were removed from config
     for (const pluginName of state.tabMapping.keys()) {
-      if (!state.plugins.has(pluginName)) {
+      if (!state.registry.plugins.has(pluginName)) {
         state.tabMapping.delete(pluginName);
       }
     }
 
     // Prune stale activeDispatches entries for removed plugins
     for (const pluginName of state.activeDispatches.keys()) {
-      if (!state.plugins.has(pluginName)) {
+      if (!state.registry.plugins.has(pluginName)) {
         state.activeDispatches.delete(pluginName);
       }
     }
@@ -166,7 +168,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     // in config that accumulate as garbage. Build a set of all valid prefixed
     // tool names, then remove any config key not in that set.
     const validToolNames = new Set<string>();
-    for (const plugin of state.plugins.values()) {
+    for (const plugin of state.registry.plugins.values()) {
       for (const tool of plugin.tools) {
         validToolNames.add(prefixedToolName(plugin.name, tool.name));
       }
@@ -185,7 +187,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     // outdatedPlugins stores npm package names, not plugin names. Keep only
     // entries whose npm package name matches a still-present plugin.
     state.outdatedPlugins = state.outdatedPlugins.filter(o =>
-      Array.from(state.plugins.values()).some(p => p.npmPackageName === o.name),
+      Array.from(state.registry.plugins.values()).some(p => p.npmPackageName === o.name),
     );
   } catch (err) {
     // Discovery or config loading failed. State retains whatever plugins
@@ -367,9 +369,9 @@ const performConfigReload = async (
       notifyToolListChanged(srv);
     }
 
-    log.info(`Config reload complete: ${state.plugins.size} plugin(s) in ${Date.now() - startTs}ms`);
+    log.info(`Config reload complete: ${state.registry.plugins.size} plugin(s) in ${Date.now() - startTs}ms`);
 
-    return { plugins: state.plugins.size, durationMs: Date.now() - startTs };
+    return { plugins: state.registry.plugins.size, durationMs: Date.now() - startTs };
   } finally {
     resolveGuard();
     setReloadGuard(undefined);

@@ -23,13 +23,12 @@
 
 import { dispatchToExtension, isDispatchError, sendInvocationStart, sendInvocationEnd } from './extension-protocol.js';
 import { log } from './logger.js';
+import { trustTierPrefix } from './registry.js';
 import { prefixedToolName, isToolEnabled } from './state.js';
 import { version } from './version.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import AjvValidator from 'ajv';
 import { z } from 'zod';
 import type { ServerState, CachedBrowserTool, ToolLookupEntry } from './state.js';
-import type { TrustTier } from '@opentabs-dev/shared';
 import type { ZodError } from 'zod';
 
 /** Maximum concurrent tool dispatches per plugin to prevent tab performance degradation */
@@ -50,18 +49,6 @@ const sanitizeOutput = (obj: unknown, depth = 0): unknown => {
     if (!DANGEROUS_KEYS.has(key)) result[key] = sanitizeOutput(value, depth + 1);
   }
   return result;
-};
-
-/** Map trust tier to a human-readable prefix for MCP tool descriptions */
-const trustTierPrefix = (tier: TrustTier): string => {
-  switch (tier) {
-    case 'official':
-      return '[Official] ';
-    case 'community':
-      return '[Community plugin — unverified] ';
-    case 'local':
-      return '[Local plugin] ';
-  }
 };
 
 /**
@@ -113,64 +100,11 @@ const formatZodError = (err: ZodError): string => {
 };
 
 /**
- * Compile a JSON Schema into an Ajv validate function.
- * Returns a ToolLookupEntry with the validate fn and error formatter.
- * If compilation fails, validate is null and errors are logged.
+ * Rebuild cached browser tool JSON schemas on state.
+ * Called after state.browserTools changes (during reload).
+ * Plugin tool lookups are handled by the immutable registry.
  */
-const compileToolValidator = (
-  ajv: InstanceType<typeof AjvValidator>,
-  pluginName: string,
-  toolName: string,
-  inputSchema: Record<string, unknown>,
-): Pick<ToolLookupEntry, 'validate' | 'validationErrors'> => {
-  try {
-    const validate = ajv.compile(inputSchema);
-    return {
-      validate,
-      validationErrors: () => {
-        if (!validate.errors?.length) return 'Unknown validation error';
-        return validate.errors
-          .map(e => {
-            const path = e.instancePath || '(root)';
-            return `  - ${path}: ${e.message ?? 'invalid'}`;
-          })
-          .join('\n');
-      },
-    };
-  } catch (err) {
-    log.warn(`Failed to compile JSON Schema for ${pluginName}/${toolName}:`, err);
-    return {
-      validate: null,
-      validationErrors: () => 'Schema compilation failed — validation skipped',
-    };
-  }
-};
-
-/**
- * Rebuild the O(1) tool lookup map and cached browser tool schemas on state.
- * Called after state.plugins or state.browserTools changes (during reload).
- */
-const rebuildToolLookups = (state: ServerState): void => {
-  // Single Ajv instance for all plugin tool schemas.
-  // allErrors: false stops validation on first error to limit combinatorial work.
-  // Schemas are pre-validated at discovery time, but untrusted community plugins
-  // could submit pathological schemas with deeply nested oneOf/anyOf — stopping
-  // early bounds the validation cost per tool call.
-  const ajv = new AjvValidator({ allErrors: false });
-
-  // Plugin tool lookup: prefixed name → { pluginName, toolName, validate }
-  const toolLookup = new Map<string, ToolLookupEntry>();
-  for (const plugin of state.plugins.values()) {
-    for (const toolDef of plugin.tools) {
-      const prefixed = prefixedToolName(plugin.name, toolDef.name);
-      const { validate, validationErrors } = compileToolValidator(ajv, plugin.name, toolDef.name, toolDef.input_schema);
-      toolLookup.set(prefixed, { pluginName: plugin.name, toolName: toolDef.name, validate, validationErrors });
-    }
-  }
-  state.toolLookup = toolLookup;
-
-  // Browser tool schemas: pre-compute JSON Schema once per reload using
-  // Zod 4's native z.toJSONSchema() which produces valid draft 2020-12.
+const rebuildCachedBrowserTools = (state: ServerState): void => {
   state.cachedBrowserTools = state.browserTools.map((bt): CachedBrowserTool => {
     const schema = z.toJSONSchema(bt.input) as Record<string, unknown>;
     delete schema['$schema'];
@@ -255,8 +189,8 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
 
     const { pluginName: foundPlugin, toolName: foundTool } = callableCheck;
     log.debug('tool.call:', toolName, '→', foundPlugin + '/' + foundTool);
-    // Safe to assert: checkToolCallable verified the tool exists in toolLookup
-    const lookup = state.toolLookup.get(toolName) as ToolLookupEntry;
+    // Safe to assert: checkToolCallable verified the tool exists in registry.toolLookup
+    const lookup = state.registry.toolLookup.get(toolName) as ToolLookupEntry;
 
     // Validate args against the tool's JSON Schema before dispatching.
     // The validator is pre-compiled at discovery time for performance.
@@ -445,7 +379,7 @@ export const getEnabledToolsList = (
 ): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> => {
   const tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [];
 
-  for (const plugin of state.plugins.values()) {
+  for (const plugin of state.registry.plugins.values()) {
     for (const toolDef of plugin.tools) {
       const prefixed = prefixedToolName(plugin.name, toolDef.name);
       if (!isToolEnabled(state, prefixed)) continue;
@@ -488,18 +422,11 @@ export type ToolCallableResult = ToolCallableOk | ToolCallableError;
  * (before this check) in the tools/call handler.
  */
 export const checkToolCallable = (state: ServerState, prefixedToolName: string): ToolCallableResult => {
-  const lookup = state.toolLookup.get(prefixedToolName);
+  const lookup = state.registry.toolLookup.get(prefixedToolName);
   if (!lookup) return { ok: false, error: `Tool ${prefixedToolName} not found` };
   if (!isToolEnabled(state, prefixedToolName)) return { ok: false, error: `Tool ${prefixedToolName} is disabled` };
   return { ok: true, pluginName: lookup.pluginName, toolName: lookup.toolName };
 };
 
 export type { McpServerInstance };
-export {
-  createMcpServer,
-  registerMcpHandlers,
-  rebuildToolLookups,
-  notifyToolListChanged,
-  trustTierPrefix,
-  sanitizeOutput,
-};
+export { createMcpServer, registerMcpHandlers, rebuildCachedBrowserTools, notifyToolListChanged, sanitizeOutput };
