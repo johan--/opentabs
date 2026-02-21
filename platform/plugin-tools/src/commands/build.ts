@@ -559,6 +559,7 @@ if (typeof plugin.onNavigate === 'function') {
       format: 'iife',
       target: 'browser',
       minify: false,
+      sourcemap: 'external',
       naming: 'adapter.iife.js',
       external: [],
     });
@@ -668,6 +669,10 @@ const runBuild = async (projectDir: string): Promise<void> => {
   await Bun.write(iifePath, iifeContent + hashAndFreeze);
   const iifeSize = (await Bun.file(iifePath).stat()).size;
   console.log(`  Written: ${pc.bold('dist/adapter.iife.js')} (${formatBytes(iifeSize)})`);
+
+  const sourceMapPath = join(distDir, 'adapter.iife.js.map');
+  const sourceMapSize = (await Bun.file(sourceMapPath).stat()).size;
+  console.log(`  Written: ${pc.bold('dist/adapter.iife.js.map')} (${formatBytes(sourceMapSize)})`);
 
   // Step 5: Resolve installed SDK version
   console.log(pc.dim('Resolving SDK version...'));

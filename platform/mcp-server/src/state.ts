@@ -51,6 +51,8 @@ export interface RegisteredPlugin {
   source: PluginSource;
   /** SHA-256 hex hash of the adapter IIFE content (from manifest, set by `opentabs-plugin build`) */
   adapterHash?: string;
+  /** Source map content for the adapter IIFE (from dist/adapter.iife.js.map). Undefined for old plugins. */
+  iifeSourceMap?: string;
   /** Filesystem path for local plugins (used for file watching) */
   sourcePath?: string;
   /** Original npm package name (e.g., 'opentabs-plugin-slack') — only for npm-installed plugins */

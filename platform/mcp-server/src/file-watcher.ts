@@ -47,8 +47,8 @@ const MAX_DETECTION_TIMESTAMPS = 20;
 interface FileWatcherCallbacks {
   /** Called when a plugin's manifest changes (tools may have changed) */
   onManifestChanged: (pluginName: string) => void;
-  /** Send plugin.update to extension with new IIFE */
-  onIifeChanged: (pluginName: string, iife: string) => void;
+  /** Send plugin.update to extension with new IIFE and optional source map */
+  onIifeChanged: (pluginName: string, iife: string, sourceMap?: string) => void;
   /** Called when ~/.opentabs/config.json changes on disk */
   onConfigChanged: () => void;
   /** Called when a previously-failed plugin path is successfully loaded */
@@ -188,13 +188,25 @@ const handleIifeChange = async (
       plugin.adapterHash = embeddedHash;
     }
 
+    // Read source map if available
+    const sourceMapPath = join(pluginDir, 'dist', 'adapter.iife.js.map');
+    let sourceMap: string | undefined;
+    try {
+      if (await fileExists(sourceMapPath)) {
+        sourceMap = await readFileWithRetry(sourceMapPath);
+        plugin.iifeSourceMap = sourceMap;
+      }
+    } catch {
+      // Source map read failed — proceed without it
+    }
+
     // Update mtime for polling fallback
     const entry = findEntry(state, pluginDir);
     if (entry) recordMtime(entry, iifePath);
 
     log.info(`File watcher: IIFE updated for "${pluginName}" — sending plugin.update`);
 
-    callbacks.onIifeChanged(pluginName, iife);
+    callbacks.onIifeChanged(pluginName, iife, sourceMap);
   } catch (err) {
     log.error(`File watcher: Failed to read IIFE for "${pluginName}":`, err);
   }
@@ -309,6 +321,16 @@ const handleToolsJsonChange = async (
         }
       } catch {
         // IIFE read failed — the IIFE watcher will handle it separately
+      }
+
+      // Read source map if available
+      const sourceMapPath = join(pluginDir, 'dist', 'adapter.iife.js.map');
+      try {
+        if (await fileExists(sourceMapPath)) {
+          plugin.iifeSourceMap = await readFileWithRetry(sourceMapPath);
+        }
+      } catch {
+        // Source map read failed — proceed without it
       }
     }
 

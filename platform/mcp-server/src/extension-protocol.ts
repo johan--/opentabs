@@ -77,12 +77,32 @@ interface McpCallbacks {
  * Write a plugin's adapter IIFE to the extension's adapters/ directory.
  * The extension injects adapters via chrome.scripting.executeScript({ files: [...] })
  * using these files, bypassing page CSP restrictions.
+ *
+ * If a source map is provided, writes it alongside the adapter as {pluginName}.js.map
+ * and rewrites the sourceMappingURL in the IIFE to reference the per-plugin filename
+ * (prevents collisions when multiple plugins are loaded).
  */
-const writeAdapterFile = async (pluginName: string, iife: string): Promise<void> => {
+const writeAdapterFile = async (pluginName: string, iife: string, sourceMap?: string): Promise<void> => {
   const adaptersDir = getAdaptersDir();
   const finalPath = join(adaptersDir, `${pluginName}.js`);
   const tmpPath = join(adaptersDir, `${pluginName}.js.tmp`);
-  await Bun.write(tmpPath, iife);
+
+  let content = iife;
+  if (sourceMap) {
+    // Rewrite sourceMappingURL to use the per-plugin filename
+    content = iife.replace(
+      /\/\/# sourceMappingURL=adapter\.iife\.js\.map/,
+      `//# sourceMappingURL=${pluginName}.js.map`,
+    );
+
+    // Write source map atomically
+    const mapFinalPath = join(adaptersDir, `${pluginName}.js.map`);
+    const mapTmpPath = join(adaptersDir, `${pluginName}.js.map.tmp`);
+    await Bun.write(mapTmpPath, sourceMap);
+    await rename(mapTmpPath, mapFinalPath);
+  }
+
+  await Bun.write(tmpPath, content);
   await rename(tmpPath, finalPath);
 };
 
@@ -102,10 +122,22 @@ const cleanupStaleAdapterFiles = async (currentPluginNames: Set<string>): Promis
   }
 
   const staleFiles = entries.filter(f => {
-    if (!f.endsWith('.js') || f.endsWith('.js.tmp')) return false;
+    if (f.endsWith('.js.tmp') || f.endsWith('.js.map.tmp')) return false;
     if (f.startsWith(EXEC_FILE_PREFIX)) return false; // Managed by cleanupStaleExecFiles
-    const pluginName = f.slice(0, -3); // strip '.js'
-    return !currentPluginNames.has(pluginName);
+
+    // Match adapter .js files
+    if (f.endsWith('.js')) {
+      const pluginName = f.slice(0, -3); // strip '.js'
+      return !currentPluginNames.has(pluginName);
+    }
+
+    // Match adapter .js.map source map files
+    if (f.endsWith('.js.map')) {
+      const pluginName = f.slice(0, -7); // strip '.js.map'
+      return !currentPluginNames.has(pluginName);
+    }
+
+    return false;
   });
 
   if (staleFiles.length === 0) return;
@@ -153,7 +185,7 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
   const currentPluginNames = new Set(pluginList.map(p => p.name));
   await cleanupStaleAdapterFiles(currentPluginNames);
 
-  const writePromise = Promise.allSettled(pluginList.map(p => writeAdapterFile(p.name, p.iife)));
+  const writePromise = Promise.allSettled(pluginList.map(p => writeAdapterFile(p.name, p.iife, p.iifeSourceMap)));
   const timeout = timeoutRace<null>(null, ADAPTER_WRITE_TIMEOUT_MS);
   const writeResults = await Promise.race([writePromise, timeout.promise]);
   timeout.cancel();
@@ -306,12 +338,17 @@ const sendInvocationEnd = (
  * Sent as a JSON-RPC notification (no id, no response expected). The extension
  * processes the update and re-injects the adapter into matching tabs.
  */
-const sendPluginUpdate = async (state: ServerState, pluginName: string, iife: string): Promise<void> => {
+const sendPluginUpdate = async (
+  state: ServerState,
+  pluginName: string,
+  iife: string,
+  sourceMap?: string,
+): Promise<void> => {
   const plugin = state.registry.plugins.get(pluginName);
   if (!plugin) return;
 
   await ensureAdaptersDir();
-  await writeAdapterFile(pluginName, iife);
+  await writeAdapterFile(pluginName, iife, sourceMap);
 
   const sent = sendToExtension(state, {
     jsonrpc: '2.0',

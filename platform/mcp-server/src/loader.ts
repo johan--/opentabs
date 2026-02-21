@@ -38,6 +38,8 @@ interface LoadedPlugin {
   readonly npmPackageName: string | undefined;
   /** SDK version the plugin was built with (from tools.json sdkVersion field). Undefined for old plugins. */
   readonly sdkVersion: string | undefined;
+  /** Source map content for the adapter IIFE (from dist/adapter.iife.js.map). Undefined for old plugins. */
+  readonly iifeSourceMap: string | undefined;
 }
 
 /**
@@ -325,6 +327,18 @@ const loadPlugin = async (
   // Compute adapter hash from IIFE content
   const adapterHash = await computeHash(iife);
 
+  // Read source map if available (optional — older plugins won't have one)
+  const sourceMapPath = join(dir, 'dist', 'adapter.iife.js.map');
+  let iifeSourceMap: string | undefined;
+  try {
+    const sourceMapFile = Bun.file(sourceMapPath);
+    if (await sourceMapFile.exists()) {
+      iifeSourceMap = await sourceMapFile.text();
+    }
+  } catch {
+    // Source map not available — not an error
+  }
+
   return ok({
     name: pluginName,
     version: pkg.version,
@@ -341,6 +355,7 @@ const loadPlugin = async (
     adapterHash,
     npmPackageName: pkg.name,
     sdkVersion: pluginSdkVersion,
+    iifeSourceMap,
   });
 };
 

@@ -128,13 +128,13 @@ const createFileWatcherCallbacks = (
       notifyAllClients();
       const plugin = state.registry.plugins.get(pluginName);
       if (plugin) {
-        void sendPluginUpdate(state, pluginName, plugin.iife).catch((err: unknown) => {
+        void sendPluginUpdate(state, pluginName, plugin.iife, plugin.iifeSourceMap).catch((err: unknown) => {
           log.error(`Failed to write adapter file for ${pluginName}:`, err);
         });
       }
     },
-    onIifeChanged: (pluginName: string, iife: string) => {
-      void sendPluginUpdate(state, pluginName, iife).catch((err: unknown) => {
+    onIifeChanged: (pluginName: string, iife: string, sourceMap?: string) => {
+      void sendPluginUpdate(state, pluginName, iife, sourceMap).catch((err: unknown) => {
         log.error(`Failed to write adapter file for ${pluginName}:`, err);
       });
     },
