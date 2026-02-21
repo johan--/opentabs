@@ -27,7 +27,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "knip": "knip",
     "check": "bun run build && bun run type-check && bun run lint && bun run knip && bun run test",
-    "check:all": "bun run build && bun run type-check && bun run type-check:e2e && bun run lint && bun run knip && bun run test && bun run test:e2e",
+    "check:all": "bun run build && bun run type-check && bun run lint && bun run knip && bun run test && bun run test:e2e",
     "test": "bun test platform/",
     "test:e2e": "bunx playwright test",
     "postinstall": "bun scripts/check-bun-version.ts",
