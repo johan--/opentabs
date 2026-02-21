@@ -346,8 +346,7 @@ Or add the path directly to `~/.opentabs/config.json`:
 {
   "plugins": ["../plugins/my-plugin"],
   "tools": {},
-  "secret": "...",
-  "npmPlugins": []
+  "secret": "..."
 }
 ```
 
@@ -402,11 +401,11 @@ Users install your plugin with:
 npm install opentabs-plugin-my-plugin
 ```
 
-Then add the package name to their `~/.opentabs/config.json` `npmPlugins` array:
+Then add the package name to the `plugins` array in `~/.opentabs/config.json`:
 
 ```json
 {
-  "npmPlugins": ["opentabs-plugin-my-plugin"]
+  "plugins": ["opentabs-plugin-my-plugin"]
 }
 ```
 

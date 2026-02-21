@@ -36,7 +36,7 @@ The config file is created automatically on first server run with sensible defau
       <Table.Cell className="font-medium">`plugins`</Table.Cell>
       <Table.Cell className="*:text-xs">`string[]`</Table.Cell>
       <Table.Cell className="*:text-xs">`[]`</Table.Cell>
-      <Table.Cell>Local plugin directory paths. Relative paths are resolved from the config directory. Absolute paths are also supported. All paths must be under `$HOME` or `$TMPDIR` (security restriction).</Table.Cell>
+      <Table.Cell>Plugin specifiers — local directory paths (starting with `./`, `../`, `/`, or `~/`) or npm package names. A single unified array for all plugin sources.</Table.Cell>
     </Table.Row>
     <Table.Row>
       <Table.Cell className="font-medium">`tools`</Table.Cell>
@@ -50,12 +50,6 @@ The config file is created automatically on first server run with sensible defau
       <Table.Cell className="*:text-xs">_(auto-generated)_</Table.Cell>
       <Table.Cell>64-character hex string (256-bit) used for authentication. Shared between the MCP server and Chrome extension. Auto-generated on first run if missing.</Table.Cell>
     </Table.Row>
-    <Table.Row>
-      <Table.Cell className="font-medium">`npmPlugins`</Table.Cell>
-      <Table.Cell className="*:text-xs">`string[]`</Table.Cell>
-      <Table.Cell className="*:text-xs">`[]`</Table.Cell>
-      <Table.Cell>npm package names explicitly allowed for plugin discovery. Only packages listed here will be loaded from `node_modules`.</Table.Cell>
-    </Table.Row>
   </Table.Body>
 </Table>
 
@@ -63,12 +57,15 @@ The config file is created automatically on first server run with sensible defau
 
 ```json
 {
-  "plugins": ["../plugins/slack", "/Users/you/projects/my-opentabs-plugin"],
+  "plugins": [
+    "../plugins/slack",
+    "/Users/you/projects/my-opentabs-plugin",
+    "opentabs-plugin-jira"
+  ],
   "tools": {
     "slack_delete_message": false
   },
-  "secret": "a1b2c3d4e5f6...64 hex characters...",
-  "npmPlugins": ["opentabs-plugin-jira"]
+  "secret": "a1b2c3d4e5f6...64 hex characters..."
 }
 ```
 
@@ -76,10 +73,15 @@ The config file is created automatically on first server run with sensible defau
 
 ### plugins
 
-An array of filesystem paths pointing to local plugin directories. Each path must contain a `package.json` with an `opentabs` metadata field, a `dist/tools.json` tool definitions file, and a `dist/adapter.iife.js` adapter bundle.
+A unified array of plugin specifiers. Each entry is either a **local directory path** or an **npm package name**. The server determines the type based on the prefix:
+
+- **Local paths** start with `./`, `../`, `/`, or `~/` — they point to a plugin directory containing `package.json` (with an `opentabs` metadata field), `dist/tools.json`, and `dist/adapter.iife.js`
+- **npm package names** are everything else (e.g., `opentabs-plugin-jira`, `@myorg/opentabs-plugin-linear`) — resolved via `Bun.resolveSync` from the server's `node_modules`
+
+**Local path resolution:**
 
 - **Relative paths** are resolved from the config directory (`~/.opentabs/` by default)
-- **Absolute paths** are used as-is
+- **Absolute paths** and `~/` paths are used as-is (with `~/` expanded to `$HOME`)
 - **Security**: paths are validated with `realpath()` to resolve symlinks, then checked against `$HOME` and `$TMPDIR` — plugins outside these directories are rejected
 - The `create-opentabs-plugin` scaffolder and `opentabs plugin add` command both auto-register plugins in this array
 
@@ -109,18 +111,6 @@ A 64-character hex string (256-bit cryptographic random) used for authentication
 - **Admin endpoints** (`/reload`, `/extension/reload`): require the same Bearer token
 
 Auto-generated on first server run. If the field is missing from an existing config (e.g., after upgrading), the server generates a new secret and writes it back.
-
-### npmPlugins
-
-An explicit allowlist of npm package names that the server will load as plugins during discovery. The server scans `node_modules` for packages matching `opentabs-plugin-*` or with the `opentabs-plugin` keyword, but only loads packages listed in this array.
-
-```json
-{
-  "npmPlugins": ["opentabs-plugin-jira", "opentabs-plugin-linear"]
-}
-```
-
-An empty array (the default) means no npm plugins are loaded — only local plugins from the `plugins` array.
 
 ## Environment variables
 

@@ -35,41 +35,36 @@ Plugins extend the `OpenTabsPlugin` base class from `@opentabs-dev/plugin-sdk` a
 
 ## Discovery
 
-The MCP server discovers plugins from two sources on startup:
+The MCP server discovers plugins from the `plugins` array in `~/.opentabs/config.json`. The array accepts both local directory paths and npm package names — a single unified list for all plugin sources.
+
+```json
+{
+  "plugins": [
+    "../plugins/slack",
+    "/Users/me/my-plugin",
+    "opentabs-plugin-github",
+    "@myorg/opentabs-plugin-jira"
+  ]
+}
+```
+
+The server determines the type of each entry by its prefix:
 
 ### Local Plugins
 
-Paths listed in the `plugins` array of `~/.opentabs/config.json`:
+Entries starting with `./`, `../`, `/`, or `~/` are treated as local directory paths.
 
-```json
-{
-  "plugins": ["../plugins/slack", "/Users/me/my-plugin"]
-}
-```
-
-Paths can be relative (resolved from the config directory) or absolute. For security, all paths must resolve under the user's home directory (`$HOME`) or system temp directory (`$TMPDIR`). Symlinks are resolved via `realpath()` to prevent directory traversal. Paths outside allowed roots are rejected and logged.
+- **Relative paths** are resolved from the config directory (`~/.opentabs/` by default)
+- **Absolute paths** and `~/` paths are used directly (with `~/` expanded to `$HOME`)
+- **Security**: all paths must resolve under `$HOME` or `$TMPDIR` after `realpath()` symlink resolution — paths outside allowed roots are rejected and logged
 
 ### npm Plugins
 
-The server scans `node_modules` for packages matching these patterns:
-
-- `opentabs-plugin-*` (unscoped)
-- `@scope/opentabs-plugin-*` (scoped)
-- Any package with the `opentabs-plugin` keyword in its `package.json`
-
-Discovered npm packages are only loaded if they appear in the `npmPlugins` allowlist in `config.json`:
-
-```json
-{
-  "npmPlugins": ["opentabs-plugin-github", "@myorg/opentabs-plugin-jira"]
-}
-```
-
-Packages not in the allowlist are logged as skipped with instructions to enable them.
+All other entries are treated as npm package names and resolved via `Bun.resolveSync` from the server's `node_modules`.
 
 ### Precedence
 
-Local and npm discovery run in parallel. If the same plugin name appears in both sources, the local copy takes precedence.
+If the same plugin name appears from both a local path and an npm package in the array, the local copy takes precedence.
 
 ## Plugin Metadata
 
