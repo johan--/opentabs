@@ -6,7 +6,7 @@
  * 2. WebSocket at /ws — for Chrome extension connection
  * 3. GET /ws-info — authenticated WebSocket URL for extension
  * 4. GET /health — health check endpoint (includes mode: 'dev' | 'production')
- * 5. POST /reload — trigger config/plugin rediscovery (dev mode only)
+ * 5. POST /reload — trigger config/plugin rediscovery
  * 6. POST /extension/reload — trigger extension reload
  *
  * Hot reload (bun --hot):

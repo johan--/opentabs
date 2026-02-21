@@ -390,17 +390,15 @@ describe('/ws-info endpoint', () => {
 });
 
 describe('POST /reload endpoint', () => {
-  test('returns 405 in production mode with descriptive error message', async () => {
-    const { handlers } = createTestHandlers();
+  test('returns 401 without bearer auth', async () => {
+    const { handlers, state } = createTestHandlers();
+    state.wsSecret = 'test-secret';
 
     const req = new Request('http://localhost:9876/reload', { method: 'POST' });
     const res = await handlers.fetch(req, mockBunServer);
 
     expect(res).toBeInstanceOf(Response);
-    expect((res as Response).status).toBe(405);
-    const body = (await (res as Response).json()) as { ok: boolean; error: string };
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe('Reload is only available in dev mode. Restart the server to pick up plugin changes.');
+    expect((res as Response).status).toBe(401);
   });
 });
 

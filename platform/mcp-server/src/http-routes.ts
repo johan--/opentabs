@@ -203,14 +203,8 @@ const createHandleFetch =
       });
     }
 
-    // --- Config/plugin rediscovery endpoint (dev mode only) ---
+    // --- Config/plugin rediscovery endpoint ---
     if (url.pathname === '/reload' && req.method === 'POST') {
-      if (!isDev()) {
-        return Response.json(
-          { ok: false, error: 'Reload is only available in dev mode. Restart the server to pick up plugin changes.' },
-          { status: 405 },
-        );
-      }
       const authError = checkBearerAuth(req, state.wsSecret);
       if (authError) return authError;
       if (!checkEndpointRateLimit('/reload', 10)) {
