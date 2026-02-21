@@ -79,6 +79,14 @@ export abstract class OpenTabsPlugin {
    * persistent side effects can omit this.
    */
   teardown?(): void;
+  /**
+   * Called on in-page URL changes (pushState, replaceState, popstate,
+   * hashchange). Runs in the page context. If the plugin does not
+   * implement this method, no navigation listeners are set up.
+   *
+   * @param url — the new URL after the navigation (window.location.href)
+   */
+  onNavigate?(url: string): void;
 }
 
 // ---------------------------------------------------------------------------
