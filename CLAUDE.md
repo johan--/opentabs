@@ -25,7 +25,7 @@
                                                              └──────────────────┘
 ```
 
-**MCP Server** (`platform/mcp-server`): Discovers plugins, registers their tools, resources, and prompts as MCP capabilities, dispatches tool calls, resource reads, and prompt gets to the Chrome extension via WebSocket, receives plugin log entries and forwards them to MCP clients via the logging capability, converts tool progress notifications into MCP `notifications/progress` events, and serves health/config endpoints.
+**MCP Server** (`platform/mcp-server`): Discovers plugins, registers their tools, resources, and prompts as MCP capabilities, dispatches tool calls, resource reads, and prompt gets to the Chrome extension via WebSocket, receives plugin log entries and forwards them to MCP clients via the logging capability, converts tool progress notifications into MCP `notifications/progress` events, and serves health/config endpoints. The server maintains an in-memory audit log of the last 500 tool invocations, queryable via `GET /audit` (with Bearer auth), with aggregate stats included in the `/health` response's `auditSummary` field.
 
 **Chrome Extension** (`platform/browser-extension`): Receives plugin definitions from the MCP server via `sync.full`, dynamically registers content scripts for URL patterns, injects adapter IIFEs into matching tabs, dispatches tool calls, resource reads, and prompt gets to the correct tab's adapter, and relays tool progress notifications from adapters back to the MCP server. The `debugger` permission in the manifest is required for network capture via the Chrome DevTools Protocol (`chrome.debugger.attach`, `Network.enable`, `Runtime.enable`) in `network-capture.ts`.
 
@@ -33,7 +33,7 @@
 
 **Plugin Tools** (`platform/plugin-tools`): Plugin developer CLI (`opentabs-plugin`). The `opentabs-plugin build` command bundles the plugin adapter into an IIFE, generates `dist/tools.json` (containing tool schemas, resource metadata, and prompt metadata), auto-registers the plugin in `~/.opentabs/config.json` (under `localPlugins`), and calls `POST /reload` to notify the running MCP server. Supports `--watch` mode for development.
 
-**CLI** (`platform/cli`): User-facing CLI (`opentabs`). Commands: `start`, `status`, `doctor`, `logs`, `plugin create`, `config show/set/path`. The `opentabs start` command auto-initializes config and the Chrome extension on first run, then launches the MCP server. The `opentabs logs --plugin <name>` flag filters output to only show logs from a specific plugin.
+**CLI** (`platform/cli`): User-facing CLI (`opentabs`). Commands: `start`, `status`, `audit`, `doctor`, `logs`, `plugin create`, `config show/set/path`. The `opentabs start` command auto-initializes config and the Chrome extension on first run, then launches the MCP server. The `opentabs logs --plugin <name>` flag filters output to only show logs from a specific plugin. The `opentabs audit` command shows recent tool invocation history from the server's audit log.
 
 **create-plugin** (`platform/create-plugin`): Scaffolding CLI (`create-opentabs-plugin`) for new plugin projects.
 
