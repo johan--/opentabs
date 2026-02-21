@@ -160,6 +160,54 @@ const checkExtensionVersion = async (installedVersion: string | null): Promise<C
   );
 };
 
+interface HealthPluginDetail {
+  name: string;
+  displayName: string;
+  toolCount: number;
+  tabState: string;
+  source: string;
+}
+
+interface HealthFailedPlugin {
+  path: string;
+  error: string;
+}
+
+const checkNpmPlugins = (data: Record<string, unknown> | null): CheckResult[] => {
+  if (!data) {
+    return [pass('npm plugins', 'requires running server to check')];
+  }
+
+  const pluginDetails = Array.isArray(data.pluginDetails) ? (data.pluginDetails as HealthPluginDetail[]) : [];
+  const failedPlugins = Array.isArray(data.failedPlugins) ? (data.failedPlugins as HealthFailedPlugin[]) : [];
+
+  const npmPlugins = pluginDetails.filter(p => p.source === 'npm');
+
+  const results: CheckResult[] = [];
+
+  if (npmPlugins.length === 0 && failedPlugins.length === 0) {
+    results.push(pass('npm plugins', 'none discovered'));
+    return results;
+  }
+
+  for (const p of npmPlugins) {
+    const detail = `${p.displayName} — ${p.toolCount} tool${p.toolCount === 1 ? '' : 's'}, tab ${p.tabState}`;
+    results.push(pass(`npm plugin ${p.name}`, detail));
+  }
+
+  for (const f of failedPlugins) {
+    results.push(
+      warn(
+        `npm plugin ${f.path}`,
+        `failed: ${f.error}`,
+        'Check plugin installation or rebuild with opentabs-plugin build',
+      ),
+    );
+  }
+
+  return results;
+};
+
 const checkPlugins = async (config: Record<string, unknown> | null): Promise<CheckResult[]> => {
   if (!config) {
     return [warn('Plugins', 'no config to check', 'Create a config file first')];
@@ -239,9 +287,12 @@ const handleDoctor = async (options: DoctorOptions): Promise<void> => {
   // 6. Extension version matches CLI
   results.push(await checkExtensionVersion(versionFile));
 
-  // 7. Plugin checks
+  // 7. Local plugin checks
   const pluginResults = await checkPlugins(config);
   results.push(...pluginResults);
+
+  // 8. npm plugin health (from server /health data)
+  results.push(...checkNpmPlugins(healthData));
 
   // Print results
   console.log(pc.bold('OpenTabs Doctor'));
@@ -289,5 +340,12 @@ Examples:
     .action((_options: DoctorOptions, command: Command) => handleDoctor(command.optsWithGlobals()));
 };
 
-export { checkBunVersion, checkConfigFile, checkExtensionConnected, checkPlugins, registerDoctorCommand };
+export {
+  checkBunVersion,
+  checkConfigFile,
+  checkExtensionConnected,
+  checkNpmPlugins,
+  checkPlugins,
+  registerDoctorCommand,
+};
 export type { CheckResult };

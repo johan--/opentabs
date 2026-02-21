@@ -1,4 +1,4 @@
-import { checkBunVersion, checkConfigFile, checkExtensionConnected, checkPlugins } from './doctor.js';
+import { checkBunVersion, checkConfigFile, checkExtensionConnected, checkNpmPlugins, checkPlugins } from './doctor.js';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -191,5 +191,90 @@ describe('checkPlugins', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.ok).toBe(true);
     expect(results[0]?.label).toContain(pluginDir);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkNpmPlugins
+// ---------------------------------------------------------------------------
+
+describe('checkNpmPlugins', () => {
+  test('returns pass with info message when health data is null', () => {
+    const results = checkNpmPlugins(null);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.ok).toBe(true);
+    expect(results[0]?.label).toBe('npm plugins');
+    expect(results[0]?.detail).toContain('requires running server');
+  });
+
+  test('returns pass when no npm plugins are discovered', () => {
+    const results = checkNpmPlugins({ pluginDetails: [], failedPlugins: [] });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.ok).toBe(true);
+    expect(results[0]?.label).toBe('npm plugins');
+    expect(results[0]?.detail).toContain('none discovered');
+  });
+
+  test('excludes local plugins from npm plugin results', () => {
+    const results = checkNpmPlugins({
+      pluginDetails: [
+        { name: 'local-plugin', displayName: 'Local Plugin', toolCount: 2, tabState: 'ready', source: 'local' },
+      ],
+      failedPlugins: [],
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.label).toBe('npm plugins');
+    expect(results[0]?.detail).toContain('none discovered');
+  });
+
+  test('lists npm plugins with tool count and tab state', () => {
+    const results = checkNpmPlugins({
+      pluginDetails: [
+        { name: 'slack', displayName: 'Slack', toolCount: 3, tabState: 'ready', source: 'npm' },
+        { name: 'jira', displayName: 'Jira', toolCount: 1, tabState: 'closed', source: 'npm' },
+      ],
+      failedPlugins: [],
+    });
+    expect(results).toHaveLength(2);
+    expect(results[0]?.ok).toBe(true);
+    expect(results[0]?.label).toBe('npm plugin slack');
+    expect(results[0]?.detail).toContain('Slack');
+    expect(results[0]?.detail).toContain('3 tools');
+    expect(results[0]?.detail).toContain('tab ready');
+    expect(results[1]?.ok).toBe(true);
+    expect(results[1]?.label).toBe('npm plugin jira');
+    expect(results[1]?.detail).toContain('1 tool,');
+    expect(results[1]?.detail).toContain('tab closed');
+  });
+
+  test('shows warnings for failed plugins', () => {
+    const results = checkNpmPlugins({
+      pluginDetails: [],
+      failedPlugins: [{ path: '/usr/lib/node_modules/opentabs-plugin-broken', error: 'missing dist/tools.json' }],
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.ok).toBe(false);
+    expect(results[0]?.fatal).toBe(false);
+    expect(results[0]?.detail).toContain('missing dist/tools.json');
+    expect(results[0]?.hint).toContain('opentabs-plugin build');
+  });
+
+  test('shows both npm plugins and failed plugins', () => {
+    const results = checkNpmPlugins({
+      pluginDetails: [{ name: 'slack', displayName: 'Slack', toolCount: 3, tabState: 'ready', source: 'npm' }],
+      failedPlugins: [{ path: '/usr/lib/node_modules/opentabs-plugin-broken', error: 'parse error' }],
+    });
+    expect(results).toHaveLength(2);
+    expect(results[0]?.ok).toBe(true);
+    expect(results[0]?.label).toBe('npm plugin slack');
+    expect(results[1]?.ok).toBe(false);
+    expect(results[1]?.label).toContain('opentabs-plugin-broken');
+  });
+
+  test('handles missing pluginDetails and failedPlugins gracefully', () => {
+    const results = checkNpmPlugins({ status: 'ok' });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.ok).toBe(true);
+    expect(results[0]?.detail).toContain('none discovered');
   });
 });
