@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { registerBuildCommand } from './commands/index.js';
+import { registerBuildCommand, registerInspectCommand } from './commands/index.js';
 import { Command } from 'commander';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,5 +16,6 @@ const program = new Command('opentabs-plugin')
   });
 
 registerBuildCommand(program);
+registerInspectCommand(program);
 
 await program.parseAsync();
