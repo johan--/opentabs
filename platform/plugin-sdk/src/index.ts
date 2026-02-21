@@ -282,6 +282,7 @@ export { getLocalStorage, setLocalStorage, getSessionStorage, getCookie } from '
 // ---------------------------------------------------------------------------
 
 export { getPageGlobal, getCurrentUrl, getPageTitle } from './page-state.js';
+export type { GetPageGlobal } from './page-state.js';
 
 // ---------------------------------------------------------------------------
 // SDK utilities — Logging

@@ -3,14 +3,24 @@
 // ---------------------------------------------------------------------------
 
 /**
+ * Overloaded call signature for getPageGlobal — returns `T | undefined` when
+ * an explicit generic is provided, `unknown` otherwise.
+ */
+export type GetPageGlobal = {
+  (path: string): unknown;
+  <T>(path: string & { __brand?: T }): T | undefined;
+};
+
+/**
  * Safe deep property access on `globalThis` using dot-notation path.
  * Returns `undefined` if any segment in the path is missing or if a getter
- * throws. Callers can narrow the result with `as` at the call site.
+ * throws. Supports a generic type parameter for ergonomic typing at the
+ * call site without requiring `as` casts.
  *
  * @example
- * const token = getPageGlobal('TS.boot_data.api_token') as string | undefined;
+ * const token = getPageGlobal<string>('TS.boot_data.api_token'); // string | undefined
  */
-export const getPageGlobal = (path: string): unknown => {
+export const getPageGlobal: GetPageGlobal = (path: string): unknown => {
   try {
     const segments = path.split('.');
     let current: unknown = globalThis;

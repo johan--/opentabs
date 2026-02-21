@@ -70,6 +70,27 @@ describe('getPageGlobal', () => {
     });
     expect(getPageGlobal('__testGlobal.foo')).toBeUndefined();
   });
+
+  test('generic type parameter narrows return type', () => {
+    (globalThis as Record<string, unknown>).TS = {
+      boot_data: { api_token: 'xoxs-abc' },
+    };
+    // With generic: result is string | undefined (no `as` cast needed)
+    const token = getPageGlobal<string>('TS.boot_data.api_token');
+    expect(token).toBe('xoxs-abc');
+  });
+
+  test('generic defaults to unknown when omitted', () => {
+    (globalThis as Record<string, unknown>).__testGlobal = 42;
+    // Without generic: result is unknown (backward compatible)
+    const val = getPageGlobal('__testGlobal');
+    expect(val).toBe(42);
+  });
+
+  test('generic returns undefined for missing path', () => {
+    const result = getPageGlobal<string>('nonExistent.deep.path');
+    expect(result).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
