@@ -33,8 +33,8 @@ const createMockServer = () => ({
 const emptyTransports = (): Map<string, WebStandardStreamableHTTPServerTransport> => new Map();
 
 /** Write a config.json to the given directory */
-const writeConfig = (configDir: string, plugins: string[] = [], tools: Record<string, boolean> = {}): void => {
-  writeFileSync(join(configDir, 'config.json'), JSON.stringify({ plugins, tools, secret: 'test-secret' }));
+const writeConfig = (configDir: string, localPlugins: string[] = [], tools: Record<string, boolean> = {}): void => {
+  writeFileSync(join(configDir, 'config.json'), JSON.stringify({ localPlugins, tools, secret: 'test-secret' }));
 };
 
 /** Create a minimal valid plugin directory with package.json, tools.json, and adapter */

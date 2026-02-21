@@ -240,7 +240,7 @@ describe('config file watcher', () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'config-watcher-'));
     originalConfigDir = Bun.env.OPENTABS_CONFIG_DIR;
     Bun.env.OPENTABS_CONFIG_DIR = tmpDir;
-    writeFileSync(join(tmpDir, 'config.json'), '{"plugins":[]}');
+    writeFileSync(join(tmpDir, 'config.json'), '{"localPlugins":[]}');
     state = createState();
     return tmpDir;
   };
@@ -295,11 +295,11 @@ describe('config file watcher', () => {
     startConfigWatching(state, callbacks);
 
     // Write config.json multiple times rapidly
-    writeFileSync(join(dir, 'config.json'), '{"plugins":["a"]}');
+    writeFileSync(join(dir, 'config.json'), '{"localPlugins":["a"]}');
     await new Promise(r => setTimeout(r, 50));
-    writeFileSync(join(dir, 'config.json'), '{"plugins":["a","b"]}');
+    writeFileSync(join(dir, 'config.json'), '{"localPlugins":["a","b"]}');
     await new Promise(r => setTimeout(r, 50));
-    writeFileSync(join(dir, 'config.json'), '{"plugins":["a","b","c"]}');
+    writeFileSync(join(dir, 'config.json'), '{"localPlugins":["a","b","c"]}');
 
     // Wait for debounce (200ms) plus buffer for FS event delivery
     await new Promise(r => setTimeout(r, 500));
@@ -323,7 +323,7 @@ describe('config file watcher', () => {
     startConfigWatching(state, callbacks);
 
     // Trigger a config change
-    writeFileSync(join(dir, 'config.json'), '{"plugins":["stale"]}');
+    writeFileSync(join(dir, 'config.json'), '{"localPlugins":["stale"]}');
 
     // Before the debounce fires, bump the generation (simulating a hot reload restart)
     await new Promise(r => setTimeout(r, 50));
