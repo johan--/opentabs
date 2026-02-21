@@ -14,7 +14,7 @@ function Footer() {
       <div className="max-w-6xl mx-auto px-4 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 max-w-md">
-            <Text as="h2" className="mb-4">
+            <Text as="h2" className="mb-6">
               OpenTabs
             </Text>
             <Text className="text-muted-foreground leading-relaxed text-sm">
