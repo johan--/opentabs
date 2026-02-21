@@ -31,9 +31,9 @@
 
 **Plugin SDK** (`platform/plugin-sdk`): Provides the `OpenTabsPlugin` base class and `defineTool` factory. Plugins extend `OpenTabsPlugin` and define tools with Zod schemas.
 
-**Plugin Tools** (`platform/plugin-tools`): Plugin developer CLI (`opentabs-plugin`). The `opentabs-plugin build` command bundles the plugin adapter into an IIFE and generates `dist/tools.json`. Supports `--watch` mode for development.
+**Plugin Tools** (`platform/plugin-tools`): Plugin developer CLI (`opentabs-plugin`). The `opentabs-plugin build` command bundles the plugin adapter into an IIFE, generates `dist/tools.json`, auto-registers the plugin in `~/.opentabs/config.json` (under `localPlugins`), and calls `POST /reload` to notify the running MCP server. Supports `--watch` mode for development.
 
-**CLI** (`platform/cli`): User-facing CLI (`opentabs`). Commands: `start`, `status`, `doctor`, `setup`, `logs`, `plugin`, `config`. The `opentabs start` command launches the MCP server in production mode.
+**CLI** (`platform/cli`): User-facing CLI (`opentabs`). Commands: `start`, `status`, `doctor`, `logs`, `plugin create`, `config show/set/path`. The `opentabs start` command auto-initializes config and the Chrome extension on first run, then launches the MCP server.
 
 **create-plugin** (`platform/create-plugin`): Scaffolding CLI (`create-opentabs-plugin`) for new plugin projects.
 
@@ -82,7 +82,7 @@ opentabs/
 │   ├── cli/                       # User-facing CLI (opentabs)
 │   │   └── src/
 │   │       ├── cli.ts             # Entry point — `opentabs` binary
-│   │       └── commands/          # start, status, doctor, setup, logs, plugin, config
+│   │       └── commands/          # start, status, doctor, logs, plugin, config
 │   └── create-plugin/             # Plugin scaffolding CLI
 │       └── src/
 │           └── index.ts           # `create-opentabs-plugin` CLI
@@ -106,15 +106,15 @@ opentabs/
 
 ### Key Concepts
 
-**Plugin discovery**: The MCP server reads `~/.opentabs/config.json` for a unified `plugins` array containing both npm package names and local filesystem paths. Each specifier is resolved (via `Bun.resolveSync` for npm, filesystem resolution for local paths), then loaded by reading `package.json` (with an `opentabs` field for metadata), `dist/adapter.iife.js` (the adapter bundle), and `dist/tools.json` (tool schemas). Discovery is a four-phase pipeline: resolve → load → determine trust tier → build an immutable registry.
+**Plugin discovery**: The MCP server discovers plugins from two sources: (1) **npm auto-discovery** scans global `node_modules` for packages matching `opentabs-plugin-*` and `@*/opentabs-plugin-*` patterns, and (2) **local plugins** listed in the `localPlugins` array in `~/.opentabs/config.json` (filesystem paths to plugins under active development). Each discovered plugin is loaded by reading `package.json` (with an `opentabs` field for metadata), `dist/adapter.iife.js` (the adapter bundle), and `dist/tools.json` (tool schemas). Local plugins override npm plugins of the same name. Discovery is a four-phase pipeline: resolve → load → determine trust tier → build an immutable registry.
 
 **Tool prefixing**: Plugin tools are exposed to MCP clients with a `<plugin>_<tool>` prefix (e.g., `slack_send_message`). This prevents name collisions across plugins.
 
 **Tab state machine**: Each plugin has three tab states: `closed` (no matching tab), `unavailable` (tab exists but `isReady()` returns false), and `ready` (tab exists and authenticated). The extension reports state changes to the MCP server.
 
-**Dev vs production mode**: The MCP server operates in two modes, controlled by the `--dev` CLI flag or `OPENTABS_DEV=1` environment variable. **Production mode** (default) performs static plugin discovery at startup with no file watchers, no config watching, and no `POST /reload` endpoint — restart the server to pick up changes. **Dev mode** enables file watchers for local plugin `dist/` directories, config file watching, the `POST /reload` endpoint, and is intended to run with `bun --hot` for hot reload. The mode is determined once at startup in `dev-mode.ts` and accessible via `isDev()`.
+**Dev vs production mode**: The MCP server operates in two modes, controlled by the `--dev` CLI flag or `OPENTABS_DEV=1` environment variable. **Production mode** (default) performs static plugin discovery at startup with no file watchers and no config watching. **Dev mode** enables file watchers for local plugin `dist/` directories, config file watching, and is intended to run with `bun --hot` for hot reload. The `POST /reload` endpoint is available in both modes (behind bearer auth and rate limiting), allowing `opentabs-plugin build` to trigger rediscovery in either mode. The mode is determined once at startup in `dev-mode.ts` and accessible via `isDev()`.
 
-**Hot reload** (dev mode): In dev mode, the MCP server runs under `bun --hot`. On file changes, Bun re-evaluates the module while preserving `globalThis`. The server uses a `globalThis`-based cleanup pattern to tear down the previous instance (close WebSocket, stop file watchers, free the port) and reinitialize cleanly. In production mode, none of this applies — the server starts once and serves until manually restarted.
+**Hot reload** (dev mode): In dev mode, the MCP server runs under `bun --hot`. On file changes, Bun re-evaluates the module while preserving `globalThis`. The server uses a `globalThis`-based cleanup pattern to tear down the previous instance (close WebSocket, stop file watchers, free the port) and reinitialize cleanly. In production mode, the server starts once and serves until manually restarted. In both modes, the `POST /reload` endpoint triggers plugin rediscovery without restarting the process.
 
 ### Commands
 
@@ -147,18 +147,18 @@ The Chrome extension does NOT auto-reload. After building (`bun run build`), the
 4. Click the circular refresh/reload icon on the card
 5. Close and reopen the side panel if it was open (it reconnects automatically via the offscreen document's WebSocket)
 
-**Important**: In dev mode, the MCP server supports hot reload (`bun --hot`) so server-side changes take effect automatically after `bun run build`. But browser extension changes (background script, side panel, adapter injection logic) always require the manual reload step above. In dev mode, plugin adapter changes are picked up via the file watcher — no extension reload needed for plugin-only changes. In production mode, restart the server to pick up any changes.
+**Important**: In dev mode, the MCP server supports hot reload (`bun --hot`) so server-side changes take effect automatically after `bun run build`. But browser extension changes (background script, side panel, adapter injection logic) always require the manual reload step above. Plugin adapter changes are picked up via `POST /reload` (triggered by `opentabs-plugin build`) in both modes, and additionally via the file watcher in dev mode.
 
 ### Starting the MCP Server
 
-**Production mode** (default) — static plugin discovery, restart to reload:
+**Production mode** (default) — static plugin discovery at startup, `POST /reload` for rediscovery:
 
 ```bash
 opentabs start
 # or directly: bun platform/mcp-server/dist/index.js
 ```
 
-**Dev mode** — file watchers, config watching, hot reload, `POST /reload` endpoint:
+**Dev mode** — file watchers, config watching, hot reload:
 
 ```bash
 bun --hot platform/mcp-server/dist/index.js --dev
@@ -173,8 +173,7 @@ Each plugin follows the same pattern:
 1. **Create the plugin** (`plugins/<name>/`): Extend `OpenTabsPlugin` from `@opentabs-dev/plugin-sdk`
 2. **Configure `package.json`**: Add an `opentabs` field with `displayName`, `description`, and `urlPatterns`; set `main` to `dist/adapter.iife.js`
 3. **Define tools** (`plugins/<name>/src/tools/`): One file per tool using `defineTool()` with Zod schemas
-4. **Build**: `cd plugins/<name> && bun install && bun run build` (runs `tsc` then `opentabs-plugin build`, which produces `dist/adapter.iife.js` and `dist/tools.json`)
-5. **Register**: Add the plugin path or npm package name to the `plugins` array in `~/.opentabs/config.json`
+4. **Build**: `cd plugins/<name> && bun install && bun run build` (runs `tsc` then `opentabs-plugin build`, which produces `dist/adapter.iife.js` and `dist/tools.json`, auto-registers the plugin in `localPlugins`, and calls `POST /reload` to notify the MCP server)
 
 ### Plugin Isolation
 
@@ -192,23 +191,17 @@ The root tooling (`bun run build`, `bun run lint`, etc.) does NOT cover plugins.
 
 The platform packages `@opentabs-dev/shared`, `@opentabs-dev/plugin-sdk`, `@opentabs-dev/plugin-tools`, and `@opentabs-dev/cli` are published as private packages to the npm registry under the `@opentabs-dev` org. Publish order follows the dependency graph: shared → plugin-sdk → plugin-tools → cli.
 
-**Authentication**: npm requires two separate tokens:
-
-- **Session token** (`~/.npmrc`): Created by `npm login --scope=@opentabs-dev`. Used for reading/installing private packages. Expires after 2 hours.
-- **Granular token** (`~/.npmrc.publish`): Created at npmjs.com/settings/tokens/create with Read+Write + Bypass 2FA. Used for publishing without OTP prompts.
+**Authentication**: npm requires a single token in `~/.npmrc` with read+write access to `@opentabs-dev` packages.
 
 **Setup (one-time)**:
 
 ```bash
-# 1. Create session token for reading
-npm login --scope=@opentabs-dev
-
-# 2. Create publish token file with your granular access token
-echo '//registry.npmjs.org/:_authToken=<GRANULAR_TOKEN>' > ~/.npmrc.publish
-chmod 600 ~/.npmrc.publish
+# Create a granular access token at https://www.npmjs.com/settings/tokens/create
+# Permissions: Read and Write, Packages: @opentabs-dev/*, Bypass 2FA enabled
+echo '//registry.npmjs.org/:_authToken=<TOKEN>' > ~/.npmrc
 ```
 
-**Publishing** (uses `scripts/publish.sh` which handles token switching automatically):
+**Publishing** (uses `scripts/publish.sh` which verifies auth via `npm whoami` before publishing):
 
 ```bash
 ./scripts/publish.sh 0.0.3
@@ -246,15 +239,15 @@ bun run build
 # 3. Reload extension from chrome://extensions/
 ```
 
-### Plugin Changes (File Watcher — Dev Mode)
+### Plugin Changes
 
-In dev mode, the MCP server watches local plugin `dist/` directories for changes to `tools.json` and `adapter.iife.js`. On change, it re-reads the files and sends a `plugin.update` notification to the extension.
+`opentabs-plugin build` auto-registers the plugin in `localPlugins` (first build only) and calls `POST /reload` to trigger server rediscovery. In dev mode, the file watcher also detects changes to `dist/tools.json` and `dist/adapter.iife.js`.
 
 ```bash
 # 1. Edit plugin source
 # 2. Build the plugin
-cd plugins/slack && bun run build
-# 3. Done — file watcher detects changes automatically
+cd plugins/<name> && bun run build
+# 3. Done — build notifies the server via POST /reload
 ```
 
 ---
