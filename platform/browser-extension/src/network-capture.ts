@@ -206,6 +206,36 @@ chrome.debugger.onEvent.addListener((source: chrome.debugger.Debuggee, method: s
         : res.body;
       request.responseBody = truncateBody(body);
     });
+  } else if (method === 'Network.webSocketCreated') {
+    // WebSocket connections use separate CDP events (not requestWillBeSent).
+    // Capture the creation event as a synthetic request so that the
+    // analyze-site API detection module can classify it as websocket.
+    const url = p?.url as string | undefined;
+    if (!url) return;
+
+    // Apply URL filter
+    if (state.urlFilter && !url.includes(state.urlFilter)) return;
+
+    const completed: CapturedRequest = {
+      url,
+      method: 'GET',
+      status: 101,
+      statusText: 'Switching Protocols',
+      requestHeaders: { Upgrade: 'websocket', Connection: 'Upgrade' },
+      timestamp: Date.now(),
+    };
+
+    if (state.requests.length >= state.maxRequests) {
+      state.requests.shift();
+      for (const [rid, ridIdx] of state.requestIdToIndex) {
+        if (ridIdx <= 0) {
+          state.requestIdToIndex.delete(rid);
+        } else {
+          state.requestIdToIndex.set(rid, ridIdx - 1);
+        }
+      }
+    }
+    state.requests.push(completed);
   } else if (method === 'Runtime.consoleAPICalled') {
     const type = p?.type as string | undefined;
     const args = p?.args as Array<{ type?: string; value?: unknown; description?: string }> | undefined;

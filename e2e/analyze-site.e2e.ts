@@ -431,6 +431,45 @@ test.describe('plugin_analyze_site — tRPC API', () => {
   });
 });
 
+test.describe('plugin_analyze_site — WebSocket real-time connection', () => {
+  test('detects WebSocket connection in API analysis', async ({
+    mcpServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const siteUrl = `${analyzeSiteServer.url}/websocket-app/`;
+    const analysis = await analyzeSite(mcpClient, siteUrl);
+
+    // --- WebSocket detection ---
+    // The page creates a WebSocket connection (ws://...) which should be
+    // captured via the Network.webSocketCreated CDP event and classified
+    // as protocol: 'websocket' by detect-apis.
+    const wsEndpoints = analysis.apis.endpoints.filter(e => e.protocol === 'websocket');
+    expect(wsEndpoints.length).toBeGreaterThanOrEqual(1);
+
+    // The WebSocket URL should contain /ws
+    const wsEndpoint = wsEndpoints.find(e => e.url.includes('/ws'));
+    expect(wsEndpoint).toBeDefined();
+
+    // --- Suggestions ---
+    // WebSocket endpoints should generate a subscribe_realtime suggestion
+    const wsSuggestion = analysis.suggestions.find(s => s.toolName === 'subscribe_realtime');
+    expect(wsSuggestion).toBeDefined();
+    expect(wsSuggestion?.approach).toContain('/ws');
+
+    // --- REST API also detected ---
+    // The page also makes a REST call to /websocket-app/api/config
+    const restEndpoints = analysis.apis.endpoints.filter(e => e.protocol === 'rest');
+    expect(restEndpoints.length).toBeGreaterThanOrEqual(1);
+
+    // --- Title ---
+    expect(analysis.title).toBe('WebSocket Test App');
+  });
+});
+
 test.describe('plugin_analyze_site — mixed auth (cookie + CSRF + Bearer)', () => {
   test('detects all three auth methods from a complex real-world setup', async ({
     mcpServer,

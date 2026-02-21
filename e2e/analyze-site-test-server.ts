@@ -17,6 +17,7 @@
  *   /apikey-app/        — API key header auth with X-API-Key on all API requests
  *   /trpc-app/          — tRPC-style API with /api/trpc/<procedure> endpoints
  *   /mixed-auth/        — Mixed auth: cookie session + CSRF meta/hidden + Bearer token from window global
+ *   /websocket-app/     — WebSocket real-time connection with auth token in URL
  *
  * Start: `bun e2e/analyze-site-test-server.ts`
  * Default port: 0 (dynamic, override with PORT env var)
@@ -624,6 +625,72 @@ const MIXED_AUTH_HTML = `<!DOCTYPE html>
 </html>`;
 
 // ---------------------------------------------------------------------------
+// WebSocket scenario HTML
+// ---------------------------------------------------------------------------
+
+/**
+ * Simulates a real-time web app with a WebSocket connection:
+ * - Page establishes WebSocket with auth token in URL query param
+ * - Server sends periodic messages (simulating real-time updates)
+ * - Also makes a REST API call to test combined detection
+ */
+const WEBSOCKET_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebSocket Test App</title>
+</head>
+<body>
+  <div id="app">
+    <h1>WebSocket Dashboard</h1>
+    <p id="status">Connecting...</p>
+    <ul id="messages"></ul>
+  </div>
+
+  <script>
+    // Delay WebSocket connection to allow the orchestrator to enable
+    // network capture (CDP Network.enable) before the connection fires.
+    setTimeout(function() {
+      // Establish WebSocket connection with auth token in URL
+      var wsUrl = 'ws://' + window.location.host + '/ws?token=ws-auth-token-abc123';
+      var ws = new WebSocket(wsUrl);
+
+      ws.onopen = function() {
+        document.getElementById('status').textContent = 'Connected';
+        ws.send(JSON.stringify({ type: 'subscribe', channel: 'updates' }));
+      };
+
+      ws.onmessage = function(event) {
+        try {
+          var data = JSON.parse(event.data);
+          var li = document.createElement('li');
+          li.textContent = data.message || JSON.stringify(data);
+          document.getElementById('messages').appendChild(li);
+        } catch (e) {
+          // Not JSON, ignore
+        }
+      };
+
+      ws.onerror = function() {
+        document.getElementById('status').textContent = 'WebSocket error';
+      };
+
+      ws.onclose = function() {
+        document.getElementById('status').textContent = 'Disconnected';
+      };
+
+      // Also make a REST API call to test combined detection
+      fetch('/websocket-app/api/config', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(function(res) { return res.json(); }).catch(function() {});
+    }, 1500);
+  </script>
+</body>
+</html>`;
+
+// ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 
@@ -631,9 +698,15 @@ const PORT = process.env.PORT !== undefined ? Number(process.env.PORT) : 0;
 
 const server = Bun.serve({
   port: PORT,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
     const path = url.pathname;
+
+    // --- WebSocket upgrade ---
+    if (path === '/ws') {
+      if (server.upgrade(req)) return undefined as unknown as Response;
+      return new Response('WebSocket upgrade failed', { status: 500 });
+    }
 
     // --- CORS preflight ---
     if (req.method === 'OPTIONS') {
@@ -1205,8 +1278,55 @@ const server = Bun.serve({
       });
     }
 
+    // ===================================================================
+    // WebSocket scenario
+    // ===================================================================
+
+    // Page — serves HTML
+    if (path === '/websocket-app/' || path === '/websocket-app') {
+      return new Response(WEBSOCKET_HTML, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
+    // REST API — GET /websocket-app/api/config (supplementary REST endpoint)
+    if (path === '/websocket-app/api/config' && req.method === 'GET') {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          config: {
+            refreshInterval: 5000,
+            channels: ['updates', 'alerts'],
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
     // --- 404 ---
     return new Response('Not found', { status: 404 });
+  },
+
+  // WebSocket handler for the /ws endpoint
+  websocket: {
+    open(ws) {
+      // Send a welcome message
+      ws.send(JSON.stringify({ type: 'connected', message: 'Welcome to real-time updates' }));
+
+      // Send periodic updates (2 messages, then stop)
+      let count = 0;
+      const interval = setInterval(() => {
+        count++;
+        ws.send(JSON.stringify({ type: 'update', message: `Update #${count}`, timestamp: Date.now() }));
+        if (count >= 2) clearInterval(interval);
+      }, 500);
+    },
+    message(_ws, _message) {
+      // Acknowledge subscriptions but don't need to do anything special
+    },
+    close() {
+      // No cleanup needed
+    },
   },
 });
 
