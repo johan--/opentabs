@@ -109,7 +109,7 @@ const SESSION_COOKIE_PATTERNS = [
 // JWT detection
 // ---------------------------------------------------------------------------
 
-const BASE64URL_SEGMENT = /^[A-Za-z0-9_-]+$/;
+const BASE64URL_SEGMENT = /^[A-Za-z0-9_-]+=*$/;
 
 /** Returns true if the string looks like a JWT (three dot-separated base64url segments). */
 const looksLikeJwt = (value: string): boolean => {
