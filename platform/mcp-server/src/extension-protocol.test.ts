@@ -727,6 +727,104 @@ describe('sendSyncFull', () => {
     const msg = JSON.parse(rawEmpty as string) as { params: { plugins: unknown[] } };
     expect(msg.params.plugins).toEqual([]);
   });
+
+  test('includes iconSvg and iconInactiveSvg in sync.full payload when present', async () => {
+    setupTmpConfigDir();
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'icon-plugin',
+          iconSvg: '<svg>active</svg>',
+          iconInactiveSvg: '<svg>inactive</svg>',
+          tools: [
+            {
+              name: 'my-tool',
+              displayName: 'My Tool',
+              description: 'A tool',
+              icon: 'wrench',
+              iconSvg: '<svg>tool-active</svg>',
+              iconInactiveSvg: '<svg>tool-inactive</svg>',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
+    );
+
+    await sendSyncFull(state);
+
+    expect(ws.sent).toHaveLength(1);
+    const rawIcon = ws.sent[0];
+    expect(rawIcon).toBeDefined();
+    const msg = JSON.parse(rawIcon as string) as {
+      params: {
+        plugins: {
+          name: string;
+          iconSvg?: string;
+          iconInactiveSvg?: string;
+          tools: { name: string; iconSvg?: string; iconInactiveSvg?: string }[];
+        }[];
+      };
+    };
+
+    const plugin = msg.params.plugins[0];
+    expect(plugin).toBeDefined();
+    expect(plugin?.iconSvg).toBe('<svg>active</svg>');
+    expect(plugin?.iconInactiveSvg).toBe('<svg>inactive</svg>');
+
+    const tool = plugin?.tools[0];
+    expect(tool).toBeDefined();
+    expect(tool?.iconSvg).toBe('<svg>tool-active</svg>');
+    expect(tool?.iconInactiveSvg).toBe('<svg>tool-inactive</svg>');
+  });
+
+  test('omits iconSvg and iconInactiveSvg from sync.full payload when absent', async () => {
+    setupTmpConfigDir();
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'no-icon-plugin',
+          tools: [
+            {
+              name: 'plain-tool',
+              displayName: 'Plain Tool',
+              description: 'No icon',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
+    );
+
+    await sendSyncFull(state);
+
+    expect(ws.sent).toHaveLength(1);
+    const rawNoIcon = ws.sent[0];
+    expect(rawNoIcon).toBeDefined();
+    const msg = JSON.parse(rawNoIcon as string) as {
+      params: {
+        plugins: Record<string, unknown>[];
+      };
+    };
+
+    const plugin = msg.params.plugins[0];
+    expect(plugin).toBeDefined();
+    expect('iconSvg' in (plugin as Record<string, unknown>)).toBe(false);
+    expect('iconInactiveSvg' in (plugin as Record<string, unknown>)).toBe(false);
+  });
 });
 
 describe('dispatchToExtension', () => {
@@ -1071,6 +1169,98 @@ describe('handleExtensionMessage — config.getState', () => {
 
     expect(response.result.plugins).toEqual([]);
     expect(response.result.outdatedPlugins).toEqual([]);
+  });
+
+  test('includes iconSvg and iconInactiveSvg in config.getState response when present', () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'icon-plugin',
+          iconSvg: '<svg>active</svg>',
+          iconInactiveSvg: '<svg>inactive</svg>',
+          tools: [
+            {
+              name: 'my-tool',
+              displayName: 'My Tool',
+              description: 'A tool with icon',
+              icon: 'wrench',
+              iconSvg: '<svg>tool-active</svg>',
+              iconInactiveSvg: '<svg>tool-inactive</svg>',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
+    );
+
+    handleExtensionMessage(state, JSON.stringify({ jsonrpc: '2.0', method: 'config.getState', id: 7 }), noopCallbacks);
+
+    const rawIcon = ws.sent[0];
+    expect(rawIcon).toBeDefined();
+    const response = JSON.parse(rawIcon as string) as {
+      result: {
+        plugins: {
+          name: string;
+          iconSvg?: string;
+          iconInactiveSvg?: string;
+          tools: { name: string; iconSvg?: string; iconInactiveSvg?: string }[];
+        }[];
+      };
+    };
+
+    const plugin = response.result.plugins[0];
+    expect(plugin).toBeDefined();
+    expect(plugin?.iconSvg).toBe('<svg>active</svg>');
+    expect(plugin?.iconInactiveSvg).toBe('<svg>inactive</svg>');
+
+    const tool = plugin?.tools[0];
+    expect(tool).toBeDefined();
+    expect(tool?.iconSvg).toBe('<svg>tool-active</svg>');
+    expect(tool?.iconInactiveSvg).toBe('<svg>tool-inactive</svg>');
+  });
+
+  test('omits iconSvg and iconInactiveSvg from config.getState response when absent', () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    state.registry = buildRegistry(
+      [
+        makePlugin({
+          name: 'plain-plugin',
+          tools: [
+            {
+              name: 'plain-tool',
+              displayName: 'Plain Tool',
+              description: 'No icons',
+              icon: 'wrench',
+              input_schema: {},
+              output_schema: {},
+            },
+          ],
+        }),
+      ],
+      [],
+    );
+
+    handleExtensionMessage(state, JSON.stringify({ jsonrpc: '2.0', method: 'config.getState', id: 8 }), noopCallbacks);
+
+    const rawNoIcon = ws.sent[0];
+    expect(rawNoIcon).toBeDefined();
+    const response = JSON.parse(rawNoIcon as string) as {
+      result: { plugins: Record<string, unknown>[] };
+    };
+
+    const plugin = response.result.plugins[0] as Record<string, unknown> | undefined;
+    expect(plugin).toBeDefined();
+    expect('iconSvg' in (plugin as Record<string, unknown>)).toBe(false);
+    expect('iconInactiveSvg' in (plugin as Record<string, unknown>)).toBe(false);
   });
 });
 

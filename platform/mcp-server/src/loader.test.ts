@@ -337,6 +337,117 @@ describe('parseMajorMinor', () => {
   });
 });
 
+describe('loadPlugin — SVG icon extraction', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'opentabs-loader-icon-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const writePluginWithManifest = (
+    dir: string,
+    manifest: Record<string, unknown>,
+    packageJson: Record<string, unknown> = {
+      name: 'opentabs-plugin-test',
+      version: '1.0.0',
+      main: 'dist/adapter.iife.js',
+      opentabs: { displayName: 'Test', description: 'Test', urlPatterns: ['http://localhost/*'] },
+    },
+  ) => {
+    mkdirSync(join(dir, 'dist'), { recursive: true });
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(packageJson));
+    writeFileSync(join(dir, 'dist', 'tools.json'), JSON.stringify(manifest));
+    writeFileSync(join(dir, 'dist', 'adapter.iife.js'), '(function(){})()');
+  };
+
+  test('extracts iconSvg and iconInactiveSvg from manifest object', async () => {
+    const pluginDir = join(tmpDir, 'with-icons');
+    writePluginWithManifest(pluginDir, {
+      sdkVersion: '0.0.16',
+      tools: [{ name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} }],
+      resources: [],
+      prompts: [],
+      iconSvg: '<svg>active</svg>',
+      iconInactiveSvg: '<svg>inactive</svg>',
+    });
+
+    const result = await loadPlugin(pluginDir, 'local', 'local');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.iconSvg).toBe('<svg>active</svg>');
+    expect(result.value.iconInactiveSvg).toBe('<svg>inactive</svg>');
+  });
+
+  test('iconSvg and iconInactiveSvg are undefined when not in manifest', async () => {
+    const pluginDir = join(tmpDir, 'no-icons');
+    writePluginWithManifest(pluginDir, {
+      sdkVersion: '0.0.16',
+      tools: [{ name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} }],
+      resources: [],
+      prompts: [],
+    });
+
+    const result = await loadPlugin(pluginDir, 'local', 'local');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.iconSvg).toBeUndefined();
+    expect(result.value.iconInactiveSvg).toBeUndefined();
+  });
+
+  test('iconSvg is undefined when manifest has non-string value', async () => {
+    const pluginDir = join(tmpDir, 'bad-icon');
+    writePluginWithManifest(pluginDir, {
+      sdkVersion: '0.0.16',
+      tools: [{ name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} }],
+      resources: [],
+      prompts: [],
+      iconSvg: 42,
+      iconInactiveSvg: true,
+    });
+
+    const result = await loadPlugin(pluginDir, 'local', 'local');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.iconSvg).toBeUndefined();
+    expect(result.value.iconInactiveSvg).toBeUndefined();
+  });
+
+  test('icons are undefined for legacy plain-array tools.json format', async () => {
+    const pluginDir = join(tmpDir, 'legacy');
+    mkdirSync(join(pluginDir, 'dist'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'package.json'),
+      JSON.stringify({
+        name: 'opentabs-plugin-test',
+        version: '1.0.0',
+        main: 'dist/adapter.iife.js',
+        opentabs: { displayName: 'Test', description: 'Test', urlPatterns: ['http://localhost/*'] },
+      }),
+    );
+    writeFileSync(
+      join(pluginDir, 'dist', 'tools.json'),
+      JSON.stringify([
+        { name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} },
+      ]),
+    );
+    writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), '(function(){})()');
+
+    const result = await loadPlugin(pluginDir, 'local', 'local');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.iconSvg).toBeUndefined();
+    expect(result.value.iconInactiveSvg).toBeUndefined();
+  });
+});
+
 describe('checkSdkCompatibility', () => {
   test('compatible when plugin sdkVersion is undefined', () => {
     const result = checkSdkCompatibility(undefined, '0.0.16');

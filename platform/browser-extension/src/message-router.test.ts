@@ -513,6 +513,34 @@ describe('validatePluginPayload', () => {
       expect(expectValid(validPayload()).adapterHash).toBeUndefined();
     });
   });
+
+  describe('SVG icon fields', () => {
+    test('extracts iconSvg and iconInactiveSvg when present', () => {
+      const result = expectValid({
+        ...validPayload(),
+        iconSvg: '<svg>active</svg>',
+        iconInactiveSvg: '<svg>inactive</svg>',
+      });
+      expect(result.iconSvg).toBe('<svg>active</svg>');
+      expect(result.iconInactiveSvg).toBe('<svg>inactive</svg>');
+    });
+
+    test('iconSvg is undefined when missing', () => {
+      expect(expectValid(validPayload()).iconSvg).toBeUndefined();
+    });
+
+    test('iconInactiveSvg is undefined when missing', () => {
+      expect(expectValid(validPayload()).iconInactiveSvg).toBeUndefined();
+    });
+
+    test('iconSvg is undefined when non-string', () => {
+      expect(expectValid({ ...validPayload(), iconSvg: 42 }).iconSvg).toBeUndefined();
+    });
+
+    test('iconInactiveSvg is undefined when non-string', () => {
+      expect(expectValid({ ...validPayload(), iconInactiveSvg: true }).iconInactiveSvg).toBeUndefined();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
