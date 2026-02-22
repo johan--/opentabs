@@ -22,7 +22,10 @@ const PluginList = ({
   const visiblePlugins = filterLower
     ? plugins.filter(p =>
         p.tools.some(
-          t => t.name.toLowerCase().includes(filterLower) || t.description.toLowerCase().includes(filterLower),
+          t =>
+            t.displayName.toLowerCase().includes(filterLower) ||
+            t.name.toLowerCase().includes(filterLower) ||
+            t.description.toLowerCase().includes(filterLower),
         ),
       )
     : plugins;
