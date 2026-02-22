@@ -1,4 +1,4 @@
-import { isValidPluginName } from './constants.js';
+import { INJECTION_RETRY_DELAY_MS, isValidPluginName } from './constants.js';
 import { getAllPluginMeta } from './plugin-storage.js';
 import { urlMatchesPatterns } from './tab-matching.js';
 
@@ -230,7 +230,7 @@ const injectAdapterFile = async (
     const hashMatched = await verifyAdapterHash(tabId, pluginName, adapterHash);
     if (!hashMatched) {
       // Retry once after a short delay — the file may have been partially written
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, INJECTION_RETRY_DELAY_MS));
       try {
         await chrome.scripting.executeScript({
           target: { tabId },

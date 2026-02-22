@@ -1,5 +1,6 @@
 import { Button } from './retro/Button.js';
 import { Text } from './retro/Text.js';
+import { COUNTDOWN_POLL_INTERVAL_MS } from '../constants.js';
 import { cn } from '../lib/cn.js';
 import { ShieldAlert, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
@@ -29,7 +30,7 @@ const CountdownBar = ({ timeoutMs, receivedAt }: { timeoutMs: number; receivedAt
       setRemaining(Math.max(0, timeoutMs - elapsed));
     };
     update();
-    const id = setInterval(update, 200);
+    const id = setInterval(update, COUNTDOWN_POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [timeoutMs, receivedAt]);
 

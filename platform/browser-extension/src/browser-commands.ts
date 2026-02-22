@@ -1,5 +1,11 @@
 import { bgLogCollector } from './background-log-state.js';
-import { IS_READY_TIMEOUT_MS, SCRIPT_TIMEOUT_MS, WS_CONNECTED_KEY } from './constants.js';
+import {
+  IS_READY_TIMEOUT_MS,
+  SCREENSHOT_RENDER_DELAY_MS,
+  SCRIPT_TIMEOUT_MS,
+  WS_CONNECTED_KEY,
+  WS_FLUSH_DELAY_MS,
+} from './constants.js';
 import { sendToServer } from './messaging.js';
 import {
   isCapturing,
@@ -288,8 +294,7 @@ export const handleBrowserScreenshotTab = async (
       return;
     }
     await chrome.windows.update(tab.windowId, { focused: true });
-    // Small delay for the tab to render after focus
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, SCREENSHOT_RENDER_DELAY_MS));
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
     const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
     sendToServer({ jsonrpc: '2.0', result: { image: base64 }, id });
@@ -2106,9 +2111,7 @@ export const handleExtensionForceReconnect = async (id: string | number): Promis
     // close it first, the response would never reach the MCP server.
     sendToServer({ jsonrpc: '2.0', result: { reconnecting: true }, id });
 
-    // Small delay so the response flushes over the WebSocket before we
-    // ask the offscreen document to close and reconnect.
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, WS_FLUSH_DELAY_MS));
 
     await chrome.runtime.sendMessage({
       type: 'bg:forceReconnect',
