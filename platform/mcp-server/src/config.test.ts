@@ -62,6 +62,12 @@ describe('loadConfig / saveConfig round-trip', () => {
       localPlugins: ['/path/to/plugin-a', '/path/to/plugin-b'],
       tools: { slack_send_message: false, slack_read_messages: true },
       browserToolPolicy: {},
+      permissions: {
+        trustedDomains: ['localhost', '127.0.0.1'],
+        sensitiveDomains: [],
+        toolPolicy: {},
+        domainToolPolicy: {},
+      },
       secret: 'test-secret-123',
     };
     await saveConfigWrapped(custom);
@@ -196,6 +202,12 @@ describe('tool config round-trip with isToolEnabled', () => {
       localPlugins: [],
       tools: { slack_send: false, slack_read: true },
       browserToolPolicy: {},
+      permissions: {
+        trustedDomains: ['localhost', '127.0.0.1'],
+        sensitiveDomains: [],
+        toolPolicy: {},
+        domainToolPolicy: {},
+      },
       secret: 'test-secret-roundtrip',
     };
     await saveConfigWrapped(config);
@@ -217,6 +229,12 @@ describe('tool config round-trip with isToolEnabled', () => {
       localPlugins: [],
       tools: { slack_send: false },
       browserToolPolicy: {},
+      permissions: {
+        trustedDomains: ['localhost', '127.0.0.1'],
+        sensitiveDomains: [],
+        toolPolicy: {},
+        domainToolPolicy: {},
+      },
       secret: 'test-secret-absent',
     };
     await saveConfigWrapped(config);

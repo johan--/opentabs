@@ -241,6 +241,7 @@ interface HealthResponse {
   pluginDetails: { name: string; displayName: string; toolCount: number; tabState: string; source: string }[];
   toolCount: number;
   disabledBrowserTools: string[];
+  confirmationBypassed: boolean;
   uptime: number;
   reloadCount: number;
   lastReloadTimestamp: number;

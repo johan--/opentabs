@@ -22,6 +22,21 @@ import { join } from 'node:path';
  * start with `./`, `../`, `/`, or `~/` and are resolved relative to the config
  * directory. npm plugins are auto-discovered from global node_modules.
  */
+/** Permission policy for a tool: allow (no confirmation), ask (require confirmation), deny (block) */
+type ToolPermission = 'allow' | 'ask' | 'deny';
+
+/** Permission configuration for browser tool confirmation */
+interface PermissionsConfig {
+  /** Domains where all tools are auto-allowed (supports glob patterns, e.g., '*.example.com') */
+  trustedDomains: string[];
+  /** Domains where all tools require confirmation regardless of tier (supports glob patterns) */
+  sensitiveDomains: string[];
+  /** Per-tool policy overrides: browser tool name → permission */
+  toolPolicy: Record<string, ToolPermission>;
+  /** Per-domain per-tool policy overrides: domain → { tool name → permission } */
+  domainToolPolicy: Record<string, Record<string, ToolPermission>>;
+}
+
 interface OpentabsConfig {
   /** Local plugin directory paths (resolved relative to the config directory) */
   localPlugins: string[];
@@ -29,6 +44,10 @@ interface OpentabsConfig {
   tools: Record<string, boolean>;
   /** Browser tool enabled/disabled state: browser tool name → boolean. Absent = enabled (default). */
   browserToolPolicy: Record<string, boolean>;
+  /** Permission configuration for browser tool confirmation */
+  permissions: PermissionsConfig;
+  /** Whether to skip all confirmation prompts (dangerous — disables human-in-the-loop) */
+  skipConfirmation?: boolean;
   /** Shared secret for WebSocket authentication between MCP server and Chrome extension */
   secret?: string;
 }
@@ -122,6 +141,62 @@ const readConfigWithRetry = async (
 const isLocalPathEntry = (s: string): boolean =>
   s.startsWith('./') || s.startsWith('../') || s.startsWith('/') || s.startsWith('~/');
 
+const VALID_TOOL_PERMISSIONS = new Set<string>(['allow', 'ask', 'deny']);
+
+const isToolPermission = (v: unknown): v is ToolPermission => typeof v === 'string' && VALID_TOOL_PERMISSIONS.has(v);
+
+/** Default permissions config: trust localhost, everything else uses tier defaults */
+const defaultPermissions = (): PermissionsConfig => ({
+  trustedDomains: ['localhost', '127.0.0.1'],
+  sensitiveDomains: [],
+  toolPolicy: {},
+  domainToolPolicy: {},
+});
+
+/** Parse a raw permissions value from config.json into a validated PermissionsConfig */
+const parsePermissionsConfig = (raw: unknown): PermissionsConfig => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return defaultPermissions();
+  }
+  const obj = raw as Record<string, unknown>;
+
+  const trustedDomains = Array.isArray(obj.trustedDomains)
+    ? (obj.trustedDomains as unknown[]).filter((d): d is string => typeof d === 'string')
+    : ['localhost', '127.0.0.1'];
+
+  const sensitiveDomains = Array.isArray(obj.sensitiveDomains)
+    ? (obj.sensitiveDomains as unknown[]).filter((d): d is string => typeof d === 'string')
+    : [];
+
+  const toolPolicy: Record<string, ToolPermission> = {};
+  if (obj.toolPolicy && typeof obj.toolPolicy === 'object' && !Array.isArray(obj.toolPolicy)) {
+    for (const [key, value] of Object.entries(obj.toolPolicy as Record<string, unknown>)) {
+      if (isToolPermission(value)) {
+        toolPolicy[key] = value;
+      }
+    }
+  }
+
+  const domainToolPolicy: Record<string, Record<string, ToolPermission>> = {};
+  if (obj.domainToolPolicy && typeof obj.domainToolPolicy === 'object' && !Array.isArray(obj.domainToolPolicy)) {
+    for (const [domain, tools] of Object.entries(obj.domainToolPolicy as Record<string, unknown>)) {
+      if (tools && typeof tools === 'object' && !Array.isArray(tools)) {
+        const domainEntry: Record<string, ToolPermission> = {};
+        for (const [toolName, perm] of Object.entries(tools as Record<string, unknown>)) {
+          if (isToolPermission(perm)) {
+            domainEntry[toolName] = perm;
+          }
+        }
+        if (Object.keys(domainEntry).length > 0) {
+          domainToolPolicy[domain] = domainEntry;
+        }
+      }
+    }
+  }
+
+  return { trustedDomains, sensitiveDomains, toolPolicy, domainToolPolicy };
+};
+
 /**
  * Parse a raw config record into an OpentabsConfig.
  * Validates and normalizes field types to prevent downstream errors.
@@ -193,9 +268,13 @@ const parseConfigRecord = (record: Record<string, unknown>): Omit<OpentabsConfig
     }
   }
 
+  // Parse permissions config with defensive validation
+  const permissions = parsePermissionsConfig(record.permissions);
+
+  const skipConfirmation = typeof record.skipConfirmation === 'boolean' ? record.skipConfirmation : undefined;
   const secret = typeof record.secret === 'string' ? record.secret : undefined;
 
-  return { localPlugins, tools, browserToolPolicy, secret };
+  return { localPlugins, tools, browserToolPolicy, permissions, skipConfirmation, secret };
 };
 
 /**
@@ -216,7 +295,13 @@ const loadConfig = async (): Promise<OpentabsConfig> => {
   const configFile = Bun.file(configPath);
   if (!(await configFile.exists())) {
     // First run — create default config with a fresh shared secret
-    const config: OpentabsConfig = { localPlugins: [], tools: {}, browserToolPolicy: {}, secret: generateSecret() };
+    const config: OpentabsConfig = {
+      localPlugins: [],
+      tools: {},
+      browserToolPolicy: {},
+      permissions: defaultPermissions(),
+      secret: generateSecret(),
+    };
     await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
     log.info(`Created default config at ${configPath}`);
     return config;
@@ -300,6 +385,8 @@ const saveToolConfig = async (
       localPlugins: current.localPlugins,
       tools,
       browserToolPolicy: current.browserToolPolicy,
+      permissions: current.permissions,
+      skipConfirmation: current.skipConfirmation,
       secret: current.secret,
     };
     await atomicWriteConfig(configPath, JSON.stringify(updated, null, 2) + '\n');
@@ -338,7 +425,7 @@ const writeAuthFile = async (secret: string, port: number): Promise<void> => {
   }
 };
 
-export type { OpentabsConfig };
+export type { OpentabsConfig, PermissionsConfig, ToolPermission };
 export {
   loadConfig,
   saveConfig,

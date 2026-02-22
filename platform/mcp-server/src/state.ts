@@ -8,6 +8,7 @@
  */
 
 import type { BrowserToolDefinition } from './browser-tools/definition.js';
+import type { PermissionsConfig } from './config.js';
 import type {
   TabState,
   TrustTier,
@@ -250,6 +251,10 @@ export interface ServerState {
   discoveryErrors: ReadonlyArray<{ specifier: string; error: string }>;
   /** Circular buffer of recent tool invocations for diagnostics and monitoring */
   auditLog: AuditEntry[];
+  /** Whether confirmation prompts are bypassed (from CLI flag, env var, or config) */
+  skipConfirmation: boolean;
+  /** Permission rules for browser tool confirmation */
+  permissions: PermissionsConfig;
 }
 
 /** Increment when changing the type of an existing ServerState field */
@@ -294,6 +299,13 @@ export const createState = (): ServerState => ({
   mtimePollDetectionTimestamps: [],
   discoveryErrors: [],
   auditLog: [],
+  skipConfirmation: false,
+  permissions: {
+    trustedDomains: ['localhost', '127.0.0.1'],
+    sensitiveDomains: [],
+    toolPolicy: {},
+    domainToolPolicy: {},
+  },
 });
 
 /** Generate a cryptographically random JSON-RPC request ID */

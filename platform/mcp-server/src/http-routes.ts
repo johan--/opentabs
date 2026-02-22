@@ -333,6 +333,7 @@ const createHandleFetch =
         discoveryErrors: [...state.discoveryErrors],
         toolCount,
         disabledBrowserTools,
+        confirmationBypassed: state.skipConfirmation,
         uptime: uptimeSeconds,
         reloadCount: hs?.reloadCount ?? 0,
         lastReloadTimestamp: hs?.lastReloadTimestamp ?? 0,

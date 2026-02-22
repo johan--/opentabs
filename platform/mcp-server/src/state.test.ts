@@ -34,6 +34,11 @@ describe('createState', () => {
     expect(state.cachedBrowserTools).toEqual([]);
     expect(state.activeDispatches).toBeInstanceOf(Map);
     expect(state.activeDispatches.size).toBe(0);
+    expect(state.skipConfirmation).toBe(false);
+    expect(state.permissions.trustedDomains).toEqual(['localhost', '127.0.0.1']);
+    expect(state.permissions.sensitiveDomains).toEqual([]);
+    expect(state.permissions.toolPolicy).toEqual({});
+    expect(state.permissions.domainToolPolicy).toEqual({});
   });
 
   test('returns a fresh state on each call (no shared references)', () => {

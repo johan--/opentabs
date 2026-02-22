@@ -28,6 +28,7 @@ import {
   notifyPromptListChanged,
 } from './mcp-setup.js';
 import { buildRegistry } from './registry.js';
+import { isCliSkipConfirmation } from './skip-confirmation.js';
 import { prefixedToolName } from './state.js';
 import { checkForUpdates } from './version-check.js';
 import type { McpServerInstance } from './mcp-setup.js';
@@ -178,6 +179,8 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     state.pluginPaths = [...config.localPlugins];
     state.wsSecret = config.secret ?? null;
     state.discoveryErrors = errors;
+    state.permissions = config.permissions;
+    state.skipConfirmation = isCliSkipConfirmation() || config.skipConfirmation === true;
 
     if (errors.length > 0) {
       log.warn(`${errors.length} plugin(s) failed to load:`);
