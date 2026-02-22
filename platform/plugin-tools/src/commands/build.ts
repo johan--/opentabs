@@ -457,7 +457,21 @@ if (existing) {
     try { existing.teardown(); } catch (e) { console.warn('[OpenTabs] teardown failed for ' + ${name} + ':', e); }
   }
 }
-Reflect.deleteProperty(adapters, ${name});
+// Remove the old adapter property. If it's non-configurable (locked by
+// hashAndFreeze), rebuild the adapters container with all other adapters
+// and replace __openTabs on globalThis.
+if (!Reflect.deleteProperty(adapters, ${name})) {
+  const ot = (globalThis as any).__openTabs;
+  const newAdapters: Record<string, any> = {};
+  for (const key of Object.keys(adapters)) {
+    if (key !== ${name}) {
+      const desc = Object.getOwnPropertyDescriptor(adapters, key);
+      if (desc) Object.defineProperty(newAdapters, key, desc);
+    }
+  }
+  delete (globalThis as any).__openTabs;
+  (globalThis as any).__openTabs = Object.assign({}, ot, { adapters: newAdapters });
+}
 
 // Wire onToolInvocationStart / onToolInvocationEnd around each tool.handle()
 if (typeof plugin.onToolInvocationStart === 'function' || typeof plugin.onToolInvocationEnd === 'function') {
@@ -485,7 +499,9 @@ if (typeof plugin.onToolInvocationStart === 'function' || typeof plugin.onToolIn
   }
 }
 
-adapters[${name}] = plugin;
+// Re-read the adapters reference (may have been rebuilt above)
+const currentAdapters = (globalThis as any).__openTabs.adapters;
+currentAdapters[${name}] = plugin;
 
 // Wire onActivate
 if (typeof plugin.onActivate === 'function') {
@@ -669,16 +685,15 @@ const runBuild = async (projectDir: string): Promise<void> => {
   // Append a self-contained snippet that sets the adapter hash and then freezes
   // the adapter entry to prevent cross-adapter tampering. The freeze must happen
   // AFTER the hash is set (since frozen objects reject new properties). The
-  // property descriptor uses writable:false + configurable:true so that:
+  // property descriptor uses writable:false + configurable:false so that:
   //   - Simple assignment by page scripts fails (non-writable)
-  //   - Re-injection via Object.defineProperty succeeds (configurable)
-  //   - Extension cleanup via Reflect.deleteProperty succeeds (configurable)
-  // The adapters container reference on __openTabs is also locked down with
-  // writable:false + configurable:true, preventing page scripts from replacing
-  // the entire adapters map via simple assignment while still allowing the
-  // extension to redefine it via Object.defineProperty if needed.
+  //   - Object.defineProperty by page scripts fails (non-configurable)
+  //   - Reflect.deleteProperty by page scripts fails (non-configurable)
+  // Re-injection and cleanup are handled by the IIFE wrapper and the
+  // extension's cleanup script, which rebuild the adapters container on
+  // globalThis when deletion of a non-configurable property fails.
   const hashAndFreeze = `
-(function(){var o=(globalThis).__openTabs;if(o&&o.adapters&&o.adapters[${JSON.stringify(plugin.name)}]){var a=o.adapters[${JSON.stringify(plugin.name)}];a.__adapterHash=${JSON.stringify(adapterHash)};if(a.tools&&Array.isArray(a.tools)){for(var i=0;i<a.tools.length;i++){Object.freeze(a.tools[i]);}Object.freeze(a.tools);}Object.freeze(a);Object.defineProperty(o.adapters,${JSON.stringify(plugin.name)},{value:a,writable:false,configurable:true,enumerable:true});Object.defineProperty(o,"adapters",{value:o.adapters,writable:false,configurable:true});}})();
+(function(){var o=(globalThis).__openTabs;if(o&&o.adapters&&o.adapters[${JSON.stringify(plugin.name)}]){var a=o.adapters[${JSON.stringify(plugin.name)}];a.__adapterHash=${JSON.stringify(adapterHash)};if(a.tools&&Array.isArray(a.tools)){for(var i=0;i<a.tools.length;i++){Object.freeze(a.tools[i]);}Object.freeze(a.tools);}Object.freeze(a);Object.defineProperty(o.adapters,${JSON.stringify(plugin.name)},{value:a,writable:false,configurable:false,enumerable:true});Object.defineProperty(o,"adapters",{value:o.adapters,writable:false,configurable:false});}})();
 `;
   await Bun.write(iifePath, iifeContent + hashAndFreeze);
   const iifeSize = (await Bun.file(iifePath).stat()).size;

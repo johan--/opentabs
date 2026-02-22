@@ -434,7 +434,22 @@ export const cleanupAdaptersInMatchingTabs = async (pluginName: string, urlPatte
                   console.warn('[opentabs] teardown error:', e);
                 }
               }
-              Reflect.deleteProperty(adapters, pName);
+              // Attempt deletion; if the property is non-configurable (locked
+              // by hashAndFreeze), rebuild the adapters container without the
+              // removed plugin and replace __openTabs on globalThis.
+              if (!Reflect.deleteProperty(adapters, pName)) {
+                const newAdapters: Record<string, unknown> = {};
+                for (const key of Object.keys(adapters)) {
+                  if (key !== pName) {
+                    const desc = Object.getOwnPropertyDescriptor(adapters, key);
+                    if (desc) Object.defineProperty(newAdapters, key, desc);
+                  }
+                }
+                delete (globalThis as Record<string, unknown>).__openTabs;
+                (globalThis as Record<string, unknown>).__openTabs = Object.assign({}, ot, {
+                  adapters: newAdapters,
+                });
+              }
             }
           },
           args: [pluginName],

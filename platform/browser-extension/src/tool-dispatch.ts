@@ -184,6 +184,17 @@ const executeToolOnTab = async (
         return { type: 'error' as const, code: -32002, message: `Adapter "${pName}" not injected or not ready` };
       }
 
+      // Defense-in-depth: reject adapters that are not frozen. Legitimate
+      // adapters are always frozen by the hashAndFreeze snippet appended to
+      // the IIFE. An unfrozen adapter indicates tampering by a page script.
+      if (!Object.isFrozen(adapter)) {
+        return {
+          type: 'error' as const,
+          code: -32002,
+          message: `Adapter "${pName}" failed integrity check (not frozen)`,
+        };
+      }
+
       if (typeof adapter.isReady !== 'function') {
         return { type: 'error' as const, code: -32002, message: `Adapter "${pName}" has no isReady function` };
       }

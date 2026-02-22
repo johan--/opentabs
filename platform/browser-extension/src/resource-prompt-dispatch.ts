@@ -46,6 +46,14 @@ const executeResourceReadOnTab = async (
         return { type: 'error' as const, code: -32002, message: `Adapter "${pName}" not injected or not ready` };
       }
 
+      if (!Object.isFrozen(adapter)) {
+        return {
+          type: 'error' as const,
+          code: -32002,
+          message: `Adapter "${pName}" failed integrity check (not frozen)`,
+        };
+      }
+
       if (typeof adapter.isReady !== 'function') {
         return { type: 'error' as const, code: -32002, message: `Adapter "${pName}" has no isReady function` };
       }
@@ -149,6 +157,14 @@ const executePromptGetOnTab = async (
       const adapter = ot?.adapters?.[pName];
       if (!adapter || typeof adapter !== 'object') {
         return { type: 'error' as const, code: -32002, message: `Adapter "${pName}" not injected or not ready` };
+      }
+
+      if (!Object.isFrozen(adapter)) {
+        return {
+          type: 'error' as const,
+          code: -32002,
+          message: `Adapter "${pName}" failed integrity check (not frozen)`,
+        };
       }
 
       if (typeof adapter.isReady !== 'function') {
