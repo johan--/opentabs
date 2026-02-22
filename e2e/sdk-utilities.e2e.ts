@@ -180,4 +180,56 @@ test.describe('SDK utilities — full stack', () => {
 
     await page.close();
   });
+
+  test('removeLocalStorage: removes a key from localStorage', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    const page = await setupSdkTest(mcpServer, testServer, extensionContext, mcpClient);
+
+    // Set a localStorage key on the page to be removed by the tool
+    await page.evaluate(() => localStorage.setItem('removeMe', 'value'));
+
+    const output = await callToolExpectSuccess(mcpClient, mcpServer, 'e2e-test_sdk_remove_storage', {
+      storageType: 'local',
+      key: 'removeMe',
+    });
+
+    expect(output.existed).toBe(true);
+    expect(output.afterRemoval).toBe(false);
+
+    // Verify from the page context that the key is gone
+    const valueAfter = await page.evaluate(() => localStorage.getItem('removeMe'));
+    expect(valueAfter).toBeNull();
+
+    await page.close();
+  });
+
+  test('removeSessionStorage: removes a key from sessionStorage', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    const page = await setupSdkTest(mcpServer, testServer, extensionContext, mcpClient);
+
+    // Set a sessionStorage key on the page to be removed by the tool
+    await page.evaluate(() => sessionStorage.setItem('removeMe', 'session-value'));
+
+    const output = await callToolExpectSuccess(mcpClient, mcpServer, 'e2e-test_sdk_remove_storage', {
+      storageType: 'session',
+      key: 'removeMe',
+    });
+
+    expect(output.existed).toBe(true);
+    expect(output.afterRemoval).toBe(false);
+
+    // Verify from the page context that the key is gone
+    const valueAfter = await page.evaluate(() => sessionStorage.getItem('removeMe'));
+    expect(valueAfter).toBeNull();
+
+    await page.close();
+  });
 });
