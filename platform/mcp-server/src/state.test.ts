@@ -35,7 +35,6 @@ describe('createState', () => {
     expect(state.activeDispatches).toBeInstanceOf(Map);
     expect(state.activeDispatches.size).toBe(0);
     expect(state.skipConfirmation).toBe(false);
-    expect(state.skipSanitization).toBe(false);
     expect(state.permissions.trustedDomains).toEqual(['localhost', '127.0.0.1']);
     expect(state.permissions.sensitiveDomains).toEqual([]);
     expect(state.permissions.toolPolicy).toEqual({});

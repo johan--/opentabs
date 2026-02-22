@@ -340,7 +340,6 @@ const createHandleFetch =
         toolCount,
         disabledBrowserTools,
         confirmationBypassed: state.skipConfirmation,
-        outputSanitizationEnabled: !state.skipSanitization,
         uptime: uptimeSeconds,
         reloadCount: hs?.reloadCount ?? 0,
         lastReloadTimestamp: hs?.lastReloadTimestamp ?? 0,

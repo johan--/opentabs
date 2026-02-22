@@ -32,7 +32,6 @@ import { log } from './logger.js';
 import { evaluatePermission } from './permissions.js';
 import { getResource, getPrompt, listAllResources, listAllPrompts, trustTierPrefix } from './registry.js';
 import { sanitizeErrorMessage } from './sanitize-error.js';
-import { sanitizeToolOutput } from './sanitize-tool-output.js';
 import { prefixedToolName, isToolEnabled, isBrowserToolEnabled, appendAuditEntry, isSessionAllowed } from './state.js';
 import { version } from './version.js';
 import {
@@ -493,9 +492,8 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
       try {
         const result = await cachedBt.tool.handler(parseResult.data, state);
         const cleaned = sanitizeOutput(result);
-        const output = state.skipSanitization ? cleaned : sanitizeToolOutput(cleaned);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(output, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(cleaned, null, 2) }],
         };
       } catch (err) {
         btSuccess = false;
@@ -645,10 +643,8 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
       );
       const rawOutput = (result as Record<string, unknown>).output ?? result;
       const cleaned = sanitizeOutput(rawOutput);
-      const output = state.skipSanitization ? cleaned : sanitizeToolOutput(cleaned);
-
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(output, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(cleaned, null, 2) }],
       };
     } catch (err) {
       success = false;

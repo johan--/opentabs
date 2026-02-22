@@ -242,7 +242,6 @@ interface HealthResponse {
   toolCount: number;
   disabledBrowserTools: string[];
   confirmationBypassed: boolean;
-  outputSanitizationEnabled: boolean;
   uptime: number;
   reloadCount: number;
   lastReloadTimestamp: number;
