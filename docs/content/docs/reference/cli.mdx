@@ -149,16 +149,31 @@ opentabs audit [options]
       <Table.Cell>Filter by plugin name.</Table.Cell>
     </Table.Row>
     <Table.Row>
+      <Table.Cell className="font-medium">`--tool <name>`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Filter by tool name (e.g., `slack_send_message`).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--since <duration>`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Show entries from the last duration. Format: `<number>[smhd]` (e.g., `30m`, `1h`, `2d`).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
       <Table.Cell className="font-medium">`--json`</Table.Cell>
       <Table.Cell>—</Table.Cell>
       <Table.Cell>Output raw JSON from the audit endpoint.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--file`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Read from persistent disk log (`~/.opentabs/audit.log`) instead of the running server.</Table.Cell>
     </Table.Row>
   </Table.Body>
 </Table>
 
 Each entry shows the timestamp, tool name, success/failure status, and duration. Failed entries include the error code, category, and message when using `--json`.
 
-The server maintains the last 500 tool invocations in memory. The audit log resets when the server restarts.
+The server maintains the last 500 tool invocations in memory. The audit log resets when the server restarts. Use `--file` to read from the persistent disk log at `~/.opentabs/audit.log`, which survives server restarts.
 
 ```bash
 # Show last 20 invocations
@@ -166,6 +181,18 @@ opentabs audit
 
 # Show last 50, filtered to one plugin
 opentabs audit --limit 50 --plugin slack
+
+# Filter by tool name
+opentabs audit --tool slack_send_message
+
+# Show invocations from the last hour
+opentabs audit --since 1h
+
+# Combine filters
+opentabs audit --tool slack_send_message --since 30m
+
+# Read from persistent disk log
+opentabs audit --file
 
 # Raw JSON output
 opentabs audit --json
