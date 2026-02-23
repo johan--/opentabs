@@ -1,3 +1,10 @@
+## v0.0.22
+
+### Bug Fixes
+
+- isolate test configs so unit tests don't pollute ~/.opentabs/config.json
+- publish mcp-server to npm, skip stale plugin paths in side panel, resolve scaffold versions from SDK
+
 # Changelog
 
 ## v0.0.19
