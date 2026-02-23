@@ -77,3 +77,46 @@ The side panel theme (`styles.css`) and the docs theme (`docs/app/global.css`) s
 ## Sizing Constraints
 
 The side panel runs inside a Chrome extension popup with limited viewport width. Elements nested inside fixed-height containers (e.g., a button inside a header bar) must respect their parent's dimensions. Do not apply blanket sizing rules (like 44px touch targets) to elements inside constrained containers — this causes overflow.
+
+---
+
+## React Best Practices
+
+This project uses **React 19** (`^19.2.4`) with the automatic JSX runtime (`react-jsx`). Prefer modern React features and patterns, but **only when they fit the problem** — do not adopt a feature just because it is new. Every API choice should have a clear justification rooted in the current code, not in novelty.
+
+- **Lift state to the right level** — if state needs to persist across component mount/unmount cycles, lift it to the parent rather than introducing complex patterns.
+- **Minimize `useEffect`** — prefer derived state (inline computation) over effects that sync state. Effects are for external system synchronization (Chrome APIs, event listeners), not for state derivation.
+- **`useRef` for non-rendering values** — timers, previous values, and DOM references belong in refs, not state.
+- **`useMemo`/`useCallback` only when justified** — do not wrap trivial computations (array filters, string formatting) in `useMemo`. Reserve memoization for genuinely expensive calculations or when a stable reference is required (e.g., effect dependencies, context values).
+
+---
+
+## UI Component Authoring
+
+When creating new UI components for the side panel (`src/side-panel/components/retro/`):
+
+- **Prefer native HTML behavior over libraries for simple controls.** For inputs like number steppers, use native `<input type="number">` with `defaultValue` (uncontrolled) — the browser handles digit-only filtering, ArrowUp/Down stepping, and min/max clamping for free. Only reach for a headless library (Radix UI, React Aria) when the interaction pattern genuinely cannot be achieved with native HTML.
+- **Use Radix UI for complex interaction patterns.** The project uses **Radix UI** for primitives that require non-trivial accessibility and interaction logic (Accordion, Switch, Tooltip, Slot). Check Radix first before hand-rolling complex behavior like modals, popovers, or multi-select.
+- **Uncontrolled by default for commit-on-blur inputs.** When a value is only meaningful once committed (e.g., port number, URL), use `defaultValue` with an `onBlur`/`onKeyDown` commit handler. Controlled inputs (`value` + `onChange`) fight the user's typing by re-rendering on every keystroke. Only use controlled mode when the parent must dictate the displayed value in real time.
+- **Layer: styled primitive → app component.** The retro component in `components/retro/` applies the design system (border-2, shadow-sm, theme colors, font-mono). The app component (e.g., `PortEditor`) handles business logic (storage, messaging). Keep these layers separate.
+- **Every retro component gets a Storybook story** (`*.stories.tsx` alongside the component). Cover at minimum: default state, edge-case values, disabled state, and an "all states" composite story.
+
+---
+
+## Extension-Specific Concepts
+
+### Tab State Machine
+
+Each plugin has three tab states: `closed` (no matching tab), `unavailable` (tab exists but `isReady()` returns false), and `ready` (tab exists and authenticated). The extension reports state changes to the MCP server.
+
+### Port Configuration
+
+The MCP server port is configured in the side panel footer, stored in `chrome.storage.local` under the `serverPort` key (number, default 9515). The side panel footer displays the current port on the right side and supports inline editing — click to edit, Enter to save, Escape to cancel. When the port changes, the side panel sends a `port-changed` message through the background script to the offscreen document, which closes the current WebSocket and reconnects to the new port. The port is not stored in `auth.json` — auth.json contains only the secret.
+
+### Side Panel Empty States
+
+When the side panel has 0 plugins, it shows a simple "No Plugins Installed" card directing users to `opentabs plugin`. Connection state takes priority over plugin count. The side panel distinguishes two disconnect states: (1) **Connection refused** (server unreachable) — shows "Cannot Reach MCP Server" with `opentabs start --port <N>` where N is the configured port, and (2) **Authentication failed** (HTTP 401 from secret mismatch) — shows "Authentication Failed" with instructions to reload the extension from `chrome://extensions/`. The disconnect reason flows from the offscreen document through the background script to the side panel via `disconnectReason` fields on connection state messages.
+
+### Debugger Permission
+
+The `debugger` permission in the manifest is required for network capture via the Chrome DevTools Protocol (`chrome.debugger.attach`, `Network.enable`, `Runtime.enable`) in `network-capture.ts`.

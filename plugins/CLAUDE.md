@@ -1,0 +1,35 @@
+# Plugins Instructions
+
+## Overview
+
+Plugins in `plugins/` are **fully standalone projects** — exactly as if created by an external developer using `create-opentabs-plugin`. They are NOT part of the root bun workspace.
+
+## Plugin Isolation
+
+Each plugin:
+
+- Has its own `package.json`, `tsconfig.json`, `.prettierrc`, and `.gitignore`
+- Depends on published `@opentabs-dev/*` npm packages (not `file:` or `workspace:` links)
+- Has its own `node_modules/` and `bun.lock`
+- Is **excluded** from root `eslint`, `prettier`, `knip`, and `tsc --build`
+- Must build and type-check independently: `cd plugins/<name> && bun run build`
+
+The root tooling (`bun run build`, `bun run lint`, etc.) does NOT cover plugins. When changing platform packages that plugins depend on (`shared`, `plugin-sdk`, `plugin-tools`), publish new versions to npm and update plugin dependencies.
+
+## Adding a New Plugin
+
+Each plugin follows the same pattern:
+
+1. **Create the plugin** (`plugins/<name>/`): Extend `OpenTabsPlugin` from `@opentabs-dev/plugin-sdk`
+2. **Configure `package.json`**: Add an `opentabs` field with `displayName`, `description`, and `urlPatterns`; set `main` to `dist/adapter.iife.js`
+3. **Define tools** (`plugins/<name>/src/tools/`): One file per tool using `defineTool()` with Zod schemas. The `handle(params, context?)` function receives an optional `ToolHandlerContext` as its second argument for reporting progress during long-running operations
+4. **Optionally define resources and prompts**: Use `defineResource()` for data the plugin can expose (read via `resources/read`) and `definePrompt()` for prompt templates (rendered via `prompts/get`). Assign them to the `resources` and `prompts` properties on the plugin class
+5. **Build**: `cd plugins/<name> && bun install && bun run build` (runs `tsc` then `opentabs-plugin build`, which produces `dist/adapter.iife.js` and `dist/tools.json`, auto-registers the plugin in `localPlugins`, and calls `POST /reload` to notify the MCP server)
+
+## Building Plugins
+
+```bash
+cd plugins/<name> && bun install && bun run build
+```
+
+`opentabs-plugin build` auto-registers the plugin in `localPlugins` (first build only) and calls `POST /reload` to trigger server rediscovery. In dev mode, the file watcher also detects changes to `dist/tools.json` and `dist/adapter.iife.js`.

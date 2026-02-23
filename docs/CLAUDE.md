@@ -95,3 +95,14 @@ All illustrations live in `docs/components/illustrations.tsx` and are registered
 | `HowItWorks`               | `docs/content/docs/index.mdx`                     | 3-step runtime flow overview          |
 | `InstallPaths`             | `docs/content/docs/install/index.mdx`             | Three installation path options       |
 | `FirstPluginFlow`          | `docs/content/docs/first-plugin.mdx`              | 5-step plugin creation workflow       |
+
+## Documentation Tone
+
+The docs follow a progressive audience path: **normal user** (Quick Start, Installation) → **plugin developer** (Guides, SDK Reference) → **platform contributor** (Contributing). The tone is:
+
+- **Friendly and accessible** — no jargon without explanation, no assumptions about prior knowledge
+- **Step-by-step and hand-holding** — explicit numbered steps, one action per step
+- **Show before tell** — lead with a visual or code example, then explain
+- **Concrete over abstract** — real commands, real output, real file paths
+
+Illustrations should match this tone: clear, labeled, approachable. Prefer showing the "happy path" flow over comprehensive architecture diagrams. Use annotations and labels generously.
