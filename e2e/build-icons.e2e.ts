@@ -9,7 +9,7 @@
  * files, and runs the build as a subprocess.
  */
 
-import { test, expect, E2E_TEST_PLUGIN_DIR, ROOT } from './fixtures.js';
+import { test, expect, E2E_TEST_PLUGIN_DIR, ROOT, symlinkCrossPlatform } from './fixtures.js';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,7 +33,7 @@ const copyPlugin = (destDir: string): void => {
     recursive: true,
     filter: (src: string) => !src.includes('node_modules'),
   });
-  fs.symlinkSync(path.join(E2E_TEST_PLUGIN_DIR, 'node_modules'), path.join(destDir, 'node_modules'), 'dir');
+  symlinkCrossPlatform(path.join(E2E_TEST_PLUGIN_DIR, 'node_modules'), path.join(destDir, 'node_modules'), 'dir');
 };
 
 /**

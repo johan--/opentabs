@@ -32,6 +32,7 @@ import {
   createTestConfigDir,
   cleanupTestConfigDir,
   createMcpClient,
+  symlinkCrossPlatform,
 } from './fixtures.js';
 import {
   waitForExtensionConnected,
@@ -385,7 +386,7 @@ test.describe('WebSocket authentication', () => {
     expect(result).not.toBe('timeout');
   });
 
-  test('/ws-info returns URL and secret as separate fields', async ({ mcpServer }) => {
+  test('/ws-info returns URL without leaking the secret', async ({ mcpServer }) => {
     const headers: Record<string, string> = {};
     if (mcpServer.secret) headers['Authorization'] = `Bearer ${mcpServer.secret}`;
     const res = await fetch(`http://localhost:${mcpServer.port}/ws-info`, {
@@ -398,8 +399,10 @@ test.describe('WebSocket authentication', () => {
     const info = (await res.json()) as { wsUrl: string; wsSecret?: string };
     expect(info.wsUrl).toBe(`ws://localhost:${mcpServer.port}/ws`);
     expect(info.wsUrl).not.toContain('token=');
-    expect(typeof info.wsSecret).toBe('string');
-    expect((info.wsSecret ?? '').length).toBeGreaterThan(0);
+    // The server intentionally does not return wsSecret in the response body
+    // to prevent leaking it in HTTP responses. The extension already has the
+    // secret from auth.json (written to the extension directory at install time).
+    expect(info.wsSecret).toBeUndefined();
   });
 
   test('authenticated WS connection via sec-websocket-protocol succeeds and exchanges ping/pong', async ({
@@ -637,7 +640,7 @@ test.describe('extension_reload', () => {
     const extensionAdaptersDir = path.join(extensionDir, 'adapters');
     // Remove old symlink/directory and create new one
     fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
-    fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+    symlinkCrossPlatform(extensionAdaptersDir, serverAdaptersDir, 'dir');
 
     mcpServer.logs.length = 0;
 
@@ -783,7 +786,7 @@ test.describe('URL change reconnection', () => {
       fs.mkdirSync(serverBAdaptersParent, { recursive: true });
       const serverBAdaptersDir = path.join(serverBAdaptersParent, 'adapters');
       fs.rmSync(serverBAdaptersDir, { recursive: true, force: true });
-      fs.symlinkSync(extensionAdaptersDir, serverBAdaptersDir);
+      symlinkCrossPlatform(extensionAdaptersDir, serverBAdaptersDir, 'dir');
 
       // Write auth.json into the extension copy so the offscreen document
       // can bootstrap the secret for server B. The extension copy's

@@ -13,6 +13,7 @@
 import { installExtension } from './setup.js';
 import { getConfigDir, getLogFilePath } from '../config.js';
 import { parsePort, resolvePort } from '../parse-port.js';
+import { isWindows, platformExec } from '@opentabs-dev/shared';
 import pc from 'picocolors';
 import { mkdirSync, createWriteStream } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -170,7 +171,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
   console.log(pc.dim('  Press Ctrl+C to stop'));
   console.log('');
 
-  const proc = Bun.spawn(['bun', serverEntry], {
+  const proc = Bun.spawn([platformExec('bun'), serverEntry], {
     env: env as Record<string, string>,
     stdio: ['inherit', 'pipe', 'pipe'],
   });
@@ -179,7 +180,9 @@ const handleStart = async (options: StartOptions): Promise<void> => {
   const stderrPipe = teeStream(proc.stderr, process.stderr, logStream);
 
   process.on('SIGINT', () => proc.kill('SIGINT'));
-  process.on('SIGTERM', () => proc.kill('SIGTERM'));
+  if (!isWindows()) {
+    process.on('SIGTERM', () => proc.kill('SIGTERM'));
+  }
 
   await Promise.all([stdoutPipe, stderrPipe]);
   logStream.end();

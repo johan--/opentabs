@@ -11,10 +11,10 @@
  */
 
 import { log } from './logger.js';
-import { ok, err } from '@opentabs-dev/shared';
+import { ok, err, platformExec } from '@opentabs-dev/shared';
 import { readdir, realpath, stat } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import type { Result } from '@opentabs-dev/shared';
 
 /**
@@ -50,7 +50,7 @@ const isAllowedPluginPath = async (resolvedPath: string): Promise<boolean> => {
 
   // Deduplicate: on macOS, raw /var/... and resolved /private/var/... differ
   const allRoots = [...new Set([...rawRoots, ...realRoots])];
-  return allRoots.some(root => realPath.startsWith(root + '/') || realPath === root);
+  return allRoots.some(root => realPath.startsWith(root + sep) || realPath === root);
 };
 
 /**
@@ -157,7 +157,7 @@ const getGlobalNodeModulesPaths = (): string[] => {
 
   // npm global node_modules
   try {
-    const result = Bun.spawnSync(['npm', 'root', '-g']);
+    const result = Bun.spawnSync([platformExec('npm'), 'root', '-g']);
     if (result.exitCode === 0) {
       const npmPath = result.stdout.toString().trim();
       if (npmPath.length > 0) paths.push(npmPath);
@@ -168,7 +168,7 @@ const getGlobalNodeModulesPaths = (): string[] => {
 
   // bun global node_modules (derive from bin path: .../bin → .../node_modules)
   try {
-    const result = Bun.spawnSync(['bun', 'pm', '-g', 'bin']);
+    const result = Bun.spawnSync([platformExec('bun'), 'pm', '-g', 'bin']);
     if (result.exitCode === 0) {
       const bunBinPath = result.stdout.toString().trim();
       if (bunBinPath.length > 0) {

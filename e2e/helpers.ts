@@ -13,6 +13,7 @@ import {
   launchExtensionContext,
   createMcpClient,
   cleanupTestConfigDir,
+  symlinkCrossPlatform,
 } from './fixtures.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -64,7 +65,7 @@ export const setupAdapterSymlink = (configDir: string, extensionDir: string): vo
   const extensionAdaptersDir = path.join(extensionDir, 'adapters');
   fs.mkdirSync(extensionAdaptersDir, { recursive: true });
   fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
-  fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+  symlinkCrossPlatform(extensionAdaptersDir, serverAdaptersDir, 'dir');
 };
 
 // ---------------------------------------------------------------------------

@@ -329,6 +329,20 @@ const copyE2eTestPlugin = (): { pluginDir: string; tmpDir: string } => {
  */
 const killProcess = (proc: ChildProcess, graceMs = 5_000): Promise<void> => {
   if (proc.exitCode !== null) return Promise.resolve();
+
+  // On Windows, SIGTERM is unreliable — proc.kill() calls TerminateProcess
+  // which is immediate (equivalent to SIGKILL). No grace period needed.
+  if (process.platform === 'win32') {
+    return new Promise<void>(resolve => {
+      proc.once('exit', () => resolve());
+      try {
+        proc.kill();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
   return new Promise<void>(resolve => {
     const onExit = () => {
       clearTimeout(fallback);
@@ -1293,7 +1307,7 @@ const test = base.extend<TestFixtures>({
     const serverAdaptersDir = path.join(serverAdaptersParent, 'adapters');
     const extensionAdaptersDir = path.join(extensionDir, 'adapters');
     fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
-    fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+    symlinkCrossPlatform(extensionAdaptersDir, serverAdaptersDir, 'dir');
 
     // Symlink auth.json so the extension copy always sees the latest secret
     // and port. The MCP server writes auth.json to <configDir>/extension/
@@ -1303,7 +1317,7 @@ const test = base.extend<TestFixtures>({
     const serverAuthJson = path.join(serverAdaptersParent, 'auth.json');
     const extensionAuthJson = path.join(extensionDir, 'auth.json');
     fs.rmSync(extensionAuthJson, { force: true });
-    fs.symlinkSync(serverAuthJson, extensionAuthJson);
+    symlinkCrossPlatform(serverAuthJson, extensionAuthJson, 'file');
 
     await use(context);
     await context.close();
@@ -1364,16 +1378,33 @@ const fetchWsInfo = async (port: number, secret?: string): Promise<{ wsUrl: stri
       signal: AbortSignal.timeout(3_000),
     });
     if (res.ok) {
-      const info = (await res.json()) as { wsUrl?: string; wsSecret?: string };
+      const info = (await res.json()) as { wsUrl?: string };
       return {
         wsUrl: typeof info.wsUrl === 'string' ? info.wsUrl : `ws://localhost:${port}/ws`,
-        wsSecret: typeof info.wsSecret === 'string' ? info.wsSecret : null,
+        // The server intentionally does not return the secret in /ws-info
+        // (security: prevents leaking it in HTTP responses). The caller
+        // already has the secret — pass it through for WebSocket auth.
+        wsSecret: secret ?? null,
       };
     }
   } catch {
     // Server may not support /ws-info yet
   }
-  return { wsUrl: `ws://localhost:${port}/ws`, wsSecret: null };
+  return { wsUrl: `ws://localhost:${port}/ws`, wsSecret: secret ?? null };
+};
+
+// ---------------------------------------------------------------------------
+// Cross-platform symlink
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a symlink that works on all platforms. On Windows, directory symlinks
+ * require admin privileges, but junctions do not — so directory symlinks use
+ * 'junction' on Windows. File symlinks use 'file' on Windows.
+ */
+const symlinkCrossPlatform = (target: string, linkPath: string, type: 'dir' | 'file'): void => {
+  const symlinkType = process.platform === 'win32' ? (type === 'dir' ? 'junction' : 'file') : undefined;
+  fs.symlinkSync(target, linkPath, symlinkType);
 };
 
 export { expect } from '@playwright/test';
@@ -1397,6 +1428,7 @@ export {
   createExtensionCopy,
   launchExtensionContext,
   readPluginToolNames,
+  symlinkCrossPlatform,
   E2E_TEST_PLUGIN_DIR,
   ROOT,
 };
