@@ -2399,6 +2399,195 @@ export const ErrorCategories = () => (
 );
 
 /**
+ * HowItWorks — horizontal 3-step flow for the Introduction page.
+ * Shows the runtime flow: Start MCP server → Extension connects → Agent calls tool.
+ */
+export const HowItWorks = () => (
+  <div className="my-8">
+    <svg viewBox="0 0 800 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" aria-hidden="true">
+      <defs>
+        <marker id="hiw-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 Z" fill="var(--color-foreground)" />
+        </marker>
+      </defs>
+
+      {/* ── Step 1: Start MCP Server ──────────────────────── */}
+      {/* Shadow */}
+      <rect x="8" y="18" width="200" height="120" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="4"
+        y="14"
+        width="200"
+        height="120"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="4" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        1. Start Server
+      </text>
+      {/* Content */}
+      <rect x="16" y="64" width="176" height="26" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="82"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        opentabs start
+      </text>
+      <text
+        x="104"
+        y="118"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Discovers plugins, exposes tools
+      </text>
+
+      {/* ── Arrow 1→2 ────────────────────────────────────── */}
+      <line
+        x1="214"
+        y1="74"
+        x2="290"
+        y2="74"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#hiw-arrow)"
+      />
+
+      {/* ── Step 2: Extension Connects (primary-filled) ──── */}
+      {/* Shadow */}
+      <rect x="308" y="18" width="200" height="120" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="304"
+        y="14"
+        width="200"
+        height="120"
+        fill="var(--color-primary)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="304" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="404"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        2. Extension Connects
+      </text>
+      {/* Content */}
+      <text
+        x="404"
+        y="76"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.7"
+        textAnchor="middle">
+        Injects adapters into
+      </text>
+      <text
+        x="404"
+        y="92"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.7"
+        textAnchor="middle">
+        matching tabs
+      </text>
+      <text
+        x="404"
+        y="118"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Your authenticated sessions
+      </text>
+
+      {/* ── Arrow 2→3 ────────────────────────────────────── */}
+      <line
+        x1="514"
+        y1="74"
+        x2="590"
+        y2="74"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#hiw-arrow)"
+      />
+
+      {/* ── Step 3: Agent Calls Tool ─────────────────────── */}
+      {/* Shadow */}
+      <rect x="608" y="18" width="188" height="120" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="604"
+        y="14"
+        width="188"
+        height="120"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="604" y="14" width="188" height="36" fill="var(--color-foreground)" />
+      <text
+        x="698"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        3. Agent Calls Tool
+      </text>
+      {/* Content */}
+      <rect x="616" y="64" width="164" height="26" fill="var(--color-foreground)" />
+      <text
+        x="698"
+        y="82"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        slack_send_message()
+      </text>
+      <text
+        x="698"
+        y="118"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Result flows back to agent
+      </text>
+    </svg>
+  </div>
+);
+
+/**
  * PluginStructure — project structure diagram for the Plugin Development guide.
  * Shows the key files in a scaffolded plugin project as a tree.
  */
