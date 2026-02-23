@@ -110,18 +110,6 @@ const docComponents = {
   ProgressFlow,
 };
 
-const blogComponents = {
-  ...docComponents,
-  h2: (props: HTMLAttributes<HTMLHeadingElement>) => (
-    <Text as="h2" className="mt-10 mb-4 [&:first-child]:mt-0" {...props} />
-  ),
-  p: (props: HTMLAttributes<HTMLParagraphElement>) => (
-    <Text className="text-foreground mb-4 text-lg leading-relaxed" {...props} />
-  ),
-};
-
-export default function MDX({ code, type = 'doc' }: { code: string; type?: 'doc' | 'blog' }) {
-  const components = type === 'blog' ? blogComponents : docComponents;
-
-  return <MDXContent code={code} components={components} />;
+export default function MDX({ code }: { code: string }) {
+  return <MDXContent code={code} components={docComponents} />;
 }
