@@ -311,9 +311,7 @@ The AI agent sees the prefixed name when listing prompts and uses it to call `pr
 
 Resources and prompts follow the same dispatch pipeline as tools:
 
-```
-AI Agent → MCP Server → Chrome Extension → Adapter IIFE → Page Context
-```
+<DispatchFlow />
 
 1. The AI agent requests `resources/read` or `prompts/get`
 2. The MCP server looks up the resource/prompt in the registry, finds the owning plugin

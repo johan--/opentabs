@@ -5,6 +5,7 @@ import { CliCommand } from './ComponentInstall';
 import {
   ArchitectureIllustration,
   ConfigDirectory,
+  DispatchFlow,
   MonorepoStructure,
   PluginStructure,
   QuickStartFlow,
@@ -91,6 +92,7 @@ const docComponents = {
   CliCommand,
   ArchitectureIllustration,
   ConfigDirectory,
+  DispatchFlow,
   MonorepoStructure,
   QuickStartFlow,
   PluginStructure,
