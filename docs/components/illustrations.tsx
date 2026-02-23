@@ -2588,6 +2588,189 @@ export const HowItWorks = () => (
 );
 
 /**
+ * InstallPaths — 3-column layout showing the three installation paths
+ * (Users, Plugin Developers, Contributors) as parallel options of increasing complexity.
+ * Used on the Installation page.
+ */
+export const InstallPaths = () => (
+  <div className="my-8">
+    <svg viewBox="0 0 700 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" aria-hidden="true">
+      {/* ── Box 1: For Users (highlighted — most common path) ── */}
+      {/* Shadow */}
+      <rect x="8" y="18" width="200" height="140" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="4"
+        y="14"
+        width="200"
+        height="140"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="4" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        For Users
+      </text>
+      {/* Content */}
+      <rect x="16" y="64" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="80"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        npm i -g @opentabs-dev/cli
+      </text>
+      <rect x="16" y="94" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="110"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        opentabs start
+      </text>
+      <text
+        x="104"
+        y="142"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        CLI + Chrome extension
+      </text>
+
+      {/* ── Box 2: For Plugin Developers ──────────────────── */}
+      {/* Shadow */}
+      <rect x="258" y="18" width="200" height="140" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="254"
+        y="14"
+        width="200"
+        height="140"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="254" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="354"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        For Developers
+      </text>
+      {/* Content */}
+      <rect x="266" y="64" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="354"
+        y="80"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        + Bun runtime
+      </text>
+      <rect x="266" y="94" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="354"
+        y="110"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        create-opentabs-plugin
+      </text>
+      <text
+        x="354"
+        y="142"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Users setup + SDK + plugin CLI
+      </text>
+
+      {/* ── Box 3: For Contributors ──────────────────────── */}
+      {/* Shadow */}
+      <rect x="508" y="18" width="188" height="140" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="504"
+        y="14"
+        width="188"
+        height="140"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="504" y="14" width="188" height="36" fill="var(--color-foreground)" />
+      <text
+        x="598"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        For Contributors
+      </text>
+      {/* Content */}
+      <rect x="516" y="64" width="164" height="22" fill="var(--color-foreground)" />
+      <text
+        x="598"
+        y="80"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        git clone + bun install
+      </text>
+      <rect x="516" y="94" width="164" height="22" fill="var(--color-foreground)" />
+      <text
+        x="598"
+        y="110"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        bun run build
+      </text>
+      <text
+        x="598"
+        y="142"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Full monorepo + all build tools
+      </text>
+    </svg>
+  </div>
+);
+
+/**
  * PluginStructure — project structure diagram for the Plugin Development guide.
  * Shows the key files in a scaffolded plugin project as a tree.
  */
