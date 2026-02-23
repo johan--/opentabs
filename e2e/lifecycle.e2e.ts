@@ -32,6 +32,7 @@ import {
   createTestConfigDir,
   cleanupTestConfigDir,
   createMcpClient,
+  symlinkCrossPlatform,
 } from './fixtures.js';
 import {
   waitForExtensionConnected,
@@ -639,7 +640,7 @@ test.describe('extension_reload', () => {
     const extensionAdaptersDir = path.join(extensionDir, 'adapters');
     // Remove old symlink/directory and create new one
     fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
-    fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+    symlinkCrossPlatform(extensionAdaptersDir, serverAdaptersDir, 'dir');
 
     mcpServer.logs.length = 0;
 
@@ -785,7 +786,7 @@ test.describe('URL change reconnection', () => {
       fs.mkdirSync(serverBAdaptersParent, { recursive: true });
       const serverBAdaptersDir = path.join(serverBAdaptersParent, 'adapters');
       fs.rmSync(serverBAdaptersDir, { recursive: true, force: true });
-      fs.symlinkSync(extensionAdaptersDir, serverBAdaptersDir);
+      symlinkCrossPlatform(extensionAdaptersDir, serverBAdaptersDir, 'dir');
 
       // Write auth.json into the extension copy so the offscreen document
       // can bootstrap the secret for server B. The extension copy's

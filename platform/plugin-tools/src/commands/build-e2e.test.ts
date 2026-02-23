@@ -28,7 +28,11 @@ const copyPlugin = (destDir: string): void => {
     recursive: true,
     filter: (src: string) => !src.includes('node_modules'),
   });
-  symlinkSync(join(E2E_PLUGIN_DIR, 'node_modules'), join(destDir, 'node_modules'), 'dir');
+  symlinkSync(
+    join(E2E_PLUGIN_DIR, 'node_modules'),
+    join(destDir, 'node_modules'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
 };
 
 describe('opentabs-plugin build E2E', () => {

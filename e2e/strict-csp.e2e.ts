@@ -28,6 +28,7 @@ import {
   readPluginToolNames,
   readTestConfig,
   writeTestConfig,
+  symlinkCrossPlatform,
 } from './fixtures.js';
 import {
   waitFor,
@@ -491,7 +492,7 @@ test.describe('Strict CSP — file watcher IIFE re-injection', () => {
     const serverAdaptersDir = path.join(serverAdaptersParent, 'adapters');
     const extensionAdaptersDir = path.join(extensionDir, 'adapters');
     fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
-    fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+    symlinkCrossPlatform(extensionAdaptersDir, serverAdaptersDir, 'dir');
 
     const client = createMcpClient(server.port, server.secret);
 

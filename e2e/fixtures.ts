@@ -1307,7 +1307,7 @@ const test = base.extend<TestFixtures>({
     const serverAdaptersDir = path.join(serverAdaptersParent, 'adapters');
     const extensionAdaptersDir = path.join(extensionDir, 'adapters');
     fs.rmSync(serverAdaptersDir, { recursive: true, force: true });
-    fs.symlinkSync(extensionAdaptersDir, serverAdaptersDir);
+    symlinkCrossPlatform(extensionAdaptersDir, serverAdaptersDir, 'dir');
 
     // Symlink auth.json so the extension copy always sees the latest secret
     // and port. The MCP server writes auth.json to <configDir>/extension/
@@ -1317,7 +1317,7 @@ const test = base.extend<TestFixtures>({
     const serverAuthJson = path.join(serverAdaptersParent, 'auth.json');
     const extensionAuthJson = path.join(extensionDir, 'auth.json');
     fs.rmSync(extensionAuthJson, { force: true });
-    fs.symlinkSync(serverAuthJson, extensionAuthJson);
+    symlinkCrossPlatform(serverAuthJson, extensionAuthJson, 'file');
 
     await use(context);
     await context.close();
@@ -1393,6 +1393,20 @@ const fetchWsInfo = async (port: number, secret?: string): Promise<{ wsUrl: stri
   return { wsUrl: `ws://localhost:${port}/ws`, wsSecret: secret ?? null };
 };
 
+// ---------------------------------------------------------------------------
+// Cross-platform symlink
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a symlink that works on all platforms. On Windows, directory symlinks
+ * require admin privileges, but junctions do not — so directory symlinks use
+ * 'junction' on Windows. File symlinks use 'file' on Windows.
+ */
+const symlinkCrossPlatform = (target: string, linkPath: string, type: 'dir' | 'file'): void => {
+  const symlinkType = process.platform === 'win32' ? (type === 'dir' ? 'junction' : 'file') : undefined;
+  fs.symlinkSync(target, linkPath, symlinkType);
+};
+
 export { expect } from '@playwright/test';
 export {
   test,
@@ -1414,6 +1428,7 @@ export {
   createExtensionCopy,
   launchExtensionContext,
   readPluginToolNames,
+  symlinkCrossPlatform,
   E2E_TEST_PLUGIN_DIR,
   ROOT,
 };
