@@ -6,8 +6,14 @@ import {
   ArchitectureIllustration,
   ConfigDirectory,
   DispatchFlow,
+  ErrorCategories,
+  FirstPluginFlow,
+  HowItWorks,
+  InstallPaths,
+  LifecycleSequence,
   MonorepoStructure,
   PluginStructure,
+  ProgressFlow,
   QuickStartFlow,
 } from './illustrations';
 import { Table } from './retroui/Table';
@@ -93,9 +99,15 @@ const docComponents = {
   ArchitectureIllustration,
   ConfigDirectory,
   DispatchFlow,
+  ErrorCategories,
+  FirstPluginFlow,
+  HowItWorks,
+  InstallPaths,
+  LifecycleSequence,
   MonorepoStructure,
   QuickStartFlow,
   PluginStructure,
+  ProgressFlow,
 };
 
 const blogComponents = {

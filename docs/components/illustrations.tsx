@@ -1346,6 +1346,1737 @@ export const DispatchFlow = () => (
 );
 
 /**
+ * ProgressFlow — vertical 6-step flow diagram for the Streaming & Progress guide.
+ * Shows the progress notification pipeline: Tool handler → Adapter IIFE → Content script →
+ * Extension background → MCP server → AI agent, with transport labels on each arrow.
+ */
+export const ProgressFlow = () => (
+  <div className="my-8">
+    <svg
+      viewBox="0 0 400 540"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full max-w-lg"
+      aria-hidden="true">
+      <defs>
+        <marker id="pf-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 Z" fill="var(--color-foreground)" />
+        </marker>
+      </defs>
+
+      {/* ── Step 1: Tool Handler (highlighted — developer's code) ── */}
+      {/* Shadow */}
+      <rect x="124" y="4" width="160" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="120"
+        y="0"
+        width="160"
+        height="52"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="200"
+        y="22"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        Tool Handler
+      </text>
+      <text
+        x="200"
+        y="40"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        reportProgress()
+      </text>
+
+      {/* ── Arrow 1→2 ──────────────────────────────────── */}
+      <line
+        x1="200"
+        y1="56"
+        x2="200"
+        y2="88"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#pf-arrow)"
+      />
+      <text
+        x="282"
+        y="78"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        CustomEvent
+      </text>
+
+      {/* ── Step 2: Adapter IIFE ──────────────────────── */}
+      {/* Shadow */}
+      <rect x="124" y="96" width="160" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="120"
+        y="92"
+        width="160"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="200"
+        y="114"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        Adapter IIFE
+      </text>
+      <text
+        x="200"
+        y="132"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        MAIN world
+      </text>
+
+      {/* ── Arrow 2→3 ──────────────────────────────────── */}
+      <line
+        x1="200"
+        y1="148"
+        x2="200"
+        y2="180"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#pf-arrow)"
+      />
+      <text
+        x="282"
+        y="170"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        window.postMessage
+      </text>
+
+      {/* ── Step 3: Content Script Relay ──────────────── */}
+      {/* Shadow */}
+      <rect x="124" y="188" width="160" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="120"
+        y="184"
+        width="160"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="200"
+        y="206"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        Content Script
+      </text>
+      <text
+        x="200"
+        y="224"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        ISOLATED world relay
+      </text>
+
+      {/* ── Arrow 3→4 ──────────────────────────────────── */}
+      <line
+        x1="200"
+        y1="240"
+        x2="200"
+        y2="272"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#pf-arrow)"
+      />
+      <text
+        x="282"
+        y="262"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        chrome.runtime
+      </text>
+
+      {/* ── Step 4: Extension Background ─────────────── */}
+      {/* Shadow */}
+      <rect x="124" y="280" width="160" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="120"
+        y="276"
+        width="160"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="200"
+        y="298"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        Extension
+      </text>
+      <text
+        x="200"
+        y="316"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Background service worker
+      </text>
+
+      {/* ── Arrow 4→5 ──────────────────────────────────── */}
+      <line
+        x1="200"
+        y1="332"
+        x2="200"
+        y2="364"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#pf-arrow)"
+      />
+      <text
+        x="282"
+        y="354"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        WebSocket
+      </text>
+
+      {/* ── Step 5: MCP Server ───────────────────────── */}
+      {/* Shadow */}
+      <rect x="124" y="372" width="160" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="120"
+        y="368"
+        width="160"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="200"
+        y="390"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        MCP Server
+      </text>
+      <text
+        x="200"
+        y="408"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Resets timeout, forwards
+      </text>
+
+      {/* ── Arrow 5→6 ──────────────────────────────────── */}
+      <line
+        x1="200"
+        y1="424"
+        x2="200"
+        y2="456"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#pf-arrow)"
+      />
+      <text
+        x="282"
+        y="446"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        notifications/progress
+      </text>
+
+      {/* ── Step 6: AI Agent (highlighted — endpoint) ── */}
+      {/* Shadow */}
+      <rect x="124" y="464" width="160" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="120"
+        y="460"
+        width="160"
+        height="52"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="200"
+        y="482"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        AI Agent
+      </text>
+      <text
+        x="200"
+        y="500"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Live progress updates
+      </text>
+
+      {/* ── Step numbers ─────────────────────────────── */}
+      <text
+        x="108"
+        y="22"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="end">
+        1
+      </text>
+      <text
+        x="108"
+        y="114"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="end">
+        2
+      </text>
+      <text
+        x="108"
+        y="206"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="end">
+        3
+      </text>
+      <text
+        x="108"
+        y="298"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="end">
+        4
+      </text>
+      <text
+        x="108"
+        y="390"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="end">
+        5
+      </text>
+      <text
+        x="108"
+        y="482"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="end">
+        6
+      </text>
+    </svg>
+  </div>
+);
+
+/**
+ * LifecycleSequence — vertical timeline showing the adapter lifecycle hooks
+ * and when each fires. One-time hooks (onActivate, onDeactivate) use solid boxes;
+ * repeating hooks (onNavigate, onToolInvocation*) use dashed borders with a repeat indicator.
+ * Used on the Lifecycle Hooks SDK reference page.
+ */
+export const LifecycleSequence = () => (
+  <div className="my-8">
+    <svg
+      viewBox="0 0 480 400"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full max-w-lg"
+      aria-hidden="true">
+      <defs>
+        <marker id="lc-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 Z" fill="var(--color-foreground)" />
+        </marker>
+      </defs>
+
+      {/* ── Central timeline line ──────────────────────── */}
+      <line x1="60" y1="24" x2="60" y2="376" stroke="var(--color-foreground)" strokeWidth="2" opacity="0.2" />
+
+      {/* ── Phase 1: Registration (once) ──────────────── */}
+      {/* Timeline dot */}
+      <circle cx="60" cy="30" r="6" fill="var(--color-foreground)" />
+      {/* Shadow */}
+      <rect x="88" y="12" width="372" height="40" fill="var(--color-foreground)" />
+      {/* Body — solid box for one-time hook */}
+      <rect
+        x="84"
+        y="8"
+        width="372"
+        height="40"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="100"
+        y="28"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold">
+        onActivate()
+      </text>
+      <text
+        x="100"
+        y="42"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        Once, after adapter registration
+      </text>
+      {/* "once" badge */}
+      <rect x="388" y="18" width="52" height="18" fill="var(--color-foreground)" />
+      <text
+        x="414"
+        y="31"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        once
+      </text>
+
+      {/* ── Arrow 1→2 ──────────────────────────────────── */}
+      <line
+        x1="60"
+        y1="52"
+        x2="60"
+        y2="88"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#lc-arrow)"
+      />
+
+      {/* ── Phase 2: Navigation (repeating) ───────────── */}
+      {/* Timeline dot */}
+      <circle cx="60" cy="116" r="6" fill="var(--color-foreground)" />
+      {/* Shadow */}
+      <rect x="88" y="98" width="372" height="40" fill="var(--color-foreground)" />
+      {/* Body — dashed border for repeating hook */}
+      <rect
+        x="84"
+        y="94"
+        width="372"
+        height="40"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        strokeDasharray="6 4"
+      />
+      <text
+        x="100"
+        y="114"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold">
+        onNavigate(url)
+      </text>
+      <text
+        x="100"
+        y="128"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        pushState, replaceState, popstate, hashchange
+      </text>
+      {/* "repeats" badge */}
+      <rect
+        x="374"
+        y="104"
+        width="66"
+        height="18"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="1.5"
+      />
+      <text
+        x="407"
+        y="117"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6"
+        textAnchor="middle">
+        repeats
+      </text>
+
+      {/* ── Arrow 2→3 ──────────────────────────────────── */}
+      <line
+        x1="60"
+        y1="138"
+        x2="60"
+        y2="174"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#lc-arrow)"
+      />
+
+      {/* ── Phase 3: Tool Invocation Start (repeating) ── */}
+      {/* Timeline dot */}
+      <circle cx="60" cy="202" r="6" fill="var(--color-foreground)" />
+      {/* Shadow */}
+      <rect x="88" y="184" width="372" height="40" fill="var(--color-foreground)" />
+      {/* Body — dashed border for repeating hook */}
+      <rect
+        x="84"
+        y="180"
+        width="372"
+        height="40"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        strokeDasharray="6 4"
+      />
+      <text
+        x="100"
+        y="200"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold">
+        onToolInvocationStart(toolName)
+      </text>
+      <text
+        x="100"
+        y="214"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        {'Before each tool.handle()'}
+      </text>
+      {/* "repeats" badge */}
+      <rect
+        x="374"
+        y="190"
+        width="66"
+        height="18"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="1.5"
+      />
+      <text
+        x="407"
+        y="203"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6"
+        textAnchor="middle">
+        repeats
+      </text>
+
+      {/* ── Arrow 3→4 ──────────────────────────────────── */}
+      <line
+        x1="60"
+        y1="224"
+        x2="60"
+        y2="260"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#lc-arrow)"
+      />
+
+      {/* ── Phase 4: Tool Invocation End (repeating) ──── */}
+      {/* Timeline dot */}
+      <circle cx="60" cy="288" r="6" fill="var(--color-foreground)" />
+      {/* Shadow */}
+      <rect x="88" y="270" width="372" height="40" fill="var(--color-foreground)" />
+      {/* Body — dashed border for repeating hook */}
+      <rect
+        x="84"
+        y="266"
+        width="372"
+        height="40"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        strokeDasharray="6 4"
+      />
+      <text
+        x="100"
+        y="286"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold">
+        onToolInvocationEnd(toolName, success, ms)
+      </text>
+      <text
+        x="100"
+        y="300"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        {'After each tool.handle() completes'}
+      </text>
+      {/* "repeats" badge */}
+      <rect
+        x="374"
+        y="276"
+        width="66"
+        height="18"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="1.5"
+      />
+      <text
+        x="407"
+        y="289"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6"
+        textAnchor="middle">
+        repeats
+      </text>
+
+      {/* ── Arrow 4→5 ──────────────────────────────────── */}
+      <line
+        x1="60"
+        y1="310"
+        x2="60"
+        y2="346"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#lc-arrow)"
+      />
+
+      {/* ── Phase 5: Removal (once) ───────────────────── */}
+      {/* Timeline dot */}
+      <circle cx="60" cy="374" r="6" fill="var(--color-foreground)" />
+      {/* Shadow */}
+      <rect x="88" y="356" width="372" height="40" fill="var(--color-foreground)" />
+      {/* Body — solid box for one-time hook */}
+      <rect
+        x="84"
+        y="352"
+        width="372"
+        height="40"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      <text
+        x="100"
+        y="372"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold">
+        onDeactivate()
+      </text>
+      <text
+        x="100"
+        y="386"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5">
+        Before teardown, on removal or navigation away
+      </text>
+      {/* "once" badge */}
+      <rect x="388" y="362" width="52" height="18" fill="var(--color-foreground)" />
+      <text
+        x="414"
+        y="375"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        once
+      </text>
+    </svg>
+  </div>
+);
+
+/**
+ * ErrorCategories — 2-column grid showing the 6 ToolError categories grouped by
+ * retryable vs non-retryable. Each card shows the category name, factory method,
+ * and retry status. Used on the Error Handling guide page.
+ */
+export const ErrorCategories = () => (
+  <div className="my-8">
+    <svg
+      viewBox="0 0 560 290"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full max-w-3xl"
+      aria-hidden="true">
+      {/* ── Column header: Not Retryable ──────────────── */}
+      <text
+        x="170"
+        y="16"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        Not Retryable
+      </text>
+      <line x1="80" y1="24" x2="260" y2="24" stroke="var(--color-foreground)" strokeWidth="1" opacity="0.3" />
+
+      {/* ── Column header: Retryable ─────────────────── */}
+      <text
+        x="430"
+        y="16"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        fontWeight="bold"
+        textAnchor="middle">
+        Retryable
+      </text>
+      <line x1="340" y1="24" x2="520" y2="24" stroke="var(--color-foreground)" strokeWidth="1" opacity="0.3" />
+
+      {/* ── Card 1: auth (not retryable) ─────────────── */}
+      {/* Shadow */}
+      <rect x="24" y="40" width="280" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="20"
+        y="36"
+        width="280"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header strip */}
+      <rect x="20" y="36" width="280" height="24" fill="var(--color-foreground)" />
+      <text
+        x="32"
+        y="52"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold">
+        auth
+      </text>
+      <text
+        x="288"
+        y="52"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="end">
+        No
+      </text>
+      <text
+        x="32"
+        y="78"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        ToolError.auth(msg)
+      </text>
+
+      {/* ── Card 2: not_found (not retryable) ────────── */}
+      {/* Shadow */}
+      <rect x="24" y="104" width="280" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="20"
+        y="100"
+        width="280"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header strip */}
+      <rect x="20" y="100" width="280" height="24" fill="var(--color-foreground)" />
+      <text
+        x="32"
+        y="116"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold">
+        not_found
+      </text>
+      <text
+        x="288"
+        y="116"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="end">
+        No
+      </text>
+      <text
+        x="32"
+        y="142"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        ToolError.notFound(msg, code?)
+      </text>
+
+      {/* ── Card 3: validation (not retryable) ───────── */}
+      {/* Shadow */}
+      <rect x="24" y="168" width="280" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="20"
+        y="164"
+        width="280"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header strip */}
+      <rect x="20" y="164" width="280" height="24" fill="var(--color-foreground)" />
+      <text
+        x="32"
+        y="180"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold">
+        validation
+      </text>
+      <text
+        x="288"
+        y="180"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="end">
+        No
+      </text>
+      <text
+        x="32"
+        y="206"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        ToolError.validation(msg)
+      </text>
+
+      {/* ── Card 4: internal (not retryable) ─────────── */}
+      {/* Shadow */}
+      <rect x="24" y="232" width="280" height="52" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="20"
+        y="228"
+        width="280"
+        height="52"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header strip */}
+      <rect x="20" y="228" width="280" height="24" fill="var(--color-foreground)" />
+      <text
+        x="32"
+        y="244"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold">
+        internal
+      </text>
+      <text
+        x="288"
+        y="244"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="end">
+        No
+      </text>
+      <text
+        x="32"
+        y="270"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        ToolError.internal(msg)
+      </text>
+
+      {/* ── Vertical divider ─────────────────────────── */}
+      <line x1="318" y1="36" x2="318" y2="280" stroke="var(--color-foreground)" strokeWidth="1" opacity="0.15" />
+
+      {/* ── Card 5: rate_limit (retryable, highlighted) ─ */}
+      {/* Shadow */}
+      <rect x="344" y="40" width="200" height="116" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="340"
+        y="36"
+        width="200"
+        height="116"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header strip */}
+      <rect x="340" y="36" width="200" height="24" fill="var(--color-foreground)" />
+      <text
+        x="352"
+        y="52"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold">
+        rate_limit
+      </text>
+      <text
+        x="528"
+        y="52"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="end">
+        Yes
+      </text>
+      <text
+        x="352"
+        y="78"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        ToolError.rateLimited(
+      </text>
+      <text
+        x="362"
+        y="94"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        msg, retryAfterMs?)
+      </text>
+      {/* retryAfterMs note */}
+      <text
+        x="352"
+        y="140"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.4">
+        Supports retryAfterMs delay
+      </text>
+
+      {/* ── Card 6: timeout (retryable, highlighted) ──── */}
+      {/* Shadow */}
+      <rect x="344" y="168" width="200" height="112" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="340"
+        y="164"
+        width="200"
+        height="112"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header strip */}
+      <rect x="340" y="164" width="200" height="24" fill="var(--color-foreground)" />
+      <text
+        x="352"
+        y="180"
+        fontSize="11"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold">
+        timeout
+      </text>
+      <text
+        x="528"
+        y="180"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="end">
+        Yes
+      </text>
+      <text
+        x="352"
+        y="206"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.6">
+        ToolError.timeout(msg)
+      </text>
+      {/* transient note */}
+      <text
+        x="352"
+        y="264"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.4">
+        Transient network/server issues
+      </text>
+    </svg>
+  </div>
+);
+
+/**
+ * HowItWorks — horizontal 3-step flow for the Introduction page.
+ * Shows the runtime flow: Start MCP server → Extension connects → Agent calls tool.
+ */
+export const HowItWorks = () => (
+  <div className="my-8">
+    <svg viewBox="0 0 800 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" aria-hidden="true">
+      <defs>
+        <marker id="hiw-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 Z" fill="var(--color-foreground)" />
+        </marker>
+      </defs>
+
+      {/* ── Step 1: Start MCP Server ──────────────────────── */}
+      {/* Shadow */}
+      <rect x="8" y="18" width="200" height="120" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="4"
+        y="14"
+        width="200"
+        height="120"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="4" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        1. Start Server
+      </text>
+      {/* Content */}
+      <rect x="16" y="64" width="176" height="26" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="82"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        opentabs start
+      </text>
+      <text
+        x="104"
+        y="118"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Discovers plugins, exposes tools
+      </text>
+
+      {/* ── Arrow 1→2 ────────────────────────────────────── */}
+      <line
+        x1="214"
+        y1="74"
+        x2="290"
+        y2="74"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#hiw-arrow)"
+      />
+
+      {/* ── Step 2: Extension Connects (primary-filled) ──── */}
+      {/* Shadow */}
+      <rect x="308" y="18" width="200" height="120" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="304"
+        y="14"
+        width="200"
+        height="120"
+        fill="var(--color-primary)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="304" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="404"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        2. Extension Connects
+      </text>
+      {/* Content */}
+      <text
+        x="404"
+        y="76"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.7"
+        textAnchor="middle">
+        Injects adapters into
+      </text>
+      <text
+        x="404"
+        y="92"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.7"
+        textAnchor="middle">
+        matching tabs
+      </text>
+      <text
+        x="404"
+        y="118"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Your authenticated sessions
+      </text>
+
+      {/* ── Arrow 2→3 ────────────────────────────────────── */}
+      <line
+        x1="514"
+        y1="74"
+        x2="590"
+        y2="74"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#hiw-arrow)"
+      />
+
+      {/* ── Step 3: Agent Calls Tool ─────────────────────── */}
+      {/* Shadow */}
+      <rect x="608" y="18" width="188" height="120" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="604"
+        y="14"
+        width="188"
+        height="120"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="604" y="14" width="188" height="36" fill="var(--color-foreground)" />
+      <text
+        x="698"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        3. Agent Calls Tool
+      </text>
+      {/* Content */}
+      <rect x="616" y="64" width="164" height="26" fill="var(--color-foreground)" />
+      <text
+        x="698"
+        y="82"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        slack_send_message()
+      </text>
+      <text
+        x="698"
+        y="118"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Result flows back to agent
+      </text>
+    </svg>
+  </div>
+);
+
+/**
+ * InstallPaths — 3-column layout showing the three installation paths
+ * (Users, Plugin Developers, Contributors) as parallel options of increasing complexity.
+ * Used on the Installation page.
+ */
+export const InstallPaths = () => (
+  <div className="my-8">
+    <svg viewBox="0 0 700 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" aria-hidden="true">
+      {/* ── Box 1: For Users (highlighted — most common path) ── */}
+      {/* Shadow */}
+      <rect x="8" y="18" width="200" height="140" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="4"
+        y="14"
+        width="200"
+        height="140"
+        fill="var(--color-primary)"
+        opacity="0.12"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="4" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        For Users
+      </text>
+      {/* Content */}
+      <rect x="16" y="64" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="80"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        npm i -g @opentabs-dev/cli
+      </text>
+      <rect x="16" y="94" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="104"
+        y="110"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        opentabs start
+      </text>
+      <text
+        x="104"
+        y="142"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        CLI + Chrome extension
+      </text>
+
+      {/* ── Box 2: For Plugin Developers ──────────────────── */}
+      {/* Shadow */}
+      <rect x="258" y="18" width="200" height="140" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="254"
+        y="14"
+        width="200"
+        height="140"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="254" y="14" width="200" height="36" fill="var(--color-foreground)" />
+      <text
+        x="354"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        For Developers
+      </text>
+      {/* Content */}
+      <rect x="266" y="64" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="354"
+        y="80"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        + Bun runtime
+      </text>
+      <rect x="266" y="94" width="176" height="22" fill="var(--color-foreground)" />
+      <text
+        x="354"
+        y="110"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        create-opentabs-plugin
+      </text>
+      <text
+        x="354"
+        y="142"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Users setup + SDK + plugin CLI
+      </text>
+
+      {/* ── Box 3: For Contributors ──────────────────────── */}
+      {/* Shadow */}
+      <rect x="508" y="18" width="188" height="140" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="504"
+        y="14"
+        width="188"
+        height="140"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="504" y="14" width="188" height="36" fill="var(--color-foreground)" />
+      <text
+        x="598"
+        y="38"
+        fontSize="13"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        For Contributors
+      </text>
+      {/* Content */}
+      <rect x="516" y="64" width="164" height="22" fill="var(--color-foreground)" />
+      <text
+        x="598"
+        y="80"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        git clone + bun install
+      </text>
+      <rect x="516" y="94" width="164" height="22" fill="var(--color-foreground)" />
+      <text
+        x="598"
+        y="110"
+        fontSize="10"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        bun run build
+      </text>
+      <text
+        x="598"
+        y="142"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Full monorepo + all build tools
+      </text>
+    </svg>
+  </div>
+);
+
+/**
+ * FirstPluginFlow — horizontal 5-step flow for the "Your First Plugin" tutorial.
+ * Scaffold → Define Tool → Register → Build → Test, with arrows between steps.
+ * The "Build" step uses primary fill since that's where the plugin magic happens.
+ */
+export const FirstPluginFlow = () => (
+  <div className="my-8">
+    <svg viewBox="0 0 900 140" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" aria-hidden="true">
+      <defs>
+        <marker id="fp-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 Z" fill="var(--color-foreground)" />
+        </marker>
+      </defs>
+
+      {/* ── Step 1: Scaffold ──────────────────────────────── */}
+      {/* Shadow */}
+      <rect x="4" y="14" width="140" height="110" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="0"
+        y="10"
+        width="140"
+        height="110"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="0" y="10" width="140" height="32" fill="var(--color-foreground)" />
+      <text
+        x="70"
+        y="32"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        1. Scaffold
+      </text>
+      {/* Content */}
+      <rect x="10" y="54" width="120" height="22" fill="var(--color-foreground)" />
+      <text
+        x="70"
+        y="69"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        opentabs plugin create
+      </text>
+      <text
+        x="70"
+        y="104"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Standalone npm package
+      </text>
+
+      {/* ── Arrow 1→2 ────────────────────────────────────── */}
+      <line
+        x1="150"
+        y1="64"
+        x2="190"
+        y2="64"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#fp-arrow)"
+      />
+
+      {/* ── Step 2: Define Tool ──────────────────────────── */}
+      {/* Shadow */}
+      <rect x="204" y="14" width="140" height="110" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="200"
+        y="10"
+        width="140"
+        height="110"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="200" y="10" width="140" height="32" fill="var(--color-foreground)" />
+      <text
+        x="270"
+        y="32"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        2. Define Tool
+      </text>
+      {/* Content */}
+      <rect x="210" y="54" width="120" height="22" fill="var(--color-foreground)" />
+      <text
+        x="270"
+        y="69"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        {'defineTool({ ... })'}
+      </text>
+      <text
+        x="270"
+        y="104"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Zod schema + handler
+      </text>
+
+      {/* ── Arrow 2→3 ────────────────────────────────────── */}
+      <line
+        x1="350"
+        y1="64"
+        x2="390"
+        y2="64"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#fp-arrow)"
+      />
+
+      {/* ── Step 3: Register ─────────────────────────────── */}
+      {/* Shadow */}
+      <rect x="404" y="14" width="140" height="110" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="400"
+        y="10"
+        width="140"
+        height="110"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="400" y="10" width="140" height="32" fill="var(--color-foreground)" />
+      <text
+        x="470"
+        y="32"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        3. Register
+      </text>
+      {/* Content */}
+      <rect x="410" y="54" width="120" height="22" fill="var(--color-foreground)" />
+      <text
+        x="470"
+        y="69"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        tools: [getPageTitle]
+      </text>
+      <text
+        x="470"
+        y="104"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        Plugin class + tools array
+      </text>
+
+      {/* ── Arrow 3→4 ────────────────────────────────────── */}
+      <line
+        x1="550"
+        y1="64"
+        x2="590"
+        y2="64"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#fp-arrow)"
+      />
+
+      {/* ── Step 4: Build (primary-filled — the magic step) ── */}
+      {/* Shadow */}
+      <rect x="604" y="14" width="140" height="110" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="600"
+        y="10"
+        width="140"
+        height="110"
+        fill="var(--color-primary)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="600" y="10" width="140" height="32" fill="var(--color-foreground)" />
+      <text
+        x="670"
+        y="32"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        4. Build
+      </text>
+      {/* Content */}
+      <rect x="610" y="54" width="120" height="22" fill="var(--color-foreground)" />
+      <text
+        x="670"
+        y="69"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        textAnchor="middle">
+        bun run build
+      </text>
+      <text
+        x="670"
+        y="104"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        IIFE + notify server
+      </text>
+
+      {/* ── Arrow 4→5 ────────────────────────────────────── */}
+      <line
+        x1="750"
+        y1="64"
+        x2="790"
+        y2="64"
+        stroke="var(--color-foreground)"
+        strokeWidth="2"
+        markerEnd="url(#fp-arrow)"
+      />
+
+      {/* ── Step 5: Test ─────────────────────────────────── */}
+      {/* Shadow */}
+      <rect x="804" y="14" width="92" height="110" fill="var(--color-foreground)" />
+      {/* Body */}
+      <rect
+        x="800"
+        y="10"
+        width="92"
+        height="110"
+        fill="var(--color-background)"
+        stroke="var(--color-foreground)"
+        strokeWidth="3"
+      />
+      {/* Header */}
+      <rect x="800" y="10" width="92" height="32" fill="var(--color-foreground)" />
+      <text
+        x="846"
+        y="32"
+        fontSize="12"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-primary)"
+        fontWeight="bold"
+        textAnchor="middle">
+        5. Test
+      </text>
+      {/* Content */}
+      <text
+        x="846"
+        y="69"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.7"
+        textAnchor="middle">
+        Ask your
+      </text>
+      <text
+        x="846"
+        y="83"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.7"
+        textAnchor="middle">
+        AI agent
+      </text>
+      <text
+        x="846"
+        y="104"
+        fontSize="9"
+        fontFamily="var(--font-mono), monospace"
+        fill="var(--color-foreground)"
+        opacity="0.5"
+        textAnchor="middle">
+        opentabs status
+      </text>
+    </svg>
+  </div>
+);
+
+/**
  * PluginStructure — project structure diagram for the Plugin Development guide.
  * Shows the key files in a scaffolded plugin project as a tree.
  */
