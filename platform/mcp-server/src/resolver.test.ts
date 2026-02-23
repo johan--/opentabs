@@ -267,6 +267,42 @@ describe('resolvePluginPath — specifier format detection', () => {
     }
   });
 
+  test('.\\ prefix is treated as local path (Windows)', async () => {
+    const result = await resolvePluginPath('.\\my-plugin', tempDir);
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).not.toContain('Package not found');
+    }
+  });
+
+  test('..\\ prefix is treated as local path (Windows)', async () => {
+    const result = await resolvePluginPath('..\\my-plugin', tempDir);
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).not.toContain('Package not found');
+    }
+  });
+
+  test('drive letter C:\\ is treated as local path (Windows)', async () => {
+    const result = await resolvePluginPath('C:\\Users\\dev\\plugins\\foo', tempDir);
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).not.toContain('Package not found');
+    }
+  });
+
+  test('drive letter D:/ is treated as local path (Windows)', async () => {
+    const result = await resolvePluginPath('D:/projects/my-plugin', tempDir);
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).not.toContain('Package not found');
+    }
+  });
+
   test('bare name is treated as npm package specifier', async () => {
     Bun.resolveSync = (() => {
       throw new Error('Not found');

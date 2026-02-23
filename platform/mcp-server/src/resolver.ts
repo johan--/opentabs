@@ -59,7 +59,13 @@ const isAllowedPluginPath = async (resolvedPath: string): Promise<boolean> => {
  * treated as an npm package name.
  */
 const isLocalPath = (specifier: string): boolean =>
-  specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/') || specifier.startsWith('~/');
+  specifier.startsWith('./') ||
+  specifier.startsWith('.\\') ||
+  specifier.startsWith('../') ||
+  specifier.startsWith('..\\') ||
+  specifier.startsWith('/') ||
+  specifier.startsWith('~/') ||
+  /^[A-Za-z]:[/\\]/.test(specifier);
 
 /**
  * Resolve a local filesystem path specifier to an absolute directory path.
