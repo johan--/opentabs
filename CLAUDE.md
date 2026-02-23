@@ -428,6 +428,7 @@ You are the best frontend React engineer, the best UI/UX designer, and the best 
 - **Always use the right abstraction** - do not inline logic that belongs in a helper, do not duplicate code that should be shared, do not stuff unrelated concerns into the same function. Use the correct pattern for the problem.
 - **Do the full job** - when fixing something, fix it completely. Update all call sites. Update all tests. Update all types. Update all documentation. Do not leave partial work.
 - **Read before writing** - before changing any code, read and understand the surrounding context, existing patterns, and conventions. Match them. Do not introduce a new pattern when an established one exists.
+- **Check git history before reverting or "fixing" recent changes** - when something is broken, always run `git log` to understand _why_ the current code looks the way it does. If a recent commit introduced a change (e.g., renaming, restructuring, new convention), assume the change was intentional and fix the downstream code to match — do not revert the change. Reverting intentional work is destructive and lazy. The correct response to "tests broke after a rename" is to update the tests, not to undo the rename.
 - **Think before acting** - step back and consider the broader design before making changes. Ask: "Is this the right place for this code? Is this the right level of abstraction? Will this be clear to the next person reading it?"
 - **Decide component boundaries before coding** - when building UI, determine which component owns which state and which DOM elements before writing any JSX. If controls must appear on the same row, they must live in the same component's render output. Do not split a visual unit across component boundaries and then try to patch it back together with props, slots, or wrappers. If the first attempt creates a layout problem, do not patch the symptom — redesign the boundary.
 - **Never iterate in circles** - if a fix introduces a new problem, stop. Do not apply another incremental patch. Instead, re-examine the root cause and identify the correct architectural solution. Two failed attempts at the same problem means the approach is wrong, not that it needs more tweaking.
@@ -455,6 +456,16 @@ This project uses **React 19** (`^19.2.4`) with the automatic JSX runtime (`reac
 - **Minimize `useEffect`** - prefer derived state (inline computation) over effects that sync state. Effects are for external system synchronization (Chrome APIs, event listeners), not for state derivation.
 - **`useRef` for non-rendering values** - timers, previous values, and DOM references belong in refs, not state.
 - **`useMemo`/`useCallback` only when justified** - do not wrap trivial computations (array filters, string formatting) in `useMemo`. Reserve memoization for genuinely expensive calculations or when a stable reference is required (e.g., effect dependencies, context values).
+
+### UI Component Authoring
+
+When creating new UI components for the side panel (`platform/browser-extension/src/side-panel/components/retro/`):
+
+- **Prefer native HTML behavior over libraries for simple controls.** For inputs like number steppers, use native `<input type="number">` with `defaultValue` (uncontrolled) — the browser handles digit-only filtering, ArrowUp/Down stepping, and min/max clamping for free. Only reach for a headless library (Radix UI, React Aria) when the interaction pattern genuinely cannot be achieved with native HTML. Overengineering simple controls with complex libraries creates fragile code.
+- **Use Radix UI for complex interaction patterns.** The project uses **Radix UI** for primitives that require non-trivial accessibility and interaction logic (Accordion, Switch, Tooltip, Slot). Check Radix first before hand-rolling complex behavior like modals, popovers, or multi-select.
+- **Uncontrolled by default for commit-on-blur inputs.** When a value is only meaningful once committed (e.g., port number, URL), use `defaultValue` with an `onBlur`/`onKeyDown` commit handler. Controlled inputs (`value` + `onChange`) fight the user's typing by re-rendering on every keystroke. Only use controlled mode when the parent must dictate the displayed value in real time.
+- **Layer: styled primitive → app component.** The retro component in `components/retro/` applies the design system (border-2, shadow-sm, theme colors, font-mono). The app component (e.g., `PortEditor`) handles business logic (storage, messaging). Keep these layers separate.
+- **Every retro component gets a Storybook story** (`*.stories.tsx` alongside the component). Cover at minimum: default state, edge-case values, disabled state, and an "all states" composite story.
 
 ### MCP Tools
 

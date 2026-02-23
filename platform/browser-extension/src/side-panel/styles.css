@@ -175,3 +175,10 @@ body {
 .animate-accordion-up {
   animation: accordion-up 0.2s ease-out;
 }
+
+/* Hide native number input spinner — replaced by custom chevron buttons */
+.hide-number-spinner::-webkit-outer-spin-button,
+.hide-number-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

@@ -1,18 +1,16 @@
 import { Empty } from './retro/Empty.js';
 import { Loader } from './retro/Loader.js';
+import { DEFAULT_PORT, PORT_STORAGE_KEY } from '../constants.js';
 import { useState, useEffect } from 'react';
 import type { DisconnectReason } from '../../extension-messages.js';
-
-const DEFAULT_PORT = 9515;
-const STORAGE_KEY = 'serverPort';
 
 const ConnectionRefusedState = () => {
   const [port, setPort] = useState(DEFAULT_PORT);
 
   useEffect(() => {
-    chrome.storage.local.get(STORAGE_KEY).then(
+    chrome.storage.local.get(PORT_STORAGE_KEY).then(
       result => {
-        const stored = result[STORAGE_KEY] as number | undefined;
+        const stored = result[PORT_STORAGE_KEY] as number | undefined;
         if (typeof stored === 'number' && stored >= 1 && stored <= 65535) {
           setPort(stored);
         }
@@ -21,6 +19,16 @@ const ConnectionRefusedState = () => {
         // Storage unavailable — keep default
       },
     );
+
+    const onChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area !== 'local' || !(PORT_STORAGE_KEY in changes)) return;
+      const newValue = changes[PORT_STORAGE_KEY].newValue as number | undefined;
+      if (typeof newValue === 'number' && newValue >= 1 && newValue <= 65535) {
+        setPort(newValue);
+      }
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
   }, []);
 
   const command = port === DEFAULT_PORT ? 'opentabs start' : `opentabs start --port ${port}`;

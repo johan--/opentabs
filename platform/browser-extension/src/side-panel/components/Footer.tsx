@@ -1,104 +1,43 @@
 import { Button } from './retro/Button.js';
 import { NumberStepper } from './retro/NumberStepper.js';
+import { DEFAULT_PORT, PORT_STORAGE_KEY } from '../constants.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { Moon, Sun } from 'lucide-react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { PortChangedMessage } from '../../extension-messages.js';
 
-const DEFAULT_PORT = 9515;
-const STORAGE_KEY = 'serverPort';
-
-const isValidPort = (value: string): boolean => {
-  const num = Number(value);
-  return Number.isInteger(num) && num >= 1 && num <= 65535;
-};
-
 const PortEditor = () => {
-  const [port, setPort] = useState(DEFAULT_PORT);
-  const [draft, setDraft] = useState(String(DEFAULT_PORT));
-  const [invalid, setInvalid] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [initialPort, setInitialPort] = useState<number | null>(null);
 
   useEffect(() => {
-    chrome.storage.local.get(STORAGE_KEY).then(
+    chrome.storage.local.get(PORT_STORAGE_KEY).then(
       result => {
-        const stored = result[STORAGE_KEY] as number | undefined;
-        if (typeof stored === 'number' && isValidPort(String(stored))) {
-          setPort(stored);
-          setDraft(String(stored));
-        }
+        const stored = result[PORT_STORAGE_KEY] as number | undefined;
+        setInitialPort(typeof stored === 'number' && stored >= 1 && stored <= 65535 ? stored : DEFAULT_PORT);
       },
       () => {
-        // Storage unavailable — keep default
+        setInitialPort(DEFAULT_PORT);
       },
     );
   }, []);
 
-  const commitPort = useCallback(
-    (value: string) => {
-      if (!isValidPort(value)) {
-        setInvalid(true);
-        return;
-      }
-      const newPort = Number(value);
-      if (newPort === port) {
-        setInvalid(false);
-        return;
-      }
-      setPort(newPort);
-      setInvalid(false);
-      chrome.storage.local.set({ [STORAGE_KEY]: newPort }).catch(() => {});
-      const message: PortChangedMessage = { type: 'port-changed', port: newPort };
-      chrome.runtime.sendMessage(message).catch(() => {});
-    },
-    [port],
-  );
+  const handleChange = useCallback((value: number) => {
+    chrome.storage.local.set({ [PORT_STORAGE_KEY]: value }).catch(() => {});
+    const message: PortChangedMessage = { type: 'port-changed', port: value };
+    chrome.runtime.sendMessage(message).catch(() => {});
+  }, []);
 
-  const handleChange = useCallback(
-    (value: string) => {
-      setDraft(value);
-      setInvalid(false);
-      // Stepper arrows produce valid clamped values — commit immediately
-      if (isValidPort(value)) {
-        commitPort(value);
-      }
-    },
-    [commitPort],
-  );
-
-  const handleBlur = useCallback(() => {
-    if (isValidPort(draft)) {
-      commitPort(draft);
-    } else {
-      // Revert to last valid port on blur if invalid
-      setDraft(String(port));
-      setInvalid(false);
-    }
-  }, [draft, port, commitPort]);
+  if (initialPort === null) return null;
 
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-muted-foreground font-mono text-xs">Port:</span>
       <NumberStepper
-        ref={inputRef}
-        value={draft}
+        defaultValue={initialPort}
         onChange={handleChange}
-        onBlur={handleBlur}
-        onKeyDown={e => {
-          if (e.key === 'Enter') {
-            e.currentTarget.blur();
-          }
-          if (e.key === 'Escape') {
-            setDraft(String(port));
-            setInvalid(false);
-            e.currentTarget.blur();
-          }
-        }}
         min={1}
         max={65535}
-        aria-invalid={invalid || undefined}
         aria-label="Server port"
-        placeholder="9515"
         className="h-7"
       />
     </div>
