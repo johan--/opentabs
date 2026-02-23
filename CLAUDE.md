@@ -298,7 +298,7 @@ The root tooling (`bun run build`, `bun run lint`, etc.) does NOT cover plugins.
 
 ### Publishing Platform Packages
 
-The platform packages `@opentabs-dev/shared`, `@opentabs-dev/plugin-sdk`, `@opentabs-dev/plugin-tools`, and `@opentabs-dev/cli` are published as private packages to the npm registry under the `@opentabs-dev` org. Publish order follows the dependency graph: shared → plugin-sdk → plugin-tools → cli.
+The platform packages `@opentabs-dev/shared`, `@opentabs-dev/mcp-server`, `@opentabs-dev/plugin-sdk`, `@opentabs-dev/plugin-tools`, `@opentabs-dev/cli`, and `@opentabs-dev/create-plugin` are published as private packages to the npm registry under the `@opentabs-dev` org. Publish order follows the dependency graph: shared → mcp-server → plugin-sdk → plugin-tools → cli → create-plugin.
 
 **Authentication**: npm requires a single token in `~/.npmrc` with read+write access to `@opentabs-dev` packages.
 
@@ -309,6 +309,8 @@ The platform packages `@opentabs-dev/shared`, `@opentabs-dev/plugin-sdk`, `@open
 # Permissions: Read and Write, Packages: @opentabs-dev/*, Bypass 2FA enabled
 echo '//registry.npmjs.org/:_authToken=<TOKEN>' > ~/.npmrc
 ```
+
+**NEVER change npm package access levels** (public/private) without explicit user approval. All `@opentabs-dev` packages are private. Do not run `npm access set status=public` or equivalent commands.
 
 **Publishing** (uses `scripts/publish.sh` which verifies auth via `npm whoami` before publishing):
 
@@ -512,6 +514,47 @@ Comments should describe **current behavior**, not historical context. Write com
 - Factual descriptions of current behavior
 - Explanations of why current code works the way it does
 - Technical rationale for design decisions
+
+---
+
+## Documentation Illustrations
+
+The docs site (`docs/`) uses inline SVG illustrations as React components. All illustrations follow a unified neo-brutalist design system — every illustration must feel like part of the same family.
+
+### Design Principles
+
+- **One concept, one illustration.** If two pages show the same concept (e.g., the 3-component architecture), they must use the same SVG component. Never draw two separate SVGs for the same thing.
+- **All illustrations live in `docs/components/illustrations.tsx`** and are registered in `docs/components/MDX.tsx` for use in `.mdx` files.
+- **No ASCII art diagrams in docs.** Every diagram in documentation must be a proper SVG illustration component. Replace ASCII box-drawing with SVG.
+- **Consistent visual style across all illustrations** — see the style rules below.
+
+### Visual Style Rules
+
+All SVG illustrations must follow the neo-brutalist style established by the existing components:
+
+- **CSS variables for theming**: `var(--color-foreground)`, `var(--color-primary)`, `var(--color-background)` — enables light/dark mode and theme variants
+- **Font**: `var(--font-mono), monospace` for all text
+- **Borders**: 3px `strokeWidth` on main container borders
+- **Shadows**: Hard drop shadows using an offset `<rect>` (4px right, 4px down) filled with `var(--color-foreground)` behind the main rect
+- **Headers**: Box-with-header-bar pattern — header rect filled with `var(--color-foreground)`, header text in `var(--color-primary)` with `fontWeight="bold"`
+- **No border-radius**: Matches `--radius: 0` from the design system
+- **Arrow markers**: Triangular arrowheads filled with `var(--color-foreground)`
+- **Muted labels**: `opacity="0.4"` to `0.5"` for secondary/subtitle text
+- **Highlighted items**: Use `var(--color-primary)` with low opacity fill (`0.12`) and a `1.5px` stroke for emphasis
+- **Dashed borders**: `strokeDasharray="4 3"` for "more items..." or optional/placeholder elements
+- **Container width**: `className="w-full"` with optional `max-w-lg` or `max-w-3xl` for smaller diagrams; wrap in `<div className="my-8">`
+- **Accessibility**: `aria-hidden="true"` on the `<svg>` element (illustrations are decorative; content is in the surrounding text)
+
+### Documentation Tone
+
+The docs follow a progressive audience path: **normal user** (Quick Start, Installation) → **plugin developer** (Guides, SDK Reference) → **platform contributor** (Contributing). The tone is:
+
+- **Friendly and accessible** — no jargon without explanation, no assumptions about prior knowledge
+- **Step-by-step and hand-holding** — explicit numbered steps, one action per step
+- **Show before tell** — lead with a visual or code example, then explain
+- **Concrete over abstract** — real commands, real output, real file paths
+
+Illustrations should match this tone: clear, labeled, approachable. Prefer showing the "happy path" flow over comprehensive architecture diagrams. Use annotations and labels generously.
 
 ---
 

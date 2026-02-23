@@ -48,29 +48,33 @@ const toTitleCase = (name: string): string =>
 
 // --- Template generation ---
 
-/** Resolve the current version of an @opentabs-dev package from the installed CLI. */
-const resolvePackageVersion = async (packageSpecifier: string): Promise<string> => {
+/**
+ * Resolve the version of @opentabs-dev packages for scaffolded plugins.
+ *
+ * All @opentabs-dev packages are published at the same version. The SDK is a
+ * direct dependency of the CLI, so `import.meta.resolve` reliably finds it
+ * even in global installs. We read its version once and use it for all
+ * @opentabs-dev dependencies in the scaffolded package.json.
+ */
+const resolveOpenTabsVersion = async (): Promise<string> => {
   try {
-    const entryUrl = import.meta.resolve(packageSpecifier);
+    const entryUrl = import.meta.resolve('@opentabs-dev/plugin-sdk');
     const entryDir = dirname(new URL(entryUrl).pathname);
     const pkg: unknown = await Bun.file(join(entryDir, '..', 'package.json')).json();
     if (pkg !== null && typeof pkg === 'object' && 'version' in pkg && typeof pkg.version === 'string') {
       return `^${pkg.version}`;
     }
-    return '^0.0.2';
   } catch {
-    return '^0.0.2';
+    // Resolution failed
   }
+  return '*';
 };
 
 const generatePackageJson = async (args: ScaffoldArgs, urlPattern: string): Promise<string> => {
   const displayName = args.display ?? toTitleCase(args.name);
   const desc = args.description ?? `OpenTabs plugin for ${displayName}`;
 
-  const [sdkVersion, pluginToolsVersion] = await Promise.all([
-    resolvePackageVersion('@opentabs-dev/plugin-sdk'),
-    resolvePackageVersion('@opentabs-dev/plugin-tools'),
-  ]);
+  const openTabsVersion = await resolveOpenTabsVersion();
 
   const pkg = {
     name: `opentabs-plugin-${args.name}`,
@@ -105,10 +109,10 @@ const generatePackageJson = async (args: ScaffoldArgs, urlPattern: string): Prom
       zod: '^4.0.0',
     },
     dependencies: {
-      '@opentabs-dev/plugin-sdk': sdkVersion,
+      '@opentabs-dev/plugin-sdk': openTabsVersion,
     },
     devDependencies: {
-      '@opentabs-dev/plugin-tools': pluginToolsVersion,
+      '@opentabs-dev/plugin-tools': openTabsVersion,
       concurrently: '^9.1.2',
       eslint: '^9.39.2',
       'eslint-config-prettier': '^10.1.8',
