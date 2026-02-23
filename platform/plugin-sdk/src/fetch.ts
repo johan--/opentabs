@@ -24,6 +24,11 @@ export const httpStatusToToolError = (response: Response, message: string): Tool
     const retryAfterMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
     return ToolError.rateLimited(message, retryAfterMs);
   }
+  if (status >= 500) {
+    const retryAfter = status === 503 ? response.headers.get('Retry-After') : null;
+    const retryAfterMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
+    return new ToolError(message, 'http_error', { category: 'internal', retryable: true, retryAfterMs });
+  }
   return new ToolError(message, 'http_error', { category: 'internal' });
 };
 
