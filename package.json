@@ -32,6 +32,8 @@
     "test": "bun test platform/",
     "build:e2e-plugin": "cd plugins/e2e-test && bun install --frozen-lockfile && bun run build",
     "test:e2e": "bun run build:e2e-plugin && bunx playwright test",
+    "clean": "bun scripts/clean.ts",
+    "clean:all": "bun scripts/clean.ts --all",
     "postinstall": "bun scripts/check-bun-version.ts",
     "prepare": "husky"
   },
