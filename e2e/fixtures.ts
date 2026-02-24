@@ -825,9 +825,15 @@ const createExtensionCopy = (
   try {
     // Copy extension directory, excluding build artifacts and source files
     // that are not needed at runtime (speeds up test setup).
+    // This filter mirrors EXTENSION_COPY_EXCLUDE_PATTERN from @opentabs-dev/shared.
+    const excludePattern =
+      /(?:^|[\\/])(?:node_modules|src|\.git|\.storybook|storybook-static)(?:[\\/]|$)|(?:^|[\\/])tsconfig[^/\\]*|(?:^|[\\/])build-[^/\\]*\.ts$|(?:^|[\\/])package\.json$|(?:^|[\\/])CLAUDE\.md$/;
     fs.cpSync(EXTENSION_DIR, extensionDir, {
       recursive: true,
-      filter: (source: string) => !/[\\/](node_modules|src|\.tsbuildinfo)[\\/]?$/.test(source),
+      filter: (source: string) => {
+        const rel = path.relative(EXTENSION_DIR, source);
+        return rel === '' || !excludePattern.test(rel);
+      },
     });
 
     // Patch the default MCP server URL in the offscreen document so it

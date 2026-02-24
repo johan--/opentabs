@@ -430,6 +430,24 @@ describe('EXTENSION_COPY_EXCLUDE_PATTERN', () => {
     });
   });
 
+  describe('storybook exclusions', () => {
+    test('matches .storybook at root', () => {
+      expect(pattern.test('.storybook')).toBe(true);
+    });
+
+    test('matches .storybook/main.ts', () => {
+      expect(pattern.test('.storybook/main.ts')).toBe(true);
+    });
+
+    test('matches storybook-static at root', () => {
+      expect(pattern.test('storybook-static')).toBe(true);
+    });
+
+    test('matches storybook-static/index.json', () => {
+      expect(pattern.test('storybook-static/index.json')).toBe(true);
+    });
+  });
+
   describe('tsconfig exclusions', () => {
     test('matches tsconfig.json at root', () => {
       expect(pattern.test('tsconfig.json')).toBe(true);
@@ -449,6 +467,24 @@ describe('EXTENSION_COPY_EXCLUDE_PATTERN', () => {
 
     test('matches tsconfig.test.json in subdirectory', () => {
       expect(pattern.test('sub/tsconfig.test.json')).toBe(true);
+    });
+  });
+
+  describe('build script and metadata exclusions', () => {
+    test('matches build-extension.ts', () => {
+      expect(pattern.test('build-extension.ts')).toBe(true);
+    });
+
+    test('matches build-side-panel.ts', () => {
+      expect(pattern.test('build-side-panel.ts')).toBe(true);
+    });
+
+    test('matches package.json at root', () => {
+      expect(pattern.test('package.json')).toBe(true);
+    });
+
+    test('matches CLAUDE.md at root', () => {
+      expect(pattern.test('CLAUDE.md')).toBe(true);
     });
   });
 
@@ -479,6 +515,14 @@ describe('EXTENSION_COPY_EXCLUDE_PATTERN', () => {
 
     test('does not match side-panel/index.html', () => {
       expect(pattern.test('side-panel/index.html')).toBe(false);
+    });
+
+    test('does not match offscreen', () => {
+      expect(pattern.test('offscreen')).toBe(false);
+    });
+
+    test('does not match offscreen/offscreen.html', () => {
+      expect(pattern.test('offscreen/offscreen.html')).toBe(false);
     });
   });
 });

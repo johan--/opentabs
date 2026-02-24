@@ -336,9 +336,16 @@ export const isBlockedUrlScheme = (url: string): boolean => {
   }
 };
 
-/** Matches paths to exclude when copying the browser extension to ~/.opentabs/extension/ */
+/**
+ * Matches paths to exclude when copying the browser extension to ~/.opentabs/extension/.
+ *
+ * Excluded categories:
+ * - Directories: node_modules, src, .git, .storybook, storybook-static
+ * - File patterns: tsconfig*, build-*.ts
+ * - Root-level metadata: package.json, CLAUDE.md
+ */
 export const EXTENSION_COPY_EXCLUDE_PATTERN =
-  /(?:^|[\\/])(?:node_modules|src|\.git)(?:[\\/]|$)|(?:^|[\\/])tsconfig[^/\\]*/;
+  /(?:^|[\\/])(?:node_modules|src|\.git|\.storybook|storybook-static)(?:[\\/]|$)|(?:^|[\\/])tsconfig[^/\\]*|(?:^|[\\/])build-[^/\\]*\.ts$|(?:^|[\\/])package\.json$|(?:^|[\\/])CLAUDE\.md$/;
 
 // ---------------------------------------------------------------------------
 // Plugin name validation
