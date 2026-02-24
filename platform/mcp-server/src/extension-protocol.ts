@@ -26,6 +26,7 @@ import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PluginLogEntry } from './log-buffer.js';
 import type {
+  RegisteredPlugin,
   ServerState,
   TabMapping,
   PendingDispatch,
@@ -110,6 +111,51 @@ const sendPluginManagementError = (state: ServerState, id: string | number, err:
     id,
   });
 };
+
+/**
+ * Serialize a plugin's metadata and tools into the wire format sent to the extension.
+ * Returns the common core shape shared by sync.full, plugin.update, and config.getState.
+ * Callers can spread additional fields on top (e.g., sourcePath, adapterHash for sync messages,
+ * or tabState, source, sdkVersion for config.getState).
+ */
+const serializePluginForExtension = (
+  plugin: RegisteredPlugin,
+  state: ServerState,
+): {
+  name: string;
+  version: string;
+  displayName: string;
+  urlPatterns: string[];
+  trustTier: string;
+  iconSvg?: string;
+  iconInactiveSvg?: string;
+  tools: {
+    name: string;
+    displayName: string;
+    description: string;
+    icon: string;
+    iconSvg?: string;
+    iconInactiveSvg?: string;
+    enabled: boolean;
+  }[];
+} => ({
+  name: plugin.name,
+  version: plugin.version,
+  displayName: plugin.displayName,
+  urlPatterns: plugin.urlPatterns,
+  trustTier: plugin.trustTier,
+  ...(plugin.iconSvg ? { iconSvg: plugin.iconSvg } : {}),
+  ...(plugin.iconInactiveSvg ? { iconInactiveSvg: plugin.iconInactiveSvg } : {}),
+  tools: plugin.tools.map(t => ({
+    name: t.name,
+    displayName: t.displayName,
+    description: t.description,
+    icon: t.icon,
+    ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
+    ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
+    enabled: isToolEnabled(state, prefixedToolName(plugin.name, t.name)),
+  })),
+});
 
 /** Callbacks the extension protocol can invoke on the MCP side */
 interface McpCallbacks {
@@ -246,24 +292,9 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
   }
 
   const plugins = pluginList.map(p => ({
-    name: p.name,
-    version: p.version,
-    displayName: p.displayName,
-    urlPatterns: p.urlPatterns,
-    trustTier: p.trustTier,
+    ...serializePluginForExtension(p, state),
     sourcePath: p.sourcePath,
     adapterHash: p.adapterHash,
-    ...(p.iconSvg ? { iconSvg: p.iconSvg } : {}),
-    ...(p.iconInactiveSvg ? { iconInactiveSvg: p.iconInactiveSvg } : {}),
-    tools: p.tools.map(t => ({
-      name: t.name,
-      displayName: t.displayName,
-      description: t.description,
-      icon: t.icon,
-      ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-      ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-      enabled: isToolEnabled(state, prefixedToolName(p.name, t.name)),
-    })),
   }));
 
   const sent = sendToExtension(state, {
@@ -506,24 +537,9 @@ const sendPluginUpdate = async (
     jsonrpc: '2.0',
     method: 'plugin.update',
     params: {
-      name: plugin.name,
-      version: plugin.version,
-      displayName: plugin.displayName,
-      urlPatterns: plugin.urlPatterns,
-      trustTier: plugin.trustTier,
+      ...serializePluginForExtension(plugin, state),
       sourcePath: plugin.sourcePath,
       adapterHash: plugin.adapterHash,
-      ...(plugin.iconSvg ? { iconSvg: plugin.iconSvg } : {}),
-      ...(plugin.iconInactiveSvg ? { iconInactiveSvg: plugin.iconInactiveSvg } : {}),
-      tools: plugin.tools.map(t => ({
-        name: t.name,
-        displayName: t.displayName,
-        description: t.description,
-        icon: t.icon,
-        ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-        ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-        enabled: isToolEnabled(state, prefixedToolName(plugin.name, t.name)),
-      })),
     },
   });
   if (!sent) log.warn('Failed to send plugin.update — extension not connected');
@@ -821,26 +837,11 @@ const handleConfigGetState = (state: ServerState, id: string | number): void => 
       const tabInfo = state.tabMapping.get(p.name);
       const update = p.npmPackageName ? outdatedByPkg.get(p.npmPackageName) : undefined;
       return {
-        name: p.name,
-        displayName: p.displayName,
-        version: p.version,
-        trustTier: p.trustTier,
+        ...serializePluginForExtension(p, state),
         source: p.source,
         tabState: tabInfo?.state ?? 'closed',
-        urlPatterns: p.urlPatterns,
         ...(p.sdkVersion ? { sdkVersion: p.sdkVersion } : {}),
-        ...(p.iconSvg ? { iconSvg: p.iconSvg } : {}),
-        ...(p.iconInactiveSvg ? { iconInactiveSvg: p.iconInactiveSvg } : {}),
         ...(update ? { update } : {}),
-        tools: p.tools.map(t => ({
-          name: t.name,
-          displayName: t.displayName,
-          description: t.description,
-          icon: t.icon,
-          ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-          ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-          enabled: isToolEnabled(state, prefixedToolName(p.name, t.name)),
-        })),
       };
     });
 
