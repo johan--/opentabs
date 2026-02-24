@@ -277,8 +277,8 @@ const handleHealth = (
   const toolCount = state.registry.toolLookup.size + state.cachedBrowserTools.length;
   const uptimeSeconds = Math.floor((Date.now() - state.startedAt) / 1000);
 
-  const pendingPlugins = state.fileWatcherEntries.filter(e => e.pluginName.startsWith('(pending:')).length;
-  const watchedPlugins = state.fileWatcherEntries.length - pendingPlugins;
+  const pendingPlugins = state.fileWatching.entries.filter(e => e.pluginName.startsWith('(pending:')).length;
+  const watchedPlugins = state.fileWatching.entries.length - pendingPlugins;
 
   const auditSummary = computeAuditSummary(state.auditLog);
 
@@ -308,8 +308,8 @@ const handleHealth = (
     fileWatcher: {
       watchedPlugins,
       pendingPlugins,
-      lastPollAt: state.mtimeLastPollAt,
-      pollDetections: state.mtimePollDetections,
+      lastPollAt: state.fileWatching.mtimeLastPollAt,
+      pollDetections: state.fileWatching.mtimePollDetections,
     },
     auditSummary,
   });
