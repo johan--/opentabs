@@ -3,6 +3,7 @@ import { injectPluginsIntoTab, reinjectStoredPlugins } from './iife-injection.js
 import { handleServerMessage, clearConfirmationBadge, clearAllConfirmationBadges } from './message-router.js';
 import { forwardToSidePanel, sendToServer } from './messaging.js';
 import { invalidatePluginCache } from './plugin-storage.js';
+import { persistOpenWindows, restoreSidePanels } from './side-panel-state.js';
 import { checkTabStateChanges, clearTabStateCache, sendTabSyncAll } from './tab-state.js';
 import { notifyDispatchProgress } from './tool-dispatch.js';
 import type { DisconnectReason, InternalMessage } from './extension-messages.js';
@@ -18,10 +19,12 @@ const openWindows = new Set<number>();
 
 chrome.sidePanel.onOpened.addListener(({ windowId }) => {
   openWindows.add(windowId);
+  persistOpenWindows(openWindows);
 });
 
 chrome.sidePanel.onClosed.addListener(({ windowId }) => {
   openWindows.delete(windowId);
+  persistOpenWindows(openWindows);
 });
 
 chrome.action.onClicked.addListener(({ windowId }) => {
@@ -338,6 +341,11 @@ chrome.runtime.onStartup.addListener(() => {
 ensureOffscreenDocument().catch((err: unknown) => console.warn('[opentabs] offscreen creation failed:', err));
 setupKeepaliveAlarm().catch((err: unknown) => console.warn('[opentabs] keepalive alarm failed:', err));
 reinjectStoredPlugins().catch((err: unknown) => console.warn('[opentabs] plugin reinjection failed:', err));
+restoreSidePanels()
+  .then(restored => {
+    for (const id of restored) openWindows.add(id);
+  })
+  .catch((err: unknown) => console.warn('[opentabs] side panel restore failed:', err));
 
 // Relay MCP server URL changes to the offscreen document, and invalidate
 // the plugin metadata cache when storage is modified from another context
