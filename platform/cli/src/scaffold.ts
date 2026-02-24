@@ -507,7 +507,8 @@ const scaffoldPlugin = async (args: ScaffoldArgs): Promise<string> => {
   console.log('Next steps:');
   console.log(`  ${pc.cyan(`cd ${args.name}`)}`);
   console.log(`  ${pc.cyan('bun install')}`);
-  console.log(`  ${pc.cyan('bun run build')}`);
+  console.log(`  ${pc.cyan('bun run build')}       ${pc.dim('# compile once')}`);
+  console.log(`  ${pc.cyan('bun run dev')}         ${pc.dim('# watch mode — auto-rebuild on changes')}`);
 
   return projectDir;
 };
