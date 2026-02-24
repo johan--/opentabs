@@ -74,3 +74,5 @@ export const DEFAULT_LOG_LIMIT = 100;
 export const VALID_PLUGIN_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 /** Validate a plugin name against the expected format */
 export const isValidPluginName = (name: string): boolean => VALID_PLUGIN_NAME.test(name);
+/** Build the WebSocket URL for the MCP server on the given port */
+export const buildWsUrl = (port: number): string => `ws://localhost:${port}/ws`;

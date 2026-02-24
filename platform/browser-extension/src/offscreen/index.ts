@@ -13,7 +13,13 @@
  * documents do not have access to chrome.storage APIs.
  */
 
-import { DEFAULT_SERVER_PORT, WS_CLOSE_AUTH_FAILED, WS_CLOSE_PONG_TIMEOUT, WS_INFO_TIMEOUT_MS } from '../constants.js';
+import {
+  buildWsUrl,
+  DEFAULT_SERVER_PORT,
+  WS_CLOSE_AUTH_FAILED,
+  WS_CLOSE_PONG_TIMEOUT,
+  WS_INFO_TIMEOUT_MS,
+} from '../constants.js';
 import { ALL_ALLOWED_METHODS } from '../known-methods.js';
 import { installLogCollector } from '../log-collector.js';
 import type { DisconnectReason, InternalMessage, WsStateMessage, WsDataMessage } from '../extension-messages.js';
@@ -21,7 +27,7 @@ import type { DisconnectReason, InternalMessage, WsStateMessage, WsDataMessage }
 /** Capture console output in a ring buffer for retrieval by debugging tools */
 const offscreenLogCollector = installLogCollector('offscreen');
 
-const DEFAULT_MCP_SERVER_URL = `ws://localhost:${DEFAULT_SERVER_PORT}/ws`;
+const DEFAULT_MCP_SERVER_URL = buildWsUrl(DEFAULT_SERVER_PORT);
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
 const BACKOFF_MULTIPLIER = 2;
@@ -503,7 +509,7 @@ chrome.runtime.onMessage.addListener((message: InternalMessage, sender, sendResp
     }
 
     case 'port-changed': {
-      const newUrl = `ws://localhost:${message.port}/ws`;
+      const newUrl = buildWsUrl(message.port);
       if (newUrl !== mcpServerUrl) {
         console.log(`[opentabs:offscreen] Port changed to ${message.port}, reconnecting`);
         mcpServerUrl = newUrl;

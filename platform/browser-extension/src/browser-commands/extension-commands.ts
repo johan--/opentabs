@@ -1,6 +1,7 @@
 import { requireTabId, sendErrorResult, sendSuccessResult } from './helpers.js';
 import { bgLogCollector } from '../background-log-state.js';
 import {
+  buildWsUrl,
   DEFAULT_LOG_LIMIT,
   DEFAULT_SERVER_PORT,
   EXEC_MAX_ASYNC_WAIT_MS,
@@ -38,7 +39,7 @@ export const handleExtensionGetState = async (id: string | number): Promise<void
       typeof localData[SERVER_PORT_KEY] === 'number' && localData[SERVER_PORT_KEY] > 0
         ? localData[SERVER_PORT_KEY]
         : DEFAULT_SERVER_PORT;
-    const mcpServerUrl = `ws://localhost:${port}/ws`;
+    const mcpServerUrl = buildWsUrl(port);
 
     // Plugin metadata with tab states
     const pluginIndex = await getAllPluginMeta();
