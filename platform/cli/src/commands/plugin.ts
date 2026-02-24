@@ -328,8 +328,9 @@ const handlePluginSearch = async (query?: string): Promise<void> => {
   }
 
   if (results.length === 0) {
-    const term = query ?? '';
-    console.log(pc.yellow(`No plugins found for '${term}'. Try a different search term.`));
+    console.log(
+      pc.yellow(query ? `No plugins found for "${query}". Try a different search term.` : 'No plugins found.'),
+    );
     return;
   }
 
