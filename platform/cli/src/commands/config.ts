@@ -14,6 +14,7 @@ import { notifyServer } from '../notify-server.js';
 import { resolvePort } from '../parse-port.js';
 import { atomicWrite, generateSecret, toErrorMessage } from '@opentabs-dev/shared';
 import pc from 'picocolors';
+import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -304,6 +305,13 @@ const handleSetLocalPluginsAdd = async (value: string, options: { port?: number 
   plugins.push(pluginPath);
   await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(`${pc.green('Added:')} ${pluginPath}`);
+
+  if (!existsSync(pluginPath)) {
+    console.log(pc.yellow(`Warning: Path does not exist: ${pluginPath}`));
+  } else if (!(await Bun.file(join(pluginPath, 'package.json')).exists())) {
+    console.log(pc.yellow(`Warning: No package.json found at ${pluginPath}. Plugin may not load.`));
+  }
+
   await notifyServer({ port: options.port, warnIfNotRunning: true });
 };
 
