@@ -8,7 +8,7 @@
  */
 
 import { resolvePort } from '../parse-port.js';
-import { toErrorMessage } from '@opentabs-dev/shared';
+import { platformExec, toErrorMessage } from '@opentabs-dev/shared';
 import pc from 'picocolors';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +29,7 @@ const getInstalledVersion = async (): Promise<string> => {
 
 /** Query the latest published version via `npm view`. */
 const getLatestVersion = (): string => {
-  const result = Bun.spawnSync(['npm', 'view', CLI_PACKAGE_NAME, 'version'], {
+  const result = Bun.spawnSync([platformExec('npm'), 'view', CLI_PACKAGE_NAME, 'version'], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   if (result.exitCode !== 0) {
@@ -54,13 +54,24 @@ const isServerRunning = async (port: number): Promise<boolean> => {
 /** Run `bun install -g` to update the CLI package. */
 const performUpdate = (version: string): boolean => {
   const target = `${CLI_PACKAGE_NAME}@${version}`;
-  const result = Bun.spawnSync(['bun', 'install', '-g', target], {
+  const result = Bun.spawnSync([platformExec('bun'), 'install', '-g', target], {
     stdio: ['inherit', 'inherit', 'inherit'],
   });
   return result.exitCode === 0;
 };
 
+/** Detect if the CLI is running from a source checkout (monorepo) rather than a global npm install. */
+const isRunningFromSource = (): boolean => {
+  const cliPath = fileURLToPath(import.meta.url);
+  return !cliPath.includes('node_modules');
+};
+
 const handleUpdate = async (options: UpdateOptions): Promise<void> => {
+  if (isRunningFromSource()) {
+    console.log(pc.yellow('You appear to be running from source. Use git pull to update instead.'));
+    return;
+  }
+
   const port = resolvePort(options);
 
   // 1. Get current and latest versions

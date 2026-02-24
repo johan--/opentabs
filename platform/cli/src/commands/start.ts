@@ -105,25 +105,57 @@ const printFirstTimeInstructions = (extensionDest: string, port: number, secret:
   printMcpClientConfigs(mcpUrl, secret);
 };
 
-const printMcpClientConfigs = (mcpUrl: string, secret: string | null): void => {
-  const headers = secret ? `, "headers": { "Authorization": "Bearer ${secret}" }` : '';
+const indent = (json: string, prefix: string): string =>
+  json
+    .split('\n')
+    .map((line, i) => (i === 0 ? `${prefix}${line}` : `${prefix}${line}`))
+    .join('\n');
 
-  console.log(pc.dim(`     ${pc.bold('Claude Code')} (~/.claude.json — add to "mcpServers"):`));
-  console.log(
-    pc.dim(`     { "mcpServers": { "opentabs": { "type": "streamable-http", "url": "${mcpUrl}"${headers} } } }`),
-  );
-  console.log('');
-  console.log(pc.dim(`     ${pc.bold('OpenCode')} (opencode.json in project root):`));
-  console.log(pc.dim(`     { "mcp": { "opentabs": { "type": "remote", "url": "${mcpUrl}"${headers} } } }`));
-  console.log('');
-  console.log(pc.dim(`     ${pc.bold('Cursor')} (.cursor/mcp.json):`));
-  console.log(pc.dim(`     { "mcpServers": { "opentabs": { "type": "http", "url": "${mcpUrl}"${headers} } } }`));
-  console.log('');
-  console.log(pc.dim(`     ${pc.bold('Windsurf')} (~/.codeium/windsurf/mcp_config.json):`));
-  console.log(pc.dim(`     { "mcpServers": { "opentabs": { "serverUrl": "${mcpUrl}"${headers} } } }`));
-  console.log('');
-  console.log(pc.dim('     For other MCP clients, consult their documentation for adding a Streamable HTTP server'));
-  console.log(pc.dim(`     pointing to ${mcpUrl} with Authorization: Bearer <secret>`));
+const printMcpClientConfigs = (mcpUrl: string, secret: string | null): void => {
+  const pad = '     ';
+  const authHeaders = secret ? { Authorization: `Bearer ${secret}` } : undefined;
+
+  const configs: Array<{ label: string; file: string; json: Record<string, unknown> }> = [
+    {
+      label: 'Claude Code',
+      file: '~/.claude.json — add to "mcpServers"',
+      json: {
+        mcpServers: {
+          opentabs: { type: 'streamable-http', url: mcpUrl, ...(authHeaders && { headers: authHeaders }) },
+        },
+      },
+    },
+    {
+      label: 'OpenCode',
+      file: 'opencode.json in project root',
+      json: {
+        mcp: { opentabs: { type: 'remote', url: mcpUrl, ...(authHeaders && { headers: authHeaders }) } },
+      },
+    },
+    {
+      label: 'Cursor',
+      file: '.cursor/mcp.json',
+      json: {
+        mcpServers: { opentabs: { type: 'http', url: mcpUrl, ...(authHeaders && { headers: authHeaders }) } },
+      },
+    },
+    {
+      label: 'Windsurf',
+      file: '~/.codeium/windsurf/mcp_config.json',
+      json: {
+        mcpServers: { opentabs: { serverUrl: mcpUrl, ...(authHeaders && { headers: authHeaders }) } },
+      },
+    },
+  ];
+
+  for (const { label, file, json } of configs) {
+    console.log(pc.dim(`${pad}${pc.bold(label)} (${file}):`));
+    console.log(pc.dim(indent(JSON.stringify(json, null, 2), pad)));
+    console.log('');
+  }
+
+  console.log(pc.dim(`${pad}For other MCP clients, consult their documentation for adding a Streamable HTTP server`));
+  console.log(pc.dim(`${pad}pointing to ${mcpUrl} with Authorization: Bearer <secret>`));
   console.log('');
 };
 
@@ -132,7 +164,11 @@ const handleStart = async (options: StartOptions): Promise<void> => {
 
   if (!(await Bun.file(serverEntry).exists())) {
     console.error(pc.red(`Error: MCP server entry not found at ${serverEntry}`));
-    console.error('Run bun run build from the project root first.');
+    if (serverEntry.includes('node_modules')) {
+      console.error('Try reinstalling: bun install -g @opentabs-dev/cli');
+    } else {
+      console.error('Run bun run build from the project root first.');
+    }
     process.exit(1);
   }
 
@@ -160,9 +196,10 @@ const handleStart = async (options: StartOptions): Promise<void> => {
 
   console.log(`Starting OpenTabs MCP server on port ${pc.bold(String(port))}...`);
   console.log('');
-  console.log(`  ${pc.cyan('MCP endpoint:')}  http://localhost:${port}/mcp`);
-  console.log(`  ${pc.cyan('Health check:')}  http://localhost:${port}/health`);
-  console.log(`  ${pc.cyan('Log file:')}     ${logFilePath}`);
+  const label = (s: string) => `  ${pc.cyan(s.padEnd(15))}`;
+  console.log(`${label('MCP endpoint:')}http://localhost:${port}/mcp`);
+  console.log(`${label('Health check:')}http://localhost:${port}/health`);
+  console.log(`${label('Log file:')}${logFilePath}`);
   console.log('');
 
   if (isFirstTime) {
@@ -194,6 +231,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
   logStream.end();
 
   const exitCode = await proc.exited;
+  console.log(pc.dim('Server stopped.'));
   process.exit(exitCode);
 };
 

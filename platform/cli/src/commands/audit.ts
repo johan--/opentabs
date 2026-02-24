@@ -6,6 +6,7 @@
  * for post-restart forensics.
  */
 
+import { isTimeout } from './status.js';
 import { getConfigDir, isConnectionRefused, readAuthSecret } from '../config.js';
 import { resolvePort } from '../parse-port.js';
 import { toErrorMessage } from '@opentabs-dev/shared';
@@ -147,11 +148,12 @@ const handleAuditFromFile = async (options: AuditOptions): Promise<void> => {
   const lines = raw.split('\n').filter(line => line.trim().length > 0);
 
   let entries: AuditEntry[] = [];
+  let skippedCount = 0;
   for (const line of lines) {
     try {
       entries.push(JSON.parse(line) as AuditEntry);
     } catch {
-      // Skip malformed lines
+      skippedCount++;
     }
   }
 
@@ -170,15 +172,22 @@ const handleAuditFromFile = async (options: AuditOptions): Promise<void> => {
 
   if (options.json) {
     console.log(JSON.stringify(entries, null, 2));
-    return;
+  } else if (entries.length === 0) {
+    const hasFilters = options.plugin || options.tool || options.since;
+    if (hasFilters) {
+      console.log(pc.dim('No entries match the current filters. Try broadening the search.'));
+    } else {
+      console.log(pc.dim('No audit entries found. Invoke tools through an MCP client to generate audit entries.'));
+    }
+  } else {
+    printAuditTable(entries);
   }
 
-  if (entries.length === 0) {
-    console.log(pc.dim('No audit entries found.'));
-    return;
+  if (skippedCount > 0) {
+    console.log(
+      pc.dim(`Note: ${skippedCount} malformed log ${skippedCount === 1 ? 'entry was' : 'entries were'} skipped.`),
+    );
   }
-
-  printAuditTable(entries);
 };
 
 const handleAudit = async (options: AuditOptions): Promise<void> => {
@@ -239,7 +248,12 @@ const handleAudit = async (options: AuditOptions): Promise<void> => {
     }
 
     if (entries.length === 0) {
-      console.log(pc.dim('No audit entries found.'));
+      const hasFilters = options.plugin || options.tool || options.since;
+      if (hasFilters) {
+        console.log(pc.dim('No entries match the current filters. Try broadening the search.'));
+      } else {
+        console.log(pc.dim('No audit entries found. Invoke tools through an MCP client to generate audit entries.'));
+      }
       return;
     }
 
@@ -250,6 +264,9 @@ const handleAudit = async (options: AuditOptions): Promise<void> => {
     if (isConnectionRefused(err)) {
       console.error(pc.red('MCP server is not running.'));
       console.error(pc.dim(startHint));
+    } else if (isTimeout(err)) {
+      console.error(pc.red('Server not responding (timed out). Is the server running?'));
+      console.error(pc.dim(`The server at port ${port} did not respond in time.`));
     } else {
       const message = toErrorMessage(err);
       console.error(pc.red(`Error: ${message}`));

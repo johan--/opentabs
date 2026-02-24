@@ -1,4 +1,6 @@
 import {
+  checkAuthSecret,
+  checkBrowser,
   checkBunVersion,
   checkConfigFile,
   checkExtensionConnected,
@@ -60,6 +62,25 @@ describe('checkBunVersion', () => {
     expect(result.ok).toBe(true);
     expect(result.label).toBe('Bun runtime');
     expect(result.detail).toContain(Bun.version);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkBrowser
+// ---------------------------------------------------------------------------
+
+describe('checkBrowser', () => {
+  test('returns a result with label Browser', () => {
+    const result: CheckResult = checkBrowser();
+    expect(result.label).toBe('Browser');
+    expect(result.fatal).toBe(false);
+  });
+
+  test('finds a Chromium-based browser on macOS', () => {
+    if (process.platform !== 'darwin') return;
+    const result: CheckResult = checkBrowser();
+    // CI and dev machines should have at least one Chromium browser
+    expect(result.ok).toBe(true);
   });
 });
 
@@ -219,6 +240,62 @@ describe('checkConfigFile', () => {
     } finally {
       Bun.env.OPENTABS_CONFIG_DIR = prev;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkAuthSecret
+// ---------------------------------------------------------------------------
+
+describe('checkAuthSecret', () => {
+  const extensionDir = join(TEST_BASE_DIR, 'extension');
+  const authPath = join(extensionDir, 'auth.json');
+
+  test('returns pass when auth.json contains a valid secret', async () => {
+    mkdirSync(extensionDir, { recursive: true });
+    await Bun.write(authPath, JSON.stringify({ secret: 'abc123def456' }));
+    const { result, secret } = await checkAuthSecret();
+    expect(result.ok).toBe(true);
+    expect(result.label).toBe('Auth secret');
+    expect(result.detail).toBe('valid');
+    expect(secret).toBe('abc123def456');
+  });
+
+  test('returns warn when auth.json is missing', async () => {
+    const emptyDir = join(TEST_BASE_DIR, 'empty-auth-dir');
+    mkdirSync(emptyDir, { recursive: true });
+    const prev = Bun.env.OPENTABS_CONFIG_DIR;
+    Bun.env.OPENTABS_CONFIG_DIR = emptyDir;
+    try {
+      const { result, secret } = await checkAuthSecret();
+      expect(result.ok).toBe(false);
+      expect(result.fatal).toBe(false);
+      expect(result.label).toBe('Auth secret');
+      expect(result.detail).toContain('missing or invalid');
+      expect(result.hint).toContain('opentabs start');
+      expect(secret).toBeNull();
+    } finally {
+      Bun.env.OPENTABS_CONFIG_DIR = prev;
+    }
+  });
+
+  test('returns warn when auth.json has empty secret', async () => {
+    mkdirSync(extensionDir, { recursive: true });
+    await Bun.write(authPath, JSON.stringify({ secret: '' }));
+    const { result, secret } = await checkAuthSecret();
+    expect(result.ok).toBe(false);
+    expect(result.fatal).toBe(false);
+    expect(result.detail).toContain('missing or invalid');
+    expect(secret).toBeNull();
+  });
+
+  test('returns warn when auth.json is malformed JSON', async () => {
+    mkdirSync(extensionDir, { recursive: true });
+    await Bun.write(authPath, 'not valid json');
+    const { result, secret } = await checkAuthSecret();
+    expect(result.ok).toBe(false);
+    expect(result.fatal).toBe(false);
+    expect(secret).toBeNull();
   });
 });
 

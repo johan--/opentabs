@@ -8,10 +8,10 @@ import {
   getConfigPath,
   getLocalPluginsFromConfig,
   isConnectionRefused,
-  readAuthSecret,
   readConfig,
   resolvePluginPath,
 } from '../config.js';
+import { notifyServer } from '../notify-server.js';
 import { parsePort, resolvePort } from '../parse-port.js';
 import { scaffoldPlugin, promptForMissingArgs, ScaffoldError } from '../scaffold.js';
 import {
@@ -21,6 +21,7 @@ import {
   normalizePluginName,
   resolvePluginPackageCandidates,
   platformExec,
+  toErrorMessage,
 } from '@opentabs-dev/shared';
 import pc from 'picocolors';
 import { join } from 'node:path';
@@ -34,44 +35,6 @@ interface NpmSearchPackage {
   version: string;
   publisher?: { username: string };
 }
-
-/**
- * Notify the running MCP server to rediscover plugins via POST /reload.
- * Non-fatal — prints a hint on failure but never throws.
- */
-const notifyServer = async (options: { port?: number }): Promise<void> => {
-  const port = resolvePort(options);
-  const secret = await readAuthSecret();
-
-  try {
-    const healthRes = await fetch(`http://localhost:${port}/health`, {
-      signal: AbortSignal.timeout(3_000),
-    });
-    if (!healthRes.ok) return;
-  } catch {
-    // Server not running — nothing to notify
-    return;
-  }
-
-  try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (secret) headers['Authorization'] = `Bearer ${secret}`;
-
-    const res = await fetch(`http://localhost:${port}/reload`, {
-      method: 'POST',
-      headers,
-      signal: AbortSignal.timeout(5_000),
-    });
-
-    if (res.ok) {
-      console.log(pc.dim('Server notified — plugins rediscovered.'));
-    } else {
-      console.log(pc.dim(`Could not notify server (HTTP ${res.status}). Restart the server to pick up changes.`));
-    }
-  } catch {
-    console.log(pc.dim('Could not notify server. Restart the server to pick up changes.'));
-  }
-};
 
 // --- Install handler ---
 
@@ -101,6 +64,40 @@ const resolvePackageName = (name: string): string | null => {
     if (packageExistsOnNpm(candidate)) return candidate;
   }
   return null;
+};
+
+/**
+ * After a global npm install, check the installed package's package.json for
+ * the `opentabs` field or `opentabs-plugin` keyword. Prints a yellow warning
+ * if neither is found — the install is not rolled back.
+ */
+const warnIfNotPlugin = async (pkg: string): Promise<void> => {
+  try {
+    const proc = Bun.spawn([platformExec('npm'), 'root', '-g'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const globalRoot = (await new Response(proc.stdout).text()).trim();
+    await proc.exited;
+
+    const pkgJsonPath = join(globalRoot, pkg, 'package.json');
+    const pkgJsonText = await Bun.file(pkgJsonPath).text();
+    const pkgJson = JSON.parse(pkgJsonText) as Record<string, unknown>;
+
+    const hasOpentabsField = typeof pkgJson.opentabs === 'object' && pkgJson.opentabs !== null;
+    const keywords = Array.isArray(pkgJson.keywords) ? (pkgJson.keywords as unknown[]) : [];
+    const hasPluginKeyword = keywords.includes('opentabs-plugin');
+
+    if (!hasOpentabsField && !hasPluginKeyword) {
+      console.log(
+        pc.yellow(
+          'Warning: This package does not appear to be an OpenTabs plugin (missing opentabs metadata). It may not load correctly.',
+        ),
+      );
+    }
+  } catch {
+    // Cannot read installed package — skip validation silently
+  }
 };
 
 const handlePluginInstall = async (name: string, options: { port?: number }): Promise<void> => {
@@ -133,6 +130,7 @@ const handlePluginInstall = async (name: string, options: { port?: number }): Pr
   }
 
   console.log(pc.green(`Successfully installed ${pkg}.`));
+  await warnIfNotPlugin(pkg);
   await notifyServer(options);
 };
 
@@ -175,7 +173,12 @@ const removeFromLocalPlugins = async (pkg: string): Promise<void> => {
   }
 };
 
-const handlePluginRemove = async (name: string, options: { port?: number }): Promise<void> => {
+interface PluginRemoveOptions {
+  port?: number;
+  confirm?: boolean;
+}
+
+const handlePluginRemove = async (name: string, options: PluginRemoveOptions): Promise<void> => {
   const candidates = resolvePluginPackageCandidates(name);
   const isShorthand = candidates.length > 1;
 
@@ -183,26 +186,14 @@ const handlePluginRemove = async (name: string, options: { port?: number }): Pro
     console.log(`Resolving plugin ${pc.bold(name)}...`);
   }
 
-  const pkg = resolvePackageName(name);
-  if (!pkg) {
-    // Fall back to the primary candidate for uninstall (npm uninstall is lenient)
-    const fallback = normalizePluginName(name);
-    console.log(`Removing ${pc.bold(fallback)}...`);
+  const pkg = resolvePackageName(name) ?? normalizePluginName(name);
 
-    const proc = Bun.spawn([platformExec('npm'), 'uninstall', '-g', fallback], {
-      stdio: ['inherit', 'inherit', 'inherit'],
-    });
-    const exitCode = await proc.exited;
-
-    if (exitCode !== 0) {
-      console.error(pc.red(`npm uninstall failed (exit code ${exitCode}).`));
-      process.exit(1);
-    }
-
-    console.log(pc.green(`Successfully removed ${fallback}.`));
-    await removeFromLocalPlugins(fallback);
-    await notifyServer(options);
-    return;
+  if (!options.confirm) {
+    console.error(`This will remove the plugin ${pc.bold(pkg)} globally.`);
+    console.error('');
+    console.error(`Run with ${pc.bold('--confirm')} (or ${pc.bold('-y')}) to proceed:`);
+    console.error(`  opentabs plugin remove ${name} --confirm`);
+    process.exit(1);
   }
 
   console.log(`Removing ${pc.bold(pkg)}...`);
@@ -341,17 +332,31 @@ const handlePluginSearch = (query?: string): void => {
   }
 
   if (results.length === 0) {
-    const term = query ?? '';
-    console.log(pc.yellow(`No plugins found for '${term}'. Try a different search term.`));
+    console.log(
+      pc.yellow(query ? `No plugins found for "${query}". Try a different search term.` : 'No plugins found.'),
+    );
     return;
   }
+
+  const termWidth = process.stdout.columns || 80;
+
+  // Compute the max visible width used by non-description parts across all results.
+  // Line format: "  [label] name vVersion — desc by author"
+  const maxLabelLen = 11; // "[community]" is the longest label
+  const overheadPerPkg = results.map(pkg => {
+    const author = pkg.publisher?.username ?? 'unknown';
+    // 2 indent + label + 1 space + name + 1 space + "v" + version + " — " + " by " + author
+    return 2 + maxLabelLen + 1 + pkg.name.length + 1 + 1 + pkg.version.length + 3 + 4 + author.length;
+  });
+  const maxOverhead = Math.max(...overheadPerPkg);
+  const descWidth = Math.max(30, termWidth - maxOverhead);
 
   console.log();
   for (const pkg of results) {
     const label = pkg.name.startsWith(`${OFFICIAL_SCOPE}/`) ? pc.blue('[official]') : pc.dim('[community]');
     const desc = pkg.description
-      ? pkg.description.length > 60
-        ? pkg.description.slice(0, 57) + '...'
+      ? pkg.description.length > descWidth
+        ? pkg.description.slice(0, descWidth - 3) + '...'
         : pkg.description
       : '';
     const author = pkg.publisher?.username ?? 'unknown';
@@ -513,7 +518,7 @@ const handlePluginList = async (options: PluginListOptions): Promise<void> => {
     }
   } catch (err: unknown) {
     if (!isConnectionRefused(err)) {
-      // Unexpected error (not just "server not running") — still fall through to offline mode
+      console.error(pc.dim(`Could not reach server: ${toErrorMessage(err)}. Showing offline data.`));
     }
   }
 
@@ -605,6 +610,7 @@ Examples:
 
   pluginCmd
     .command('list')
+    .alias('ls')
     .description('List installed plugins')
     .option('--port <number>', 'Server port (default: 9515)', parsePort)
     .option('--json', 'Output machine-readable JSON')
@@ -620,6 +626,7 @@ Examples:
 
   pluginCmd
     .command('install')
+    .alias('add')
     .description('Install a plugin from npm')
     .argument('<name>', 'Plugin name or full package name (e.g., slack or opentabs-plugin-slack)')
     .addHelpText(
@@ -636,15 +643,17 @@ Examples:
 
   pluginCmd
     .command('remove')
+    .alias('rm')
     .description('Remove a globally installed plugin')
     .argument('<name>', 'Plugin name or full package name (e.g., slack or opentabs-plugin-slack)')
+    .option('-y, --confirm', 'Confirm removal')
     .addHelpText(
       'after',
       `
 Examples:
-  $ opentabs plugin remove slack
-  $ opentabs plugin remove opentabs-plugin-slack
-  $ opentabs plugin remove @my-org/opentabs-plugin-custom`,
+  $ opentabs plugin remove slack --confirm
+  $ opentabs plugin remove opentabs-plugin-slack -y
+  $ opentabs plugin remove @my-org/opentabs-plugin-custom --confirm`,
     )
     .action((name: string, _options: unknown, command: Command) => handlePluginRemove(name, command.optsWithGlobals()));
 

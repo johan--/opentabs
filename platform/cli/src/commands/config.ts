@@ -10,9 +10,11 @@ import {
   readAuthSecret,
   readConfig,
 } from '../config.js';
+import { notifyServer } from '../notify-server.js';
 import { resolvePort } from '../parse-port.js';
 import { atomicWrite, generateSecret, toErrorMessage } from '@opentabs-dev/shared';
 import pc from 'picocolors';
+import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -24,7 +26,13 @@ const handleConfigPath = (): void => {
 
 interface ConfigShowOptions {
   json?: boolean;
+  showSecret?: boolean;
 }
+
+const maskSecret = (secret: string): string => {
+  if (secret.length > 8) return secret.slice(0, 4) + '...' + secret.slice(-4);
+  return '****';
+};
 
 const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
   const configPath = getConfigPath();
@@ -42,9 +50,10 @@ const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
 
   const config = result.config;
   const secret = await readAuthSecret();
+  const displaySecret = secret ? (options.showSecret ? secret : maskSecret(secret)) : null;
 
   if (options.json) {
-    const output = { ...config, ...(secret ? { secret } : {}) };
+    const output = { ...config, ...(displaySecret ? { secret: displaySecret } : {}) };
     console.log(JSON.stringify(output, null, 2));
   } else {
     console.log(pc.bold('OpenTabs Config'));
@@ -92,9 +101,9 @@ const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
       }
     }
 
-    if (secret) {
+    if (displaySecret) {
       console.log('');
-      console.log(`  ${pc.cyan('secret')}  ${pc.dim(secret)}`);
+      console.log(`  ${pc.cyan('secret')}  ${pc.dim(displaySecret)}`);
     }
   }
 };
@@ -161,6 +170,7 @@ const handleListTools = async (): Promise<void> => {
     console.error(`Start it with: ${pc.bold('opentabs start')}`);
     console.error('');
     console.error('Tool names use the format <plugin>_<tool>, e.g. slack_send_message');
+    console.error(pc.dim('You can also list installed plugins with: opentabs plugin list'));
     process.exit(1);
   }
 
@@ -177,7 +187,7 @@ const handleListTools = async (): Promise<void> => {
   console.log(pc.dim('Usage: opentabs config set tool.<name> enabled|disabled'));
 };
 
-const handleSetTool = async (key: string, value: string): Promise<void> => {
+const handleSetTool = async (key: string, value: string, options: { port?: number }): Promise<void> => {
   const toolName = key.slice(TOOL_PREFIX.length);
   if (!toolName || !toolName.includes('_')) {
     console.error(pc.red(`Invalid tool name: ${toolName || '(empty)'}`));
@@ -205,9 +215,19 @@ const handleSetTool = async (key: string, value: string): Promise<void> => {
 
   const indicator = enabled ? pc.green('enabled') : pc.red('disabled');
   console.log(`${toolName}: ${indicator}`);
+
+  const port = resolvePort(options);
+  const registeredTools = await fetchToolNames(port);
+  if (registeredTools && !registeredTools.includes(toolName)) {
+    console.log(
+      pc.yellow(`Warning: "${toolName}" does not match any registered tool. Check the name or start the server.`),
+    );
+  }
+
+  await notifyServer({ port: options.port, warnIfNotRunning: true });
 };
 
-const handleSetBrowserTool = async (key: string, value: string): Promise<void> => {
+const handleSetBrowserTool = async (key: string, value: string, options: { port?: number }): Promise<void> => {
   const toolName = key.slice(BROWSER_TOOL_PREFIX.length);
   if (!toolName || (!toolName.startsWith('browser_') && !toolName.startsWith('extension_'))) {
     console.error(pc.red(`Invalid browser tool name: ${toolName || '(empty)'}`));
@@ -238,21 +258,23 @@ const handleSetBrowserTool = async (key: string, value: string): Promise<void> =
 
   const indicator = enabled ? pc.green('enabled') : pc.red('disabled');
   console.log(`${toolName}: ${indicator}`);
+  await notifyServer({ port: options.port, warnIfNotRunning: true });
 };
 
-const handleSetPort = async (value: string): Promise<void> => {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+const handleSetPort = async (value: string, options: { port?: number }): Promise<void> => {
+  const newPort = Number(value);
+  if (!Number.isInteger(newPort) || newPort < 1 || newPort > 65535) {
     console.error(pc.red(`Invalid port: ${value}`));
     console.error('Port must be an integer between 1 and 65535.');
     process.exit(1);
   }
 
   const { config, configPath } = await loadConfig();
-  config.port = port;
+  config.port = newPort;
 
   await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
-  console.log(`port: ${pc.cyan(String(port))}`);
+  console.log(`port: ${pc.cyan(String(newPort))}`);
+  await notifyServer({ port: options.port, warnIfNotRunning: true });
 };
 
 /**
@@ -265,7 +287,7 @@ const resolveStoredPluginPath = (storedPath: string, configDir: string): string 
   return resolve(configDir, storedPath);
 };
 
-const handleSetLocalPluginsAdd = async (value: string): Promise<void> => {
+const handleSetLocalPluginsAdd = async (value: string, options: { port?: number }): Promise<void> => {
   const pluginPath = resolve(value);
   const { config, configPath } = await loadConfig();
 
@@ -284,9 +306,17 @@ const handleSetLocalPluginsAdd = async (value: string): Promise<void> => {
   plugins.push(pluginPath);
   await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(`${pc.green('Added:')} ${pluginPath}`);
+
+  if (!existsSync(pluginPath)) {
+    console.log(pc.yellow(`Warning: Path does not exist: ${pluginPath}`));
+  } else if (!(await Bun.file(join(pluginPath, 'package.json')).exists())) {
+    console.log(pc.yellow(`Warning: No package.json found at ${pluginPath}. Plugin may not load.`));
+  }
+
+  await notifyServer({ port: options.port, warnIfNotRunning: true });
 };
 
-const handleSetLocalPluginsRemove = async (value: string): Promise<void> => {
+const handleSetLocalPluginsRemove = async (value: string, options: { port?: number }): Promise<void> => {
   const pluginPath = resolve(value);
   const { config, configPath } = await loadConfig();
 
@@ -308,9 +338,50 @@ const handleSetLocalPluginsRemove = async (value: string): Promise<void> => {
   plugins.splice(index, 1);
   await atomicWriteConfig(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(`${pc.green('Removed:')} ${pluginPath}`);
+  await notifyServer({ port: options.port, warnIfNotRunning: true });
 };
 
-const handleConfigSet = async (key: string, value?: string): Promise<void> => {
+const levenshtein = (a: string, b: string): number => {
+  const n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+
+  for (let i = 1; i <= a.length; i++) {
+    const curr = [i] as number[];
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min((prev[j] ?? 0) + 1, (curr[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + cost);
+    }
+    prev = curr;
+  }
+  return prev[n] ?? 0;
+};
+
+const KNOWN_KEYS = ['tool.', 'browser-tool.', PORT_KEY, LOCAL_PLUGINS_ADD, LOCAL_PLUGINS_REMOVE];
+
+const suggestKey = (input: string): string | null => {
+  let best: string | null = null;
+  let bestDistance = Infinity;
+
+  for (const known of KNOWN_KEYS) {
+    // For prefix keys (ending with '.'), compare against the prefix portion of the input
+    const inputPart = known.endsWith('.') ? input.slice(0, input.indexOf('.') + 1) || input : input;
+    const distance = levenshtein(inputPart, known);
+    if (distance < bestDistance && distance <= 2) {
+      bestDistance = distance;
+      best = known;
+    }
+  }
+
+  if (!best) return null;
+
+  // For prefix keys, append the user's suffix to show a complete suggestion
+  if (best.endsWith('.') && input.includes('.')) {
+    return best + input.slice(input.indexOf('.') + 1);
+  }
+  return best;
+};
+
+const handleConfigSet = async (key: string, value: string | undefined, options: { port?: number }): Promise<void> => {
   if (key === TOOL_PREFIX) {
     return handleListTools();
   }
@@ -322,22 +393,29 @@ const handleConfigSet = async (key: string, value?: string): Promise<void> => {
   }
 
   if (key.startsWith(TOOL_PREFIX)) {
-    return handleSetTool(key, value);
+    return handleSetTool(key, value, options);
   }
   if (key.startsWith(BROWSER_TOOL_PREFIX)) {
-    return handleSetBrowserTool(key, value);
+    return handleSetBrowserTool(key, value, options);
   }
   if (key === PORT_KEY) {
-    return handleSetPort(value);
+    return handleSetPort(value, options);
   }
   if (key === LOCAL_PLUGINS_ADD) {
-    return handleSetLocalPluginsAdd(value);
+    return handleSetLocalPluginsAdd(value, options);
   }
   if (key === LOCAL_PLUGINS_REMOVE) {
-    return handleSetLocalPluginsRemove(value);
+    return handleSetLocalPluginsRemove(value, options);
   }
 
   console.error(pc.red(`Unknown config key: ${key}`));
+
+  const suggestion = suggestKey(key);
+  if (suggestion) {
+    console.error(`Did you mean ${pc.bold(suggestion)}?`);
+    console.error('');
+  }
+
   console.error(SUPPORTED_KEYS);
   process.exit(1);
 };
@@ -365,7 +443,8 @@ const handleConfigReset = async (options: ConfigResetOptions): Promise<void> => 
   }
 
   await configFile.delete();
-  console.log('Config reset. Run opentabs start to regenerate.');
+  console.log(`${pc.green('Config file deleted:')} ${configPath}`);
+  console.log(pc.dim('Run opentabs start to regenerate.'));
 };
 
 /**
@@ -379,7 +458,24 @@ const writeAuthFile = async (secret: string): Promise<void> => {
   await atomicWrite(authPath, JSON.stringify({ secret }) + '\n', 0o600);
 };
 
-const handleRotateSecret = async (options: { port?: number }): Promise<void> => {
+interface RotateSecretOptions {
+  port?: number;
+  confirm?: boolean;
+}
+
+const handleRotateSecret = async (options: RotateSecretOptions): Promise<void> => {
+  if (!options.confirm) {
+    console.error(
+      pc.yellow(
+        'This will generate a new authentication secret. All MCP client configurations (Claude Code, Cursor, etc.) will need to be updated with the new secret.',
+      ),
+    );
+    console.error('');
+    console.error(`Run with ${pc.bold('--confirm')} to proceed:`);
+    console.error('  opentabs config rotate-secret --confirm');
+    process.exit(1);
+  }
+
   const oldSecret = await readAuthSecret();
   const newSecret = generateSecret();
   const port = resolvePort(options);
@@ -446,7 +542,9 @@ Examples:
   $ opentabs config set localPlugins.add /path/to/plugin
   $ opentabs config set localPlugins.remove /path/to/plugin`,
     )
-    .action((key: string, value?: string) => handleConfigSet(key, value));
+    .action((key: string, value: string | undefined, _options: unknown, command: Command) =>
+      handleConfigSet(key, value, command.optsWithGlobals()),
+    );
 
   configCmd
     .command('path')
@@ -461,14 +559,17 @@ Examples:
 
   configCmd
     .command('show')
+    .alias('get')
     .description('Show config contents')
     .option('--json', 'Output config as JSON')
+    .option('--show-secret', 'Display the full authentication secret')
     .addHelpText(
       'after',
       `
 Examples:
   $ opentabs config show
-  $ opentabs config show --json`,
+  $ opentabs config show --json
+  $ opentabs config show --show-secret`,
     )
     .action((options: ConfigShowOptions) => handleConfigShow(options));
 
@@ -487,6 +588,7 @@ Examples:
   configCmd
     .command('rotate-secret')
     .description('Rotate the shared authentication secret')
+    .option('--confirm', 'Skip confirmation and rotate immediately')
     .addHelpText(
       'after',
       `
@@ -494,9 +596,11 @@ Generates a new 256-bit random secret and writes it to auth.json.
 If the MCP server is running, notifies it to reload.
 
 Examples:
-  $ opentabs config rotate-secret`,
+  $ opentabs config rotate-secret --confirm`,
     )
-    .action((_options: Record<string, unknown>, command: Command) => handleRotateSecret(command.optsWithGlobals()));
+    .action((options: { confirm?: boolean }, command: Command) =>
+      handleRotateSecret({ ...options, ...command.optsWithGlobals() }),
+    );
 };
 
 export { registerConfigCommand };
