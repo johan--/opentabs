@@ -26,6 +26,7 @@ import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PluginLogEntry } from './log-buffer.js';
 import type {
+  RegisteredPlugin,
   ServerState,
   TabMapping,
   PendingDispatch,
@@ -80,6 +81,81 @@ const sendToExtension = (
     return false;
   }
 };
+
+/**
+ * Send a JSON-RPC error response to the extension.
+ * Shorthand for the common pattern of sending { jsonrpc: '2.0', error: { code, message }, id }.
+ */
+const sendJsonRpcError = (state: ServerState, id: string | number, code: number, message: string): void => {
+  sendToExtension(state, { jsonrpc: '2.0', error: { code, message }, id });
+};
+
+/**
+ * Extract error details from a caught plugin management error and send a JSON-RPC error response.
+ * Handles code, message, data, and retryAfterMs fields that plugin management functions may throw.
+ */
+const sendPluginManagementError = (state: ServerState, id: string | number, err: unknown): void => {
+  const code = typeof (err as Record<string, unknown>).code === 'number' ? (err as { code: number }).code : -32603;
+  const message = err instanceof Error ? err.message : 'Unknown error';
+  const rawData = (err as Record<string, unknown>).data;
+  const data = typeof rawData === 'object' && rawData !== null ? (rawData as Record<string, unknown>) : undefined;
+  const retryAfterMs =
+    typeof (err as Record<string, unknown>).retryAfterMs === 'number'
+      ? (err as { retryAfterMs: number }).retryAfterMs
+      : undefined;
+  const errorData = { ...(data ?? {}), ...(retryAfterMs !== undefined ? { retryAfterMs } : {}) };
+  const hasData = Object.keys(errorData).length > 0;
+  sendToExtension(state, {
+    jsonrpc: '2.0',
+    error: { code, message, ...(hasData ? { data: errorData } : {}) },
+    id,
+  });
+};
+
+/**
+ * Serialize a plugin's metadata and tools into the wire format sent to the extension.
+ * Returns the common core shape shared by sync.full, plugin.update, and config.getState.
+ * Callers can spread additional fields on top (e.g., sourcePath, adapterHash for sync messages,
+ * or tabState, source, sdkVersion for config.getState).
+ */
+const serializePluginForExtension = (
+  plugin: RegisteredPlugin,
+  state: ServerState,
+): {
+  name: string;
+  version: string;
+  displayName: string;
+  urlPatterns: string[];
+  trustTier: string;
+  iconSvg?: string;
+  iconInactiveSvg?: string;
+  tools: {
+    name: string;
+    displayName: string;
+    description: string;
+    icon: string;
+    iconSvg?: string;
+    iconInactiveSvg?: string;
+    enabled: boolean;
+  }[];
+} => ({
+  name: plugin.name,
+  version: plugin.version,
+  displayName: plugin.displayName,
+  urlPatterns: plugin.urlPatterns,
+  trustTier: plugin.trustTier,
+  ...(plugin.iconSvg ? { iconSvg: plugin.iconSvg } : {}),
+  ...(plugin.iconInactiveSvg ? { iconInactiveSvg: plugin.iconInactiveSvg } : {}),
+  tools: plugin.tools.map(t => ({
+    name: t.name,
+    displayName: t.displayName,
+    description: t.description,
+    icon: t.icon,
+    ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
+    ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
+    enabled: isToolEnabled(state, prefixedToolName(plugin.name, t.name)),
+  })),
+});
 
 /** Callbacks the extension protocol can invoke on the MCP side */
 interface McpCallbacks {
@@ -216,24 +292,9 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
   }
 
   const plugins = pluginList.map(p => ({
-    name: p.name,
-    version: p.version,
-    displayName: p.displayName,
-    urlPatterns: p.urlPatterns,
-    trustTier: p.trustTier,
+    ...serializePluginForExtension(p, state),
     sourcePath: p.sourcePath,
     adapterHash: p.adapterHash,
-    ...(p.iconSvg ? { iconSvg: p.iconSvg } : {}),
-    ...(p.iconInactiveSvg ? { iconInactiveSvg: p.iconInactiveSvg } : {}),
-    tools: p.tools.map(t => ({
-      name: t.name,
-      displayName: t.displayName,
-      description: t.description,
-      icon: t.icon,
-      ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-      ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-      enabled: isToolEnabled(state, prefixedToolName(p.name, t.name)),
-    })),
   }));
 
   const sent = sendToExtension(state, {
@@ -476,24 +537,9 @@ const sendPluginUpdate = async (
     jsonrpc: '2.0',
     method: 'plugin.update',
     params: {
-      name: plugin.name,
-      version: plugin.version,
-      displayName: plugin.displayName,
-      urlPatterns: plugin.urlPatterns,
-      trustTier: plugin.trustTier,
+      ...serializePluginForExtension(plugin, state),
       sourcePath: plugin.sourcePath,
       adapterHash: plugin.adapterHash,
-      ...(plugin.iconSvg ? { iconSvg: plugin.iconSvg } : {}),
-      ...(plugin.iconInactiveSvg ? { iconInactiveSvg: plugin.iconInactiveSvg } : {}),
-      tools: plugin.tools.map(t => ({
-        name: t.name,
-        displayName: t.displayName,
-        description: t.description,
-        icon: t.icon,
-        ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-        ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-        enabled: isToolEnabled(state, prefixedToolName(plugin.name, t.name)),
-      })),
     },
   });
   if (!sent) log.warn('Failed to send plugin.update — extension not connected');
@@ -651,11 +697,7 @@ const handleExtensionMessage = (
 
   // Unrecognized method with an id — send JSON-RPC -32601 'Method not found'
   if (id !== undefined && method) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32601, message: `Method not found: ${method}` },
-      id,
-    });
+    sendJsonRpcError(state, id, -32601, `Method not found: ${method}`);
     return;
   }
 
@@ -742,7 +784,7 @@ const handleTabStateChanged = (
 ): void => {
   const sendError = (message: string): void => {
     if (id !== undefined) {
-      sendToExtension(state, { jsonrpc: '2.0', error: { code: -32602, message }, id });
+      sendJsonRpcError(state, id, -32602, message);
     } else {
       log.warn(`tab.stateChanged: ${message}`);
     }
@@ -795,26 +837,11 @@ const handleConfigGetState = (state: ServerState, id: string | number): void => 
       const tabInfo = state.tabMapping.get(p.name);
       const update = p.npmPackageName ? outdatedByPkg.get(p.npmPackageName) : undefined;
       return {
-        name: p.name,
-        displayName: p.displayName,
-        version: p.version,
-        trustTier: p.trustTier,
+        ...serializePluginForExtension(p, state),
         source: p.source,
         tabState: tabInfo?.state ?? 'closed',
-        urlPatterns: p.urlPatterns,
         ...(p.sdkVersion ? { sdkVersion: p.sdkVersion } : {}),
-        ...(p.iconSvg ? { iconSvg: p.iconSvg } : {}),
-        ...(p.iconInactiveSvg ? { iconInactiveSvg: p.iconInactiveSvg } : {}),
         ...(update ? { update } : {}),
-        tools: p.tools.map(t => ({
-          name: t.name,
-          displayName: t.displayName,
-          description: t.description,
-          icon: t.icon,
-          ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-          ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-          enabled: isToolEnabled(state, prefixedToolName(p.name, t.name)),
-        })),
       };
     });
 
@@ -835,7 +862,7 @@ const handleConfigSetToolEnabled = (
   callbacks: McpCallbacks,
 ): void => {
   if (!params) {
-    sendToExtension(state, { jsonrpc: '2.0', error: { code: -32602, message: 'Missing params' }, id });
+    sendJsonRpcError(state, id, -32602, 'Missing params');
     return;
   }
 
@@ -845,30 +872,18 @@ const handleConfigSetToolEnabled = (
   const enabled = toolEnabledParams.enabled;
 
   if (typeof pluginName !== 'string' || typeof tool !== 'string' || typeof enabled !== 'boolean') {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: 'Invalid params: expected plugin (string), tool (string), enabled (boolean)' },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, 'Invalid params: expected plugin (string), tool (string), enabled (boolean)');
     return;
   }
 
   const plugin = state.registry.plugins.get(pluginName);
   if (!plugin) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: `Plugin not found: ${pluginName}` },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
     return;
   }
 
   if (!plugin.tools.some(t => t.name === tool)) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: `Tool not found: ${tool} in plugin ${pluginName}` },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, `Tool not found: ${tool} in plugin ${pluginName}`);
     return;
   }
 
@@ -891,7 +906,7 @@ const handleConfigSetAllToolsEnabled = (
   callbacks: McpCallbacks,
 ): void => {
   if (!params) {
-    sendToExtension(state, { jsonrpc: '2.0', error: { code: -32602, message: 'Missing params' }, id });
+    sendJsonRpcError(state, id, -32602, 'Missing params');
     return;
   }
 
@@ -900,21 +915,13 @@ const handleConfigSetAllToolsEnabled = (
   const enabled = allToolsEnabledParams.enabled;
 
   if (typeof pluginName !== 'string' || typeof enabled !== 'boolean') {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: 'Invalid params: expected plugin (string), enabled (boolean)' },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, 'Invalid params: expected plugin (string), enabled (boolean)');
     return;
   }
 
   const plugin = state.registry.plugins.get(pluginName);
   if (!plugin) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: `Plugin not found: ${pluginName}` },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
     return;
   }
 
@@ -1030,11 +1037,7 @@ const handlePluginSearch = async (
 ): Promise<void> => {
   const query = params?.query;
   if (query !== undefined && typeof query !== 'string') {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: 'Invalid params: query must be a string if provided' },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, 'Invalid params: query must be a string if provided');
     return;
   }
 
@@ -1046,17 +1049,7 @@ const handlePluginSearch = async (
       id,
     });
   } catch (err) {
-    const code = typeof (err as Record<string, unknown>).code === 'number' ? (err as { code: number }).code : -32603;
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    const data: Record<string, unknown> = {};
-    if (typeof (err as Record<string, unknown>).retryAfterMs === 'number') {
-      data.retryAfterMs = (err as { retryAfterMs: number }).retryAfterMs;
-    }
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code, message, ...(Object.keys(data).length > 0 ? { data } : {}) },
-      id,
-    });
+    sendPluginManagementError(state, id, err);
   }
 };
 
@@ -1067,11 +1060,7 @@ const handlePluginInstall = async (
   callbacks: McpCallbacks,
 ): Promise<void> => {
   if (!params || typeof params.name !== 'string' || params.name.length === 0) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: 'Invalid params: name must be a non-empty string' },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, 'Invalid params: name must be a non-empty string');
     return;
   }
 
@@ -1087,15 +1076,7 @@ const handlePluginInstall = async (
       id,
     });
   } catch (err) {
-    const code = typeof (err as Record<string, unknown>).code === 'number' ? (err as { code: number }).code : -32603;
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    const rawData = (err as Record<string, unknown>).data;
-    const data = typeof rawData === 'object' && rawData !== null ? (rawData as Record<string, unknown>) : undefined;
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code, message, ...(data ? { data } : {}) },
-      id,
-    });
+    sendPluginManagementError(state, id, err);
   }
 };
 
@@ -1110,11 +1091,7 @@ const handlePluginUpdateFromRegistry = async (
   callbacks: McpCallbacks,
 ): Promise<void> => {
   if (!params || typeof params.name !== 'string' || params.name.length === 0) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: 'Invalid params: name must be a non-empty string' },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, 'Invalid params: name must be a non-empty string');
     return;
   }
 
@@ -1130,15 +1107,7 @@ const handlePluginUpdateFromRegistry = async (
       id,
     });
   } catch (err) {
-    const code = typeof (err as Record<string, unknown>).code === 'number' ? (err as { code: number }).code : -32603;
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    const rawData = (err as Record<string, unknown>).data;
-    const data = typeof rawData === 'object' && rawData !== null ? (rawData as Record<string, unknown>) : undefined;
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code, message, ...(data ? { data } : {}) },
-      id,
-    });
+    sendPluginManagementError(state, id, err);
   }
 };
 
@@ -1149,11 +1118,7 @@ const handlePluginRemove = async (
   callbacks: McpCallbacks,
 ): Promise<void> => {
   if (!params || typeof params.name !== 'string' || params.name.length === 0) {
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32602, message: 'Invalid params: name must be a non-empty string' },
-      id,
-    });
+    sendJsonRpcError(state, id, -32602, 'Invalid params: name must be a non-empty string');
     return;
   }
 
@@ -1178,15 +1143,7 @@ const handlePluginRemove = async (
       id,
     });
   } catch (err) {
-    const code = typeof (err as Record<string, unknown>).code === 'number' ? (err as { code: number }).code : -32603;
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    const rawData = (err as Record<string, unknown>).data;
-    const data = typeof rawData === 'object' && rawData !== null ? (rawData as Record<string, unknown>) : undefined;
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code, message, ...(data ? { data } : {}) },
-      id,
-    });
+    sendPluginManagementError(state, id, err);
   }
 };
 
@@ -1199,12 +1156,7 @@ const handlePluginCheckUpdates = async (state: ServerState, id: string | number)
       id,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    sendToExtension(state, {
-      jsonrpc: '2.0',
-      error: { code: -32603, message },
-      id,
-    });
+    sendPluginManagementError(state, id, err);
   }
 };
 
