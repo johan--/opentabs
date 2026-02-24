@@ -2,8 +2,9 @@ import { Button } from './retro/Button.js';
 import { Text } from './retro/Text.js';
 import { COUNTDOWN_POLL_INTERVAL_MS } from '../constants.js';
 import { cn } from '../lib/cn.js';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ShieldAlert, ChevronDown } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { SpConfirmationRequestMessage } from '../../extension-messages.js';
 
 type ConfirmationData = SpConfirmationRequestMessage['data'] & {
@@ -54,61 +55,41 @@ const CountdownBar = ({ timeoutMs, receivedAt }: { timeoutMs: number; receivedAt
 };
 
 /** Renders the "Allow Always" button with a scope dropdown */
-const AllowAlwaysButton = ({ domain, onSelect }: { domain: string | null; onSelect: (scope: Scope) => void }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => setOpen(v => !v)}>
+const AllowAlwaysButton = ({ domain, onSelect }: { domain: string | null; onSelect: (scope: Scope) => void }) => (
+  <DropdownMenu.Root>
+    <DropdownMenu.Trigger asChild>
+      <Button size="sm" variant="outline" className="gap-1 text-xs">
         Allow Always
-        <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className="h-3 w-3" />
       </Button>
-      {open && (
-        <div className="border-border bg-card absolute right-0 bottom-full z-50 mb-1 w-56 rounded border-2 shadow-md">
-          <button
-            type="button"
-            className="hover:bg-accent w-full cursor-pointer px-3 py-2 text-left font-sans text-xs"
-            onClick={() => {
-              onSelect('tool_domain');
-              setOpen(false);
-            }}>
-            For this tool on this domain
-          </button>
-          <button
-            type="button"
-            className="hover:bg-accent w-full cursor-pointer px-3 py-2 text-left font-sans text-xs"
-            onClick={() => {
-              onSelect('tool_all');
-              setOpen(false);
-            }}>
-            For this tool everywhere
-          </button>
-          {domain && (
-            <button
-              type="button"
-              className="hover:bg-accent w-full cursor-pointer px-3 py-2 text-left font-sans text-xs"
-              onClick={() => {
-                onSelect('domain_all');
-                setOpen(false);
-              }}>
-              For all tools on {domain}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+    </DropdownMenu.Trigger>
+    <DropdownMenu.Portal>
+      <DropdownMenu.Content
+        side="top"
+        align="end"
+        sideOffset={4}
+        className="border-border bg-card z-50 w-56 rounded border-2 shadow-md">
+        <DropdownMenu.Item
+          className="hover:bg-accent data-[highlighted]:bg-accent cursor-pointer px-3 py-2 font-sans text-xs outline-none"
+          onSelect={() => onSelect('tool_domain')}>
+          For this tool on this domain
+        </DropdownMenu.Item>
+        <DropdownMenu.Item
+          className="hover:bg-accent data-[highlighted]:bg-accent cursor-pointer px-3 py-2 font-sans text-xs outline-none"
+          onSelect={() => onSelect('tool_all')}>
+          For this tool everywhere
+        </DropdownMenu.Item>
+        {domain && (
+          <DropdownMenu.Item
+            className="hover:bg-accent data-[highlighted]:bg-accent cursor-pointer px-3 py-2 font-sans text-xs outline-none"
+            onSelect={() => onSelect('domain_all')}>
+            For all tools on {domain}
+          </DropdownMenu.Item>
+        )}
+      </DropdownMenu.Content>
+    </DropdownMenu.Portal>
+  </DropdownMenu.Root>
+);
 
 const ConfirmationDialog = ({ confirmations, onRespond, onDenyAll }: ConfirmationDialogProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
