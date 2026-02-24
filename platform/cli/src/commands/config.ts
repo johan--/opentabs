@@ -540,6 +540,7 @@ Examples:
 
   configCmd
     .command('show')
+    .alias('get')
     .description('Show config contents')
     .option('--json', 'Output config as JSON')
     .option('--show-secret', 'Display the full authentication secret')
