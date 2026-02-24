@@ -40,7 +40,7 @@ const App = () => {
     connectedRef.current = connected;
     loadingRef.current = loading;
     pluginsRef.current = plugins;
-  });
+  }, [connected, loading, plugins]);
 
   const loadPlugins = useCallback(() => {
     const now = Date.now();
