@@ -461,7 +461,12 @@ const handleConfirmationResponse = (state: ServerState, params: Record<string, u
       rule.tool = null;
     }
 
-    state.sessionPermissions.push(rule);
+    const isDuplicate = state.sessionPermissions.some(
+      r => r.tool === rule.tool && r.domain === rule.domain && r.scope === rule.scope,
+    );
+    if (!isDuplicate) {
+      state.sessionPermissions.push(rule);
+    }
   }
 
   pending.resolve(decision);
