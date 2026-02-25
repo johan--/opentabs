@@ -25,7 +25,7 @@
  *   bun scripts/publish.ts 0.0.3
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -257,9 +257,11 @@ const main = async (): Promise<void> => {
     console.log(`  ${pkg}/package.json → ${version}`);
   }
 
-  // 3. Sync lockfile with bumped versions, then rebuild
+  // 3. Delete lockfile and reinstall so bun picks up the bumped workspace versions.
+  //    Without this, `bun publish` resolves workspace:* to the old lockfile versions.
   console.log('');
   console.log('==> Syncing lockfile and rebuilding with new versions...');
+  unlinkSync(resolve(ROOT, 'bun.lock'));
   run(['bun', 'install']);
   run(['bun', 'run', 'build:force']);
 
