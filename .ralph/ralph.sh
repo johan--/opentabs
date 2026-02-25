@@ -627,12 +627,20 @@ dispatch_prd() {
     local plugin_tmp_config="/tmp/opentabs-plugin-config-$$"
     setup_script="$setup_script && cd $worktree_dir/plugins/e2e-test && bun install --frozen-lockfile 2>&1 | tail -1 && OPENTABS_CONFIG_DIR=$plugin_tmp_config bun run build 2>&1 | tail -1"
   fi
-  if ! docker run --rm --init --ipc=host \
-    --shm-size=2g \
-    -e "HOME=/tmp/worker" \
-    -v "$worktree_dir:$worktree_dir" \
-    -v "$PROJECT_DIR/.git:$PROJECT_DIR/.git" \
-    --network host \
+  # Build common Docker args for setup and worker containers.
+  local -a DOCKER_COMMON=()
+  DOCKER_COMMON+=(--init --ipc=host --shm-size=2g)
+  DOCKER_COMMON+=(-e "HOME=/tmp/worker")
+  DOCKER_COMMON+=(-v "$worktree_dir:$worktree_dir")
+  DOCKER_COMMON+=(-v "$PROJECT_DIR/.git:$PROJECT_DIR/.git")
+  DOCKER_COMMON+=(--network host)
+  # npm auth — needed to install private @opentabs-dev/* packages in plugins.
+  # Mounted read-only at container HOME so bun/npm finds it automatically.
+  if [ -f "$HOME/.npmrc" ]; then
+    DOCKER_COMMON+=(-v "$HOME/.npmrc:/tmp/worker/.npmrc:ro")
+  fi
+
+  if ! docker run --rm "${DOCKER_COMMON[@]}" \
     -w "$worktree_dir" \
     "$DOCKER_IMAGE" \
     "bash -c 'mkdir -p /tmp/worker && $setup_script'"; then
@@ -708,23 +716,8 @@ dispatch_prd() {
   local -a DOCKER_ARGS=()
   DOCKER_ARGS+=(--name "$container_name")
   DOCKER_ARGS+=(--detach)
-  DOCKER_ARGS+=(--init)
-  DOCKER_ARGS+=(--ipc=host)
-  DOCKER_ARGS+=(--shm-size=2g)
-  # Container-local HOME — all writes (claude sessions, node caches, .opentabs)
-  # go here and are discarded when the container exits. No host pollution.
-  DOCKER_ARGS+=(-e "HOME=/tmp/worker")
-  # Mount the worktree at its original host path. Git worktrees store a .git
-  # file containing `gitdir: /path/to/.git/worktrees/<name>` — both the
-  # worktree and the main .git must be at their original host paths for
-  # bidirectional resolution to work.
-  DOCKER_ARGS+=(-v "$worktree_dir:$worktree_dir")
+  DOCKER_ARGS+=("${DOCKER_COMMON[@]}")
   DOCKER_ARGS+=(-e "WORKER_WORKTREE_DIR=$worktree_dir")
-  # Main repo's .git directory — read-write because git commit writes to
-  # .git/objects and refs.
-  DOCKER_ARGS+=(-v "$PROJECT_DIR/.git:$PROJECT_DIR/.git")
-  # Host networking — container can reach local LLM proxies and services.
-  DOCKER_ARGS+=(--network host)
 
   # Start the container. It runs worker.sh which executes the agent loop.
   # Container output (stdout+stderr) is captured by docker and streamed
