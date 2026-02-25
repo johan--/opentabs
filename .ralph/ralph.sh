@@ -728,16 +728,21 @@ dispatch_prd() {
   # .git/worktrees/<name>/commondir uses relative paths to reach .git/objects.
   # Read-write because git commit writes to .git/objects and refs.
   DOCKER_ARGS+=(-v "$PROJECT_DIR/.git:$PROJECT_DIR/.git")
-  # Claude CLI auth and config (read-only)
+  # Run as the current host user — Claude CLI refuses --dangerously-skip-permissions
+  # as root, and file ownership in the bind-mounted worktree must match the host.
+  DOCKER_ARGS+=(--user "$(id -u):$(id -g)")
+  DOCKER_ARGS+=(-e "HOME=$HOME")
+  # Claude CLI auth and config (read-write — claude writes debug logs, session
+  # data, todos, and stats to ~/.claude/ and ~/.claude.json at runtime)
   if [ -d "$HOME/.claude" ]; then
-    DOCKER_ARGS+=(-v "$HOME/.claude:/root/.claude:ro")
+    DOCKER_ARGS+=(-v "$HOME/.claude:$HOME/.claude")
   fi
   if [ -f "$HOME/.claude.json" ]; then
-    DOCKER_ARGS+=(-v "$HOME/.claude.json:/root/.claude.json:ro")
+    DOCKER_ARGS+=(-v "$HOME/.claude.json:$HOME/.claude.json")
   fi
   # Git config (read-only — for user identity in commits)
   if [ -f "$HOME/.gitconfig" ]; then
-    DOCKER_ARGS+=(-v "$HOME/.gitconfig:/root/.gitconfig:ro")
+    DOCKER_ARGS+=(-v "$HOME/.gitconfig:$HOME/.gitconfig:ro")
   fi
   # Network: use host network so the container can reach the LLM proxy
   # (e.g., http://192.168.2.2:4000) and any other local services.
