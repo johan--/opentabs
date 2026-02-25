@@ -12,6 +12,6 @@ playwright-report/
 /.ralph/*
 !/.ralph/RALPH.md
 !/.ralph/ralph.sh
-!/.ralph/perfect_docs.sh
+!/.ralph/perfect-docs.sh
 .claude/worktrees/
 opencode.json
