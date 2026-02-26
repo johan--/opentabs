@@ -171,6 +171,68 @@ cleanup();
 
 Functions for making HTTP requests using the page's authenticated session. All fetch utilities use `credentials: 'include'` to send session cookies automatically.
 
+<Table>
+  <Table.Header>
+    <Table.Row>
+      <Table.Head>Function</Table.Head>
+      <Table.Head>Method</Table.Head>
+      <Table.Head>Description</Table.Head>
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell className="font-medium">`fetchFromPage`</Table.Cell>
+      <Table.Cell>Any</Table.Cell>
+      <Table.Cell>Low-level fetch — returns `Response`, handles timeout and errors.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`fetchJSON`</Table.Cell>
+      <Table.Cell>Any</Table.Cell>
+      <Table.Cell>Fetch and parse a JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`postJSON`</Table.Cell>
+      <Table.Cell>POST</Table.Cell>
+      <Table.Cell>POST with a JSON body, parse JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`postForm`</Table.Cell>
+      <Table.Cell>POST</Table.Cell>
+      <Table.Cell>POST with a URL-encoded form body (`application/x-www-form-urlencoded`), parse JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`postFormData`</Table.Cell>
+      <Table.Cell>POST</Table.Cell>
+      <Table.Cell>POST with a multipart/form-data body (file uploads), parse JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`putJSON`</Table.Cell>
+      <Table.Cell>PUT</Table.Cell>
+      <Table.Cell>PUT with a JSON body, parse JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`patchJSON`</Table.Cell>
+      <Table.Cell>PATCH</Table.Cell>
+      <Table.Cell>PATCH with a JSON body, parse JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`deleteJSON`</Table.Cell>
+      <Table.Cell>DELETE</Table.Cell>
+      <Table.Cell>DELETE, parse JSON response.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`httpStatusToToolError`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Map an HTTP error response to a `ToolError` with the appropriate category.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`parseRetryAfterMs`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Parse a `Retry-After` header value into milliseconds.</Table.Cell>
+    </Table.Row>
+  </Table.Body>
+</Table>
+
 ### `fetchFromPage(url, init?)`
 
 Fetches a URL using the page's session cookies. Provides built-in timeout and throws a `ToolError` on non-ok HTTP status codes.
