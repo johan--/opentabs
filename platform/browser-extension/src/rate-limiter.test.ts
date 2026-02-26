@@ -1,4 +1,4 @@
-import { checkRateLimit, resetRateLimiter } from './rate-limiter.js';
+import { checkRateLimit, getTrackedMethodCount, resetRateLimiter } from './rate-limiter.js';
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 let now: number;
@@ -97,6 +97,39 @@ describe('checkRateLimit', () => {
         checkRateLimit('browser.listTabs', now);
       }
       expect(checkRateLimit('browser.listTabs', now)).toBe(false);
+    });
+  });
+
+  describe('stale key pruning', () => {
+    test('deletes key when all timestamps expire on next check', () => {
+      checkRateLimit('browser.screenshotTab', now);
+      expect(getTrackedMethodCount()).toBe(1);
+
+      // Advance past window — all timestamps expire
+      now += 1_001;
+
+      // Call again: prunes expired timestamps → empty → deletes key, then re-adds with new timestamp
+      checkRateLimit('browser.screenshotTab', now);
+      expect(getTrackedMethodCount()).toBe(1);
+    });
+
+    test('key is absent between reset and first call', () => {
+      expect(getTrackedMethodCount()).toBe(0);
+      checkRateLimit('browser.screenshotTab', now);
+      expect(getTrackedMethodCount()).toBe(1);
+    });
+
+    test('map does not accumulate stale keys across multiple methods', () => {
+      checkRateLimit('browser.screenshotTab', now);
+      checkRateLimit('browser.executeScript', now);
+      expect(getTrackedMethodCount()).toBe(2);
+
+      now += 1_001;
+
+      // Both methods' timestamps expire; calling each prunes its own key then re-adds
+      checkRateLimit('browser.screenshotTab', now);
+      checkRateLimit('browser.executeScript', now);
+      expect(getTrackedMethodCount()).toBe(2);
     });
   });
 
