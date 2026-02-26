@@ -115,7 +115,7 @@ chrome.runtime.onInstalled.addListener(() => {
     await ensureOffscreenDocument();
     await setupKeepaliveAlarm();
     await reinjectStoredPlugins();
-  })();
+  })().catch((err: unknown) => console.warn('[opentabs] onInstalled failed:', err));
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -123,7 +123,7 @@ chrome.runtime.onStartup.addListener(() => {
     await ensureOffscreenDocument();
     await setupKeepaliveAlarm();
     await reinjectStoredPlugins();
-  })();
+  })().catch((err: unknown) => console.warn('[opentabs] onStartup failed:', err));
 });
 
 ensureOffscreenDocument().catch((err: unknown) => console.warn('[opentabs] offscreen creation failed:', err));
@@ -138,7 +138,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
 
   const portChange = changes[SERVER_PORT_KEY];
-  if (typeof portChange?.newValue === 'number' && portChange.newValue > 0) {
+  if (
+    typeof portChange?.newValue === 'number' &&
+    Number.isInteger(portChange.newValue) &&
+    portChange.newValue >= 1 &&
+    portChange.newValue <= 65535
+  ) {
     const newUrl = buildWsUrl(portChange.newValue);
     chrome.runtime.sendMessage({ type: 'ws:setUrl', url: newUrl } satisfies InternalMessage).catch(() => {
       // Offscreen may not be ready yet

@@ -53,6 +53,11 @@ export const checkRateLimit = (method: string, now: number = Date.now()): boolea
   // Get existing timestamps and prune expired entries
   const timestamps = (methodTimestamps.get(method) ?? []).filter(t => t > cutoff);
 
+  // Delete stale key when all timestamps have expired to prevent unbounded map growth
+  if (timestamps.length === 0) {
+    methodTimestamps.delete(method);
+  }
+
   if (timestamps.length >= config.maxRequests) {
     methodTimestamps.set(method, timestamps);
     return false;
@@ -67,3 +72,6 @@ export const checkRateLimit = (method: string, now: number = Date.now()): boolea
 export const resetRateLimiter = (): void => {
   methodTimestamps.clear();
 };
+
+/** Returns the number of methods currently tracked. Exposed for test assertions. */
+export const getTrackedMethodCount = (): number => methodTimestamps.size;

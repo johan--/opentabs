@@ -72,14 +72,18 @@ const App = () => {
   });
 
   useEffect(() => {
-    void getConnectionState().then(result => {
-      setConnected(result.connected);
-      setDisconnectReason(result.disconnectReason);
-      if (result.connected) {
-        loadPlugins();
-      }
-      setLoading(false);
-    });
+    void getConnectionState()
+      .then(result => {
+        setConnected(result.connected);
+        setDisconnectReason(result.disconnectReason);
+        if (result.connected) {
+          loadPlugins();
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
 
     const listener = (
       message: InternalMessage,
@@ -113,6 +117,7 @@ const App = () => {
           setFailedPlugins([]);
           setActiveTools(new Set());
           setPendingConfirmations([]);
+          setToolFilter('');
           rejectAllPending();
         }
         sendResponse({ ok: true });
