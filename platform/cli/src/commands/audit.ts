@@ -98,7 +98,7 @@ const printAuditTable = (entries: AuditEntry[]): void => {
 
   console.log(
     pc.bold(
-      `${'Time'.padEnd(COL_TIME)}${'Tool'.padEnd(colTool)}${'OK'.padEnd(COL_STATUS)}${'Duration'.padEnd(COL_DURATION)}`,
+      `${'Time'.padEnd(COL_TIME)}${'Tool'.padEnd(colTool)}${''.padEnd(COL_STATUS)}${'Duration'.padEnd(COL_DURATION)}`,
     ),
   );
   console.log(pc.dim('─'.repeat(COL_TIME + colTool + COL_STATUS + COL_DURATION)));
