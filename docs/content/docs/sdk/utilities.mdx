@@ -610,6 +610,12 @@ function retry<T>(fn: () => Promise<T>, opts?: RetryOptions): Promise<T>;
       <Table.Cell>Use exponential backoff — doubles the delay after each attempt (1s, 2s, 4s, ...).</Table.Cell>
     </Table.Row>
     <Table.Row>
+      <Table.Cell className="font-medium">`maxDelay`</Table.Cell>
+      <Table.Cell>`number`</Table.Cell>
+      <Table.Cell>`30000`</Table.Cell>
+      <Table.Cell>Maximum delay in milliseconds when using exponential backoff. Prevents unreasonably long wait times.</Table.Cell>
+    </Table.Row>
+    <Table.Row>
       <Table.Cell className="font-medium">`signal`</Table.Cell>
       <Table.Cell>`AbortSignal`</Table.Cell>
       <Table.Cell>—</Table.Cell>
