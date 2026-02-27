@@ -21,12 +21,23 @@ TOOL="${WORKER_TOOL:-claude}"
 MODEL="${WORKER_MODEL:-}"
 PRD_BASENAME="${WORKER_PRD_FILE}"
 RESULT_FILE="${WORKER_RESULT_FILE:-/tmp/worker-result.txt}"
+TAG="${WORKER_TAG:-worker}"
 
 # The worktree is mounted at its original host path (not /workspace) so that
 # the .git file's absolute path back to the main repo resolves correctly.
 WORKTREE_DIR="${WORKER_WORKTREE_DIR:-/workspace}"
 
-# --- Stream filter (identical to ralph.sh) ---
+# Current story progress — updated by execute_prd, read by log_prefix.
+# Format: "(passed/total)" e.g., "(1/4)". Empty before first iteration.
+STORY_PROGRESS=""
+
+# Prefixed echo — prepends the worker tag + story progress to every line.
+# Called by stream_filter and directly for status messages.
+wlog() {
+  echo "[${TAG}${STORY_PROGRESS}] $*"
+}
+
+# --- Stream filter ---
 # Extracts concise progress lines from claude's stream-json output.
 
 stream_filter() {
@@ -61,7 +72,7 @@ stream_filter() {
         if [ -n "$tool_uses" ]; then
           while IFS=$'\t' read -r tool_name tool_detail; do
             [ -z "$tool_name" ] && continue
-            printf "▸ %-8s %s\n" "$tool_name" "$tool_detail"
+            wlog "$(printf '▸ %-8s %s' "$tool_name" "$tool_detail")"
           done <<< "$tool_uses"
         fi
 
@@ -71,7 +82,7 @@ stream_filter() {
         ' 2>/dev/null)
 
         if [ -n "$text_content" ] && [ "$text_content" != "null" ]; then
-          printf "✦ %.120s\n" "$text_content"
+          wlog "$(printf '✦ %.120s' "$text_content")"
           if echo "$text_content" | grep -q "<promise>COMPLETE</promise>" 2>/dev/null; then
             echo "$text_content" >> "$result_file"
           fi
@@ -87,7 +98,7 @@ stream_filter() {
 
         echo "$result_text" >> "$result_file"
 
-        printf "⏱  %ss  │  %s turns  │  \$%s\n" "$duration_s" "$num_turns" "$cost"
+        wlog "$(printf '⏱  %ss  │  %s turns  │  $%s' "$duration_s" "$num_turns" "$cost")"
         ;;
     esac
   done
@@ -100,7 +111,7 @@ execute_prd() {
 
   # Sanity check: the worktree PRD must exist (copied by dispatch_prd on host).
   if [ ! -f "$wt_prd" ]; then
-    echo "ERROR: PRD file not found in worktree: $wt_prd"
+    wlog "ERROR: PRD file not found in worktree: $wt_prd"
     return 1
   fi
 
@@ -121,7 +132,7 @@ execute_prd() {
   # the last completed story was not an e2eCheckpoint.
   _run_e2e_safety_net() {
     if [ -n "$has_quality_checks" ]; then
-      echo "Safety net: skipped (custom qualityChecks — E2E is not separate)."
+      wlog "Safety net: skipped (custom qualityChecks — E2E is not separate)."
       return 0
     fi
 
@@ -134,19 +145,19 @@ execute_prd() {
     ' "$wt_prd" 2>/dev/null)
 
     if [ "$last_checkpoint" = "true" ]; then
-      echo "Safety net: skipped (last story was an e2eCheckpoint)."
+      wlog "Safety net: skipped (last story was an e2eCheckpoint)."
       return 0
     fi
 
-    echo ""
-    echo "── E2E Safety Net ──"
-    echo "Last completed story was not an e2eCheckpoint. Running full suite including E2E before merge..."
+    wlog ""
+    wlog "── E2E Safety Net ──"
+    wlog "Last completed story was not an e2eCheckpoint. Running full suite including E2E before merge..."
 
     if (cd "$WORKTREE_DIR" && bun run build && bun run type-check && bun run lint && bun run knip && bun run test && bun run test:e2e); then
-      echo "Safety net: full suite passed."
+      wlog "Safety net: full suite passed."
       return 0
     else
-      echo "Safety net: full suite FAILED."
+      wlog "Safety net: full suite FAILED."
       return 1
     fi
   }
@@ -154,8 +165,8 @@ execute_prd() {
   # Launch a fix iteration for safety net failures.
   _run_e2e_fix_iteration() {
     local fix_num="$1"
-    echo ""
-    echo "── Safety Net Fix Iteration $fix_num ──"
+    wlog ""
+    wlog "── Safety Net Fix Iteration $fix_num ──"
 
     local E2E_FIX_PROMPT
     E2E_FIX_PROMPT="# Safety Net Fix Task
@@ -208,8 +219,10 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
   remaining=$(jq '[.userStories[] | select(.passes != true)] | length' "$wt_prd" 2>/dev/null || echo "0")
   total=$(jq '.userStories | length' "$wt_prd" 2>/dev/null || echo "?")
 
+  STORY_PROGRESS="($(( total - remaining ))/$total)"
+
   if [ "$remaining" -eq 0 ]; then
-    echo "All stories already pass."
+    wlog "All stories already pass."
 
     if _run_e2e_safety_net; then
       return 0
@@ -223,7 +236,7 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
       fi
     done
 
-    echo "ERROR: Safety net still failing after $max_e2e_fixes fix attempts."
+    wlog "ERROR: Safety net still failing after $max_e2e_fixes fix attempts."
     return 1
   fi
 
@@ -231,7 +244,7 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
   [ "$buffer" -lt 1 ] && buffer=1
   max_iterations=$(( remaining + buffer ))
 
-  echo "Stories: $remaining remaining (of $total total), $max_iterations iterations max"
+  wlog "Stories: $remaining remaining (of $total total), $max_iterations iterations max"
 
   # Initialize progress file in worktree
   if [ ! -f "$wt_progress" ]; then
@@ -244,9 +257,11 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
   for i in $(seq 1 $max_iterations); do
     # Check if all stories pass before each iteration
     remaining=$(jq '[.userStories[] | select(.passes != true)] | length' "$wt_prd" 2>/dev/null || echo "0")
+    STORY_PROGRESS="($(( total - remaining ))/$total)"
+
     if [ "$remaining" -eq 0 ]; then
-      echo ""
-      echo "All stories pass! Completed before iteration $i."
+      wlog ""
+      wlog "All stories pass! Completed before iteration $i."
 
       if _run_e2e_safety_net; then
         return 0
@@ -260,13 +275,13 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
         fi
       done
 
-      echo "ERROR: Safety net still failing after $max_e2e_fixes fix attempts."
+      wlog "ERROR: Safety net still failing after $max_e2e_fixes fix attempts."
       return 1
     fi
 
     local passed=$(( total - remaining ))
-    echo ""
-    echo "── Iteration $i/$max_iterations — story ($passed/$total) — $remaining remaining ──"
+    wlog ""
+    wlog "── Iteration $i/$max_iterations — story ($passed/$total) — $remaining remaining ──"
 
     ITER_RESULT_FILE=$(mktemp)
     STDERR_FILE=$(mktemp)
@@ -285,22 +300,22 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
     # Detect empty iterations
     ITER_RESULT_SIZE=$(wc -c < "$ITER_RESULT_FILE" 2>/dev/null | tr -d ' ')
     if [ "${ITER_RESULT_SIZE:-0}" -eq 0 ]; then
-      echo ""
-      echo "ERROR: Empty iteration — claude produced no output."
+      wlog ""
+      wlog "ERROR: Empty iteration — claude produced no output."
       if [ -s "$STDERR_FILE" ]; then
-        echo "stderr:"
+        wlog "stderr:"
         head -20 "$STDERR_FILE"
       fi
       rm -f "$ITER_RESULT_FILE" "$STDERR_FILE"
-      echo "Aborting PRD to avoid burning iterations."
+      wlog "Aborting PRD to avoid burning iterations."
       return 1
     fi
 
     rm -f "$STDERR_FILE"
 
     if [ -f "$ITER_RESULT_FILE" ] && grep -q "<promise>COMPLETE</promise>" "$ITER_RESULT_FILE" 2>/dev/null; then
-      echo ""
-      echo "All tasks complete!"
+      wlog ""
+      wlog "All tasks complete!"
       rm -f "$ITER_RESULT_FILE"
 
       if _run_e2e_safety_net; then
@@ -315,7 +330,7 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
         fi
       done
 
-      echo "ERROR: Safety net still failing after $max_e2e_fixes fix attempts."
+      wlog "ERROR: Safety net still failing after $max_e2e_fixes fix attempts."
       return 1
     fi
 
@@ -323,8 +338,8 @@ You are an autonomous coding agent running in a git worktree. The safety net ver
     sleep 2
   done
 
-  echo ""
-  echo "Reached max iterations ($max_iterations) without completing all stories."
+  wlog ""
+  wlog "Reached max iterations ($max_iterations) without completing all stories."
   return 1
 }
 
