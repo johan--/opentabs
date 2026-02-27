@@ -1,16 +1,18 @@
 # Ralph Task Planner
 
-Plan work and generate PRD files in `.ralph/` for autonomous execution by the Ralph daemon.
+Plan work and generate PRD files for autonomous execution by distributed Ralph workers.
 
-Ralph is a bash script (`.ralph/ralph.sh`) that runs as a long-lived daemon with parallel workers (default 3). It polls `.ralph/` for ready PRD files, dispatches them to workers by timestamp order, and each worker runs in its own **git worktree** for full isolation — no type-check, lint, or build conflicts between concurrent agents. Each PRD file drives a loop of AI coding iterations — one per user story. This skill creates the PRD file that the daemon picks up automatically.
+Ralph uses a **git-based distributed work queue** (`opentabs-prds` repo on GitHub). This skill writes PRD files to that queue repo, and distributed workers across the internet claim and execute them atomically. Each PRD file drives a loop of AI coding iterations — one per user story. Workers push completed work as branches to the code repo, and a consolidator merges them into main.
 
 ---
 
-## PRD Location: Always Root `.ralph/`
+## PRD Location: The Queue Repo
 
-**PRD files MUST always be written to the root `.ralph/` directory** (the one containing `ralph.sh`). The ralph daemon only watches this single directory — it does not scan subdirectories or other `.ralph/` folders elsewhere in the repo.
+**PRD files MUST be written to the `opentabs-prds` repo** (located at `~/workspace/src/opentabs-prds/` or wherever the user has it cloned). This is a separate git repo that serves as the distributed work queue. PRD files are committed and pushed to the remote, where workers fetch and claim them.
 
-Even when the task targets a standalone subproject (like `docs/`), the PRD goes in root `.ralph/`. The `workingDirectory` and `qualityChecks` fields in the PRD tell the ralph agent which project it's working on and how to verify the work.
+Even when the task targets a standalone subproject (like `docs/`), the PRD goes in the queue repo root. The `workingDirectory` and `qualityChecks` fields in the PRD tell the worker which project it's working on and how to verify the work.
+
+The queue repo path can be configured. If `~/workspace/src/opentabs-prds/` does not exist, ask the user for the correct path.
 
 ---
 
@@ -86,14 +88,14 @@ All file paths in story notes must be relative to the repo root (e.g., `docs/mdx
 ## PRD File Name State Machine
 
 ```
-prd-objective~draft.json                       — being written (this skill), ralph ignores
-prd-YYYY-MM-DD-HHMMSS-objective.json           — ready for pickup by ralph daemon (timestamp added at publish time)
-prd-YYYY-MM-DD-HHMMSS-objective~running.json   — currently being executed by a worker
+prd-objective~draft.json                       — being written (this skill), not committed
+prd-YYYY-MM-DD-HHMMSS-objective.json           — ready for pickup (committed + pushed to remote)
+prd-YYYY-MM-DD-HHMMSS-objective~running.json   — claimed by a worker (atomic via git push)
 prd-YYYY-MM-DD-HHMMSS-objective~done.json      — completed, pending archive
-archived to .ralph/archive/                     — final resting place
+archived to archive/                            — final resting place
 ```
 
-Multiple PRDs can be `~running` simultaneously (one per worker). This skill writes with `~draft` (no timestamp). At publish time, a **shell command** generates the real timestamp and renames the file. This ensures correct ordering — the timestamp reflects when the PRD was actually ready, not when writing started.
+Multiple PRDs can be `~running` simultaneously (one per worker). This skill writes with `~draft` (no timestamp). At publish time, `producer.sh` renames the file with a real timestamp, commits, and pushes to the remote. This ensures correct ordering — the timestamp reflects when the PRD was actually ready, not when writing started.
 
 ---
 
@@ -104,10 +106,10 @@ Multiple PRDs can be `~running` simultaneously (one per worker). This skill writ
 3. Ask 3-5 essential clarifying questions (with lettered options) if the request is ambiguous — do NOT ask about story size (always small) or single-vs-multiple PRDs (AI decides)
 4. **Validate scope** — for quality/refactoring tasks, read the code and discard any candidate stories that are subjective preferences rather than genuine issues
 5. **Decide PRD structure** — split into multiple PRDs if the work divides cleanly into independent groups (see "Single vs Multiple PRDs"); keep as one PRD if stories are tightly coupled
-6. Generate PRD file(s) with `~draft` suffix and NO timestamp (safe from premature pickup)
-7. Publish: use a shell command to rename with the current timestamp (ensures accurate ordering)
+6. Generate PRD file(s) with `~draft` suffix and NO timestamp in the queue repo
+7. Publish: run `producer.sh` to rename with timestamp, commit, and push to remote
 
-**Important:** Do NOT start implementing. Do NOT launch ralph. Just create the PRD file(s). The ralph daemon (`ralph.sh`) must already be running and will pick them up automatically.
+**Important:** Do NOT start implementing. Just create and publish the PRD file(s). Distributed workers will claim them from the remote queue.
 
 ---
 
@@ -191,20 +193,20 @@ For each candidate story, ask:
 Use a short kebab-case objective slug with NO timestamp:
 
 ```
-.ralph/prd-objective-slug~draft.json
+prd-objective-slug~draft.json
 ```
 
-Example: `.ralph/prd-improve-sdk-error-handling~draft.json`
+Written to the queue repo (e.g., `~/workspace/src/opentabs-prds/prd-improve-sdk-error-handling~draft.json`).
 
-**Do NOT put a timestamp in the draft filename.** The timestamp is added by a shell command at publish time (Step 5). This prevents timestamp inaccuracies from AI model clock drift.
+**Do NOT put a timestamp in the draft filename.** The timestamp is added by `producer.sh` at publish time (Step 5). This prevents timestamp inaccuracies from AI model clock drift.
 
 Keep the objective slug to 3-5 words max.
 
 ### Writing Sequence
 
-1. **Write** the PRD to `.ralph/prd-objective-slug~draft.json` (no timestamp)
-2. **Verify** the JSON is valid: `python3 -c "import json; json.load(open('.ralph/prd-objective-slug~draft.json')); print('Valid')"`
-3. **Publish** via shell command (see Step 5)
+1. **Write** the PRD to `<queue-repo>/prd-objective-slug~draft.json` (no timestamp)
+2. **Verify** the JSON is valid: `python3 -c "import json; json.load(open('<queue-repo>/prd-objective-slug~draft.json')); print('Valid')"`
+3. **Publish** via `producer.sh` (see Step 5)
 
 ### PRD Format
 
@@ -242,23 +244,34 @@ Keep the objective slug to 3-5 words max.
 
 ---
 
-## Step 5: Publish (Rename with Timestamp)
+## Step 5: Publish (via producer.sh)
 
-After writing and validating the PRD, publish it using this exact shell command:
+After writing and validating the PRD, publish it using `producer.sh` in the queue repo:
 
 ```bash
-mv .ralph/prd-SLUG~draft.json ".ralph/prd-$(date '+%Y-%m-%d-%H%M%S')-SLUG.json"
+cd ~/workspace/src/opentabs-prds && ./producer.sh prd-SLUG~draft.json
 ```
 
 Replace `SLUG` with your objective slug. Example:
 
 ```bash
-mv .ralph/prd-improve-sdk-error-handling~draft.json ".ralph/prd-$(date '+%Y-%m-%d-%H%M%S')-improve-sdk-error-handling.json"
+cd ~/workspace/src/opentabs-prds && ./producer.sh prd-improve-sdk-error-handling~draft.json
 ```
 
-**This is critical.** The `$(date ...)` shell expansion generates the real wall-clock timestamp at the moment of publishing. Ralph processes PRDs in filename-timestamp order, so accurate timestamps ensure correct sequencing.
+`producer.sh` handles everything atomically:
 
-**Never hardcode a timestamp in the filename.** Always use `$(date '+%Y-%m-%d-%H%M%S')` in the mv command.
+1. Validates the JSON
+2. Renames with a real wall-clock timestamp (e.g., `prd-2026-02-26-143000-improve-sdk-error-handling.json`)
+3. Commits to the queue repo
+4. Pushes to the remote (with retry if concurrent workers are also pushing)
+
+For multiple PRDs, pass them all at once:
+
+```bash
+cd ~/workspace/src/opentabs-prds && ./producer.sh prd-sdk-fixes~draft.json prd-docs-updates~draft.json
+```
+
+**Never hardcode a timestamp in the filename.** `producer.sh` generates it at publish time.
 
 ---
 
@@ -438,31 +451,31 @@ No story touches browser behavior, so no E2E checkpoints are needed mid-PRD. Ral
 
 After publishing the PRD file, tell the user:
 
-1. **PRD file created:** the full path and story count
+1. **PRD file published:** the filename, story count, and that it was pushed to the remote
 2. **Target project:** which project the PRD targets and what verification commands will be used
-3. **Auto-pickup:** the ralph daemon will pick it up automatically (no manual launch needed)
+3. **Auto-pickup:** distributed workers polling the queue will claim it automatically
 4. **Monitoring commands:**
-   - **Watch ralph daemon:** `tail -f .ralph/ralph.log`
-   - **Check PRD state:** `ls -la .ralph/prd-*.json` (look for `~running` suffix)
-   - **Check progress:** `cat .ralph/progress-*.txt`
-   - **Check worktrees:** `git worktree list`
-   - **Start ralph daemon** (if not running): `nohup bash .ralph/ralph.sh --workers 3 &`
-   - **Start for a single batch:** `nohup bash .ralph/ralph.sh --workers 3 --once &`
+   - **Check queue state:** `cd ~/workspace/src/opentabs-prds && git pull && ls prd-*.json` (look for `~running` suffix)
+   - **Check progress:** `cd ~/workspace/src/opentabs-prds && git pull && cat progress-*.txt`
+   - **Check code branches:** `git ls-remote origin 'refs/heads/ralph-*'`
+   - **Start a consumer** (if none running): `./consumer.sh --code-repo https://github.com/opentabs-dev/opentabs.git --workers 2`
+   - **Start consolidator** (to merge branches): `./consolidator.sh --code-repo https://github.com/opentabs-dev/opentabs.git`
+   - **Single batch run:** `./consumer.sh --code-repo https://github.com/opentabs-dev/opentabs.git --once`
 
 ---
 
 ## Git Rules
 
-PRD files and progress files in `.ralph/` are gitignored and must NEVER be committed. They are ephemeral working files that change on every ralph run. If they are accidentally tracked, remove them from the index with `git rm --cached` without deleting from disk.
+PRD files in the queue repo (`opentabs-prds`) ARE tracked by git — they are the queue's state and must be committed and pushed. `producer.sh` handles this automatically.
 
-Ralph commits code changes only — never ralph's own state files.
+PRD and progress files in a worker's local `.ralph/` directory (inside the code repo worktree) are gitignored and must NEVER be committed to the code repo. Workers commit code changes only — never ralph's state files.
 
 ---
 
 ## Checklist Before Publishing
 
 - [ ] **Target project identified** — determined whether this is root monorepo, docs, or a plugin
-- [ ] PRD is in root `.ralph/` (not in a subdirectory)
+- [ ] PRD is in the queue repo root (e.g., `~/workspace/src/opentabs-prds/`)
 - [ ] **`workingDirectory` set** if targeting a standalone subproject (omitted for root monorepo)
 - [ ] **`qualityChecks` set** if targeting a standalone subproject (omitted for root monorepo)
 - [ ] **`qualityChecks` matches the subproject's actual available scripts** (verified by reading its `package.json`)
@@ -478,4 +491,4 @@ Ralph commits code changes only — never ralph's own state files.
 - [ ] **For root monorepo PRDs with no browser-observable changes: all stories can be `e2eCheckpoint: false`** (ralph's safety net runs E2E after completion)
 - [ ] JSON is valid
 - [ ] File written with `~draft` suffix and NO timestamp in filename
-- [ ] Published via `mv` command with `$(date '+%Y-%m-%d-%H%M%S')` for accurate timestamp
+- [ ] Published via `producer.sh` (handles timestamp, commit, and push atomically)
