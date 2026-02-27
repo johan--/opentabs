@@ -263,11 +263,7 @@ test.describe('WebSocket connection management', () => {
     // 5. The real extension should detect it was disconnected (via the close
     //    event from the server) and reconnect. Since the fake client also
     //    disconnected, the extension's reconnect will succeed.
-    await waitForExtensionConnected(mcpServer, 15_000);
-
-    const h = await mcpServer.health();
-    expect(h).not.toBeNull();
-    if (!h) throw new Error('health returned null');
+    const h = await mcpServer.waitForHealth(health => health.extensionConnected, 15_000);
     expect(h.extensionConnected).toBe(true);
   });
 
@@ -482,33 +478,11 @@ test.describe('Secret rotation during hot reload', () => {
     await waitForLog(mcpServer, 'Hot reload complete', 15_000);
     mcpServer.secret = newSecret;
 
-    // The extension's existing connection is still alive (hot reload preserves
-    // the TCP socket). Force a disconnect by stealing the WS slot using the
-    // new secret's token, so the extension has to reconnect.
-    mcpServer.logs.length = 0;
-    const { wsUrl: newWsUrl, wsSecret: rotatedWsSecret } = await fetchWsInfo(mcpServer.port, newSecret);
-    const rotateProtocols = ['opentabs'];
-    if (rotatedWsSecret) rotateProtocols.push(rotatedWsSecret);
-    const fakeWs = rotateProtocols.length > 1 ? new WebSocket(newWsUrl, rotateProtocols) : new WebSocket(newWsUrl);
-    await new Promise<void>((resolve, reject) => {
-      fakeWs.onopen = () => resolve();
-      fakeWs.onerror = () => reject(new Error('WebSocket connect failed'));
-      setTimeout(() => reject(new Error('WebSocket connect timeout')), 5_000);
-    });
-
-    // The server replaces the old connection
-    await waitForLog(mcpServer, 'Closing previous extension WebSocket', 5_000);
-    fakeWs.close();
-    await waitForExtensionDisconnected(mcpServer, 5_000);
-
-    // Write auth.json so the extension can bootstrap the rotated secret
-    // when /ws-info returns 401 (stale secret). The extension's offscreen
-    // document falls back to auth.json on 401.
-    const extensionAuthJson = path.join(mcpServer.configDir, 'extension', 'auth.json');
-    fs.writeFileSync(extensionAuthJson, JSON.stringify({ secret: newSecret }) + '\n', 'utf-8');
-
-    // Wait for the extension to reconnect — it must re-fetch /ws-info
-    // to get a token signed with the new secret
+    // Hot reload restarts the worker, which reads the rotated secret from
+    // auth.json. The proxy breaks the extension's WebSocket connection during
+    // the restart. The extension detects the disconnect and reconnects,
+    // re-fetching /ws-info to get a token signed with the new secret.
+    // Wait for the extension to reconnect after the hot reload.
     await waitForExtensionConnected(mcpServer, 45_000);
     await waitForLog(mcpServer, 'tab.syncAll received', 15_000);
 

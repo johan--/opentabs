@@ -503,35 +503,64 @@ const startMcpServer = (configDir: string, hot: boolean = true, explicitPort?: n
 
     const logs: string[] = [];
     let resolved = false;
+    let proxyPort: number | null = null;
+
+    /** Finalize the server object with the given port and resolve the promise. */
+    const finalizeServer = (actualPort: number): void => {
+      resolved = true;
+      server.port = actualPort;
+      // Read the secret from auth.json (single source of truth).
+      // In hot mode the worker writes auth.json during startup, so by the
+      // time we see "Worker ready" the file is guaranteed to exist.
+      try {
+        const authPath = path.join(configDir, 'extension', 'auth.json');
+        const authData = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as { secret?: string };
+        server.secret = authData.secret;
+      } catch {
+        // auth.json may not be readable yet — auth will be skipped
+      }
+      server.health = () => fetchHealth(actualPort, server.secret);
+      server.waitForHealth = (predicate, timeoutMs) =>
+        waitForHealth(actualPort, predicate, timeoutMs, undefined, server.secret);
+      resolve(server);
+    };
 
     const onData = (chunk: Buffer) => {
       const text = chunk.toString();
       for (const line of text.split('\n')) {
         if (line.trim()) logs.push(line);
       }
-      if (!resolved && text.includes('listening on http://localhost:')) {
-        const actualPort = parsePortFromLogs(logs);
-        if (!actualPort) {
-          resolved = true;
-          void killProcess(proc);
-          reject(new Error(`MCP server started but could not parse port from logs.\nLogs:\n${logs.join('\n')}`));
-          return;
+
+      if (hot) {
+        // In hot mode the dev proxy logs its own "listening" message before
+        // starting the worker. Capture the proxy's port, but wait until the
+        // worker is ready (proxy logs "Worker ready") before resolving — the
+        // worker writes auth.json during startup, so auth is only available
+        // after the worker is up.
+        if (proxyPort === null && text.includes('listening on http://localhost:')) {
+          proxyPort = parsePortFromLogs(logs);
+          if (!proxyPort) {
+            resolved = true;
+            void killProcess(proc);
+            reject(new Error(`Dev proxy started but could not parse port from logs.\nLogs:\n${logs.join('\n')}`));
+            return;
+          }
         }
-        resolved = true;
-        // Now that we know the port, wire up the server object
-        server.port = actualPort;
-        // Read the secret from auth.json (single source of truth)
-        try {
-          const authPath = path.join(configDir, 'extension', 'auth.json');
-          const authData = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as { secret?: string };
-          server.secret = authData.secret;
-        } catch {
-          // auth.json may not be readable yet — auth will be skipped
+        if (!resolved && proxyPort !== null && text.includes('Worker ready')) {
+          finalizeServer(proxyPort);
         }
-        server.health = () => fetchHealth(actualPort, server.secret);
-        server.waitForHealth = (predicate, timeoutMs) =>
-          waitForHealth(actualPort, predicate, timeoutMs, undefined, server.secret);
-        resolve(server);
+      } else {
+        // Non-hot mode: index.js logs "listening" when it is fully ready.
+        if (!resolved && text.includes('listening on http://localhost:')) {
+          const actualPort = parsePortFromLogs(logs);
+          if (!actualPort) {
+            resolved = true;
+            void killProcess(proc);
+            reject(new Error(`MCP server started but could not parse port from logs.\nLogs:\n${logs.join('\n')}`));
+            return;
+          }
+          finalizeServer(actualPort);
+        }
       }
     };
 
@@ -1060,13 +1089,20 @@ const createMcpClient = (port: number, secret?: string): McpClient => {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      // After a worker restart (hot reload), the new worker has no knowledge of
-      // existing sessions. Automatically re-initialize and retry once so tests
-      // don't need to handle this explicitly.
-      if (res.status === 400 && text.includes('missing session') && !retried && initRef.fn) {
-        sessionId = null;
-        await initRef.fn();
-        return request(body, timeoutMs, true);
+      if (!retried && initRef.fn) {
+        // After a worker restart (hot reload), the new worker has no knowledge
+        // of existing sessions (400 + "missing session"). The proxy may also
+        // return 502/503 while the new worker is starting. In both cases,
+        // re-initialize the session and retry the request once.
+        if ((res.status === 400 && text.includes('missing session')) || res.status === 502 || res.status === 503) {
+          sessionId = null;
+          // For 502/503, wait briefly for the new worker to become ready
+          if (res.status === 502 || res.status === 503) {
+            await new Promise(r => setTimeout(r, 1_000));
+          }
+          await initRef.fn();
+          return request(body, timeoutMs, true);
+        }
       }
       throw new Error(`MCP request failed (${res.status}): ${text}`);
     }
