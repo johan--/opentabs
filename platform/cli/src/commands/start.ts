@@ -160,7 +160,7 @@ const printMcpClientConfigs = (mcpUrl: string, secret: string | null): void => {
   const configs: Array<{ label: string; file: string; json: Record<string, unknown> }> = [
     {
       label: 'Claude Code',
-      file: '~/.claude.json — add to "mcpServers"',
+      file: '~/.claude/settings/mcp.json',
       json: {
         mcpServers: {
           opentabs: { type: 'streamable-http', url: mcpUrl, ...(authHeaders && { headers: authHeaders }) },

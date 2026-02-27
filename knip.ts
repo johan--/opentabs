@@ -8,6 +8,8 @@ const config: KnipConfig = {
         // Peer dependencies required by ESLint plugins at runtime
         '@typescript-eslint/parser',
         'eslint-plugin-react-hooks',
+        // Required for cross-platform module resolution in vitest (not directly imported at root level)
+        'zod',
       ],
     },
     'platform/shared': {
@@ -46,7 +48,7 @@ const config: KnipConfig = {
     'platform/create-plugin': {},
   },
   tags: ['+@public'],
-  ignore: ['plugins/**', 'docs/**', 'platform/browser-extension/side-panel/**/*.{js,css}', '.ralph/worktrees/**'],
+  ignore: ['plugins/**', 'docs/**', 'platform/browser-extension/side-panel/**/*.{js,css}'],
   ignoreExportsUsedInFile: true,
 };
 
