@@ -59,6 +59,11 @@ opentabs start [options]
       <Table.Cell>`9515`</Table.Cell>
       <Table.Cell>Server port.</Table.Cell>
     </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`--show-config`</Table.Cell>
+      <Table.Cell>—</Table.Cell>
+      <Table.Cell>Print full MCP client configuration even on subsequent runs. By default, MCP client config is only shown on first run.</Table.Cell>
+    </Table.Row>
   </Table.Body>
 </Table>
 
@@ -412,6 +417,10 @@ opentabs plugin list [options]
     <Table.Row>
       <Table.Cell className="font-medium">`--port <number>`</Table.Cell>
       <Table.Cell>Server port (default: `9515`).</Table.Cell>
+    </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`-v, --verbose`</Table.Cell>
+      <Table.Cell>Show tool names for each plugin.</Table.Cell>
     </Table.Row>
   </Table.Body>
 </Table>
