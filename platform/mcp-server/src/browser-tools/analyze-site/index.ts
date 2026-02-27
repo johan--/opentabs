@@ -948,16 +948,13 @@ const analyzeSite = async (
       ? networkResult
       : ((networkResult as { requests?: NetworkRequest[] }).requests ?? []);
 
-    // Step 6: Disable network capture
-    await dispatchToExtension(state, 'browser.disableNetworkCapture', { tabId });
-
-    // Step 7: Get cookies via extension API (includes HttpOnly cookies)
+    // Step 6: Get cookies via extension API (includes HttpOnly cookies)
     const cookieResult = (await dispatchToExtension(state, 'browser.getCookies', { url })) as {
       cookies?: CookieEntry[];
     } | null;
     const cookies: CookieEntry[] = cookieResult?.cookies ?? [];
 
-    // Step 8: Run detection modules
+    // Step 7: Run detection modules
     const auth = detectAuth({
       cookies,
       localStorageEntries: storageEntries.localEntries,
@@ -988,7 +985,7 @@ const analyzeSite = async (
 
     const storage = detectStorage(storageKeys);
 
-    // Step 9: Generate suggestions
+    // Step 8: Generate suggestions
     const suggestions = generateSuggestions(apis, domAnalysis, auth, frameworkAnalysis);
 
     return {
@@ -1003,7 +1000,12 @@ const analyzeSite = async (
       suggestions,
     };
   } finally {
-    // Clean up: close the tab
+    // Clean up: disable network capture then close the tab
+    try {
+      await dispatchToExtension(state, 'browser.disableNetworkCapture', { tabId });
+    } catch {
+      // Best-effort cleanup — ignore errors
+    }
     try {
       await dispatchToExtension(state, 'browser.closeTab', { tabId });
     } catch {
