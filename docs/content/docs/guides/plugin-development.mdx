@@ -273,6 +273,28 @@ await patchJSON("/api/items/abc123", { status: "archived" });
 await deleteJSON("/api/items/abc123");
 ```
 
+### Form submissions
+
+Use `postForm` and `postFormData` when the API expects form-encoded or multipart bodies instead of JSON:
+
+- **`postForm(url, body, init?)`** — POST with `application/x-www-form-urlencoded` body. `body` is `Record<string, string>`.
+- **`postFormData(url, body, init?)`** — POST with `multipart/form-data` body. `body` is `FormData`. Useful for file uploads.
+
+```typescript
+import { postForm, postFormData } from "@opentabs-dev/plugin-sdk";
+
+// URL-encoded form
+const result = await postForm<{ success: boolean }>("/api/submit", {
+  name: "test",
+  value: "42",
+});
+
+// Multipart form data (file uploads)
+const formData = new FormData();
+formData.append("file", blob, "upload.png");
+const uploaded = await postFormData<{ id: string }>("/api/upload", formData);
+```
+
 All JSON fetch helpers support an optional Zod schema as the last argument for response validation. See the [Utilities reference](/docs/sdk/utilities) for the full API.
 
 ### Wait for DOM elements
