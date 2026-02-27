@@ -179,7 +179,8 @@ const handleListTools = async (options: { port?: number }): Promise<void> => {
   }
 
   if (tools.length === 0) {
-    console.log(pc.dim('No tools available (no plugins installed).'));
+    console.log(pc.dim('No plugin tools available (no plugins installed).'));
+    console.log(pc.dim('Browser tools are managed with: opentabs config set browser-tool.<name> enabled|disabled'));
     return;
   }
 
