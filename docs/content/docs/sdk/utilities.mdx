@@ -444,6 +444,8 @@ Maps an HTTP error response to a `ToolError` with the appropriate category. Stat
 | --- | --- | --- | --- |
 | 401, 403 | `auth` | `false` | |
 | 404 | `not_found` | `false` | |
+| 400, 422 | `validation` | `false` | |
+| 408 | `timeout` | `true` | |
 | 429 | `rate_limit` | `true` | Parses `Retry-After` header into `retryAfterMs` |
 | 503 | `internal` | `true` | Parses `Retry-After` header into `retryAfterMs` |
 | 5xx (other) | `internal` | `true` | Server errors are retryable |
@@ -492,7 +494,7 @@ function getLocalStorage(key: string): string | null;
 
 ### `setLocalStorage(key, value)`
 
-Writes a value to `localStorage`. Silently fails if storage access throws (SecurityError or QuotaExceededError).
+Writes a value to `localStorage`. Logs a warning via `log.warn()` if storage access throws (SecurityError or QuotaExceededError).
 
 ```typescript
 function setLocalStorage(key: string, value: string): void;
@@ -500,7 +502,7 @@ function setLocalStorage(key: string, value: string): void;
 
 ### `removeLocalStorage(key)`
 
-Removes a key from `localStorage`. Silently fails if storage access throws (e.g., SecurityError in sandboxed iframes).
+Removes a key from `localStorage`. Logs a warning via `log.warn()` if storage access throws (e.g., SecurityError in sandboxed iframes).
 
 ```typescript
 function removeLocalStorage(key: string): void;
@@ -516,7 +518,7 @@ function getSessionStorage(key: string): string | null;
 
 ### `setSessionStorage(key, value)`
 
-Writes a value to `sessionStorage`. Silently fails if storage access throws (SecurityError or QuotaExceededError).
+Writes a value to `sessionStorage`. Logs a warning via `log.warn()` if storage access throws (SecurityError or QuotaExceededError).
 
 ```typescript
 function setSessionStorage(key: string, value: string): void;
@@ -524,7 +526,7 @@ function setSessionStorage(key: string, value: string): void;
 
 ### `removeSessionStorage(key)`
 
-Removes a key from `sessionStorage`. Silently fails if storage access throws (e.g., SecurityError in sandboxed iframes).
+Removes a key from `sessionStorage`. Logs a warning via `log.warn()` if storage access throws (e.g., SecurityError in sandboxed iframes).
 
 ```typescript
 function removeSessionStorage(key: string): void;
