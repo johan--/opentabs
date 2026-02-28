@@ -50,10 +50,10 @@ const fileExists = (path: string): Promise<boolean> =>
   );
 
 describe('opentabs-plugin build E2E', () => {
-  // Ensure the e2e-test plugin has its dependencies installed.
+  // Ensure the e2e-test plugin has its dependencies installed and is compiled.
   // The test symlinks node_modules from the source dir into temp copies,
-  // so the source must have node_modules populated. In CI or fresh clones
-  // (e.g. the consolidator) the plugin deps may not yet be installed.
+  // so the source must have node_modules populated and dist/ built.
+  // In CI or fresh clones (e.g. the consolidator) these may be missing.
   beforeAll(() => {
     if (!existsSync(join(E2E_PLUGIN_DIR, 'node_modules', '@opentabs-dev', 'plugin-sdk'))) {
       const result = spawnSync('npm', ['install'], { cwd: E2E_PLUGIN_DIR, stdio: 'pipe' });
@@ -61,7 +61,17 @@ describe('opentabs-plugin build E2E', () => {
         throw new Error(`npm install in e2e-test plugin failed: ${result.stderr.toString()}`);
       }
     }
-  }, 60_000);
+    if (!existsSync(join(E2E_PLUGIN_DIR, 'dist', 'index.js'))) {
+      const result = spawnSync('npm', ['run', 'build'], {
+        cwd: E2E_PLUGIN_DIR,
+        stdio: 'pipe',
+        env: { ...process.env, OPENTABS_CONFIG_DIR: join(E2E_PLUGIN_DIR, '.opentabs-test-config') },
+      });
+      if (result.status !== 0) {
+        throw new Error(`npm run build in e2e-test plugin failed: ${result.stderr.toString()}`);
+      }
+    }
+  }, 120_000);
 
   let tmpDir: string;
   let configDir: string;
