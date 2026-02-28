@@ -21,19 +21,18 @@ import type {
 import type { FSWatcher } from 'node:fs';
 
 /**
- * Creates an empty Map whose mutating methods throw TypeError, preventing
- * accidental corruption of the EMPTY_REGISTRY sentinel via misrouted .set() calls.
+ * Overrides the mutating methods of an existing Map to throw TypeError, preventing
+ * accidental mutation after the registry is built.
  * Object.freeze alone does not block Map.prototype.set (it accesses internal slots).
  */
-const createFrozenRegistryMap = <K, V>(): ReadonlyMap<K, V> => {
-  const m = new Map<K, V>();
+export const freezeRegistryMap = <K, V>(map: Map<K, V>): ReadonlyMap<K, V> => {
   const throwFn = (): never => {
     throw new TypeError('Cannot mutate a frozen registry map');
   };
-  Object.defineProperty(m, 'set', { value: throwFn, writable: false, configurable: false });
-  Object.defineProperty(m, 'delete', { value: throwFn, writable: false, configurable: false });
-  Object.defineProperty(m, 'clear', { value: throwFn, writable: false, configurable: false });
-  return Object.freeze(m) as ReadonlyMap<K, V>;
+  Object.defineProperty(map, 'set', { value: throwFn, writable: false, configurable: false });
+  Object.defineProperty(map, 'delete', { value: throwFn, writable: false, configurable: false });
+  Object.defineProperty(map, 'clear', { value: throwFn, writable: false, configurable: false });
+  return Object.freeze(map) as ReadonlyMap<K, V>;
 };
 
 /** Timeout for tool dispatch and browser command requests (ms) */
@@ -343,10 +342,10 @@ export const STATE_SCHEMA_VERSION = 4;
 
 /** Frozen empty registry for initializing ServerState */
 export const EMPTY_REGISTRY: PluginRegistry = Object.freeze({
-  plugins: createFrozenRegistryMap<string, RegisteredPlugin>(),
-  toolLookup: createFrozenRegistryMap<string, ToolLookupEntry>(),
-  resourceLookup: createFrozenRegistryMap<string, ResourceLookupEntry>(),
-  promptLookup: createFrozenRegistryMap<string, PromptLookupEntry>(),
+  plugins: freezeRegistryMap(new Map<string, RegisteredPlugin>()),
+  toolLookup: freezeRegistryMap(new Map<string, ToolLookupEntry>()),
+  resourceLookup: freezeRegistryMap(new Map<string, ResourceLookupEntry>()),
+  promptLookup: freezeRegistryMap(new Map<string, PromptLookupEntry>()),
   failures: Object.freeze([] as FailedPlugin[]),
 });
 
