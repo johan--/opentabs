@@ -123,6 +123,50 @@ describe('getPageGlobal', () => {
     expect(getPageGlobal('SomeLib.version.patch')).toBeUndefined();
     delete (globalThis as Record<string, unknown>).SomeLib;
   });
+
+  describe('prototype chain blocking', () => {
+    beforeEach(() => {
+      (globalThis as Record<string, unknown>).TS = {
+        boot_data: { api_token: 'xoxs-abc' },
+      };
+    });
+
+    test('blocks __proto__ at the root', () => {
+      expect(getPageGlobal('__proto__')).toBeUndefined();
+    });
+
+    test('blocks constructor at the root', () => {
+      expect(getPageGlobal('constructor')).toBeUndefined();
+    });
+
+    test('blocks prototype at the root', () => {
+      expect(getPageGlobal('prototype')).toBeUndefined();
+    });
+
+    test('blocks constructor.prototype', () => {
+      expect(getPageGlobal('constructor.prototype')).toBeUndefined();
+    });
+
+    test('blocks __proto__.toString', () => {
+      expect(getPageGlobal('__proto__.toString')).toBeUndefined();
+    });
+
+    test('blocks __proto__ mid-path (TS.__proto__.hasOwnProperty)', () => {
+      expect(getPageGlobal('TS.__proto__.hasOwnProperty')).toBeUndefined();
+    });
+
+    test('still returns legitimate nested paths after blocking setup', () => {
+      expect(getPageGlobal('TS.boot_data.api_token')).toBe('xoxs-abc');
+    });
+
+    test('returns undefined for empty string path', () => {
+      expect(getPageGlobal('')).toBeUndefined();
+    });
+
+    test('returns undefined for path with consecutive dots (empty segment)', () => {
+      expect(getPageGlobal('a..b')).toBeUndefined();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
