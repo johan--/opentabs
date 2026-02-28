@@ -4,11 +4,16 @@ import { describe, expect, vi, test } from 'vitest';
 // Chrome API stubs — network-capture.ts registers listeners at module level
 // ---------------------------------------------------------------------------
 
+let capturedOnEventListener: ((source: { tabId?: number }, method: string, params?: object) => void) | undefined;
 let capturedOnDetachListener: ((source: { tabId?: number }, reason: string) => void) | undefined;
 
 (globalThis as Record<string, unknown>).chrome = {
   debugger: {
-    onEvent: { addListener: vi.fn() },
+    onEvent: {
+      addListener: vi.fn((cb: (source: { tabId?: number }, method: string, params?: object) => void) => {
+        capturedOnEventListener = cb;
+      }),
+    },
     onDetach: {
       addListener: vi.fn((cb: (source: { tabId?: number }, reason: string) => void) => {
         capturedOnDetachListener = cb;
@@ -21,7 +26,7 @@ let capturedOnDetachListener: ((source: { tabId?: number }, reason: string) => v
   tabs: { onRemoved: { addListener: vi.fn() } },
 };
 
-const { scrubHeaders, startCapture, isCapturing, stopCapture } = await import('./network-capture.js');
+const { scrubHeaders, startCapture, isCapturing, stopCapture, getRequests } = await import('./network-capture.js');
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -176,5 +181,40 @@ describe('onDetach handler', () => {
     const tabId = 9904;
     expect(() => capturedOnDetachListener?.({ tabId }, 'target_closed')).not.toThrow();
     expect(isCapturing(tabId)).toBe(false);
+  });
+});
+
+describe('getRequests', () => {
+  test('clear=true discards in-flight pending requests so they do not appear in subsequent reads', async () => {
+    const tabId = 1001;
+    await startCapture(tabId);
+
+    // Fire requestWillBeSent — request is now pending (no responseReceived yet)
+    capturedOnEventListener?.({ tabId }, 'Network.requestWillBeSent', {
+      requestId: 'req-stale',
+      request: { url: 'https://example.com/api', method: 'GET', headers: {} },
+    });
+
+    // Clear the buffer — pendingRequests must also be cleared
+    const firstRead = getRequests(tabId, true);
+    expect(firstRead).toHaveLength(0);
+
+    // Fire responseReceived for the now-discarded pending request
+    capturedOnEventListener?.({ tabId }, 'Network.responseReceived', {
+      requestId: 'req-stale',
+      response: {
+        url: 'https://example.com/api',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        mimeType: 'application/json',
+      },
+    });
+
+    // The stale pending request must not appear — the clear already discarded it
+    const secondRead = getRequests(tabId, false);
+    expect(secondRead).toHaveLength(0);
+
+    stopCapture(tabId);
   });
 });

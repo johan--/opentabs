@@ -416,6 +416,7 @@ export const getRequests = (tabId: number, clear: boolean = false): CapturedRequ
   if (clear) {
     state.requests = [];
     state.requestIdToRequest.clear();
+    state.pendingRequests.clear();
   }
   return requests;
 };
