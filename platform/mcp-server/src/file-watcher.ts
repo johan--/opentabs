@@ -35,6 +35,9 @@ import type { FSWatcher } from 'node:fs';
 /** Polling interval for mtime-based fallback detection (ms) */
 const MTIME_POLL_INTERVAL_MS = 30_000;
 
+/** Fast polling interval when fs.watch() fails (e.g., EMFILE from inotify limits) */
+const MTIME_FAST_POLL_INTERVAL_MS = 200;
+
 /** Number of polling detections within the window that triggers a stale-watcher warning */
 const STALE_WATCHER_THRESHOLD = 3;
 
@@ -542,6 +545,16 @@ const startConfigWatching = (state: ServerState, callbacks: FileWatcherCallbacks
     log.info(`Config watcher: Watching ${configDir} for config.json changes`);
   } catch (err) {
     log.warn(`Config watcher: Could not watch config dir at ${configDir}:`, err);
+    log.info(`Config watcher: Watching ${configDir} via mtime polling fallback`);
+
+    // fs.watch() failed (e.g., EMFILE from inotify limits). If mtime polling is
+    // running at the default slow interval, restart it at the fast interval so
+    // config.json changes are still detected promptly.
+    if (fw.mtimePollTimerId !== null) {
+      clearInterval(fw.mtimePollTimerId);
+      fw.mtimePollTimerId = null;
+      startMtimePolling(state, callbacks, MTIME_FAST_POLL_INTERVAL_MS);
+    }
   }
 };
 
@@ -556,7 +569,7 @@ const startConfigWatching = (state: ServerState, callbacks: FileWatcherCallbacks
  * fileWatcherGeneration, duplicate invocations from both fs.watch() and
  * polling are safely deduplicated.
  */
-const startMtimePolling = (state: ServerState, callbacks: FileWatcherCallbacks): void => {
+const startMtimePolling = (state: ServerState, callbacks: FileWatcherCallbacks, intervalMs?: number): void => {
   const fw = state.fileWatching;
 
   // Clean up any existing poll timer (defensive — stopFileWatching should clear this)
@@ -566,6 +579,7 @@ const startMtimePolling = (state: ServerState, callbacks: FileWatcherCallbacks):
   }
 
   const gen = fw.generation;
+  const pollInterval = intervalMs ?? MTIME_POLL_INTERVAL_MS;
 
   fw.mtimePollTimerId = setInterval(() => {
     // Bail out if a new generation started (hot reload happened)
@@ -634,9 +648,9 @@ const startMtimePolling = (state: ServerState, callbacks: FileWatcherCallbacks):
       state.fileWatching.configLastSeenMtime = configMtime;
       callbacks.onConfigChanged();
     }
-  }, MTIME_POLL_INTERVAL_MS);
+  }, pollInterval);
 
-  log.info(`Mtime polling started (interval=${MTIME_POLL_INTERVAL_MS}ms)`);
+  log.info(`Mtime polling started (interval=${pollInterval}ms)`);
 };
 
 /**
@@ -712,8 +726,13 @@ const startFileWatching = (
     log.info(`File watcher: Watching ${loadedCount} loaded + ${pendingCount} pending plugin path(s)`);
   }
 
+  // If any fs.watch() call failed (e.g., EMFILE from inotify instance limits), use
+  // fast mtime polling so file changes are still detected promptly.
+  const anyWatcherFailed = state.fileWatching.entries.some(e => e.watchers.length === 0);
+  const pollInterval = anyWatcherFailed ? MTIME_FAST_POLL_INTERVAL_MS : undefined;
+
   // Start mtime polling as a fallback for stale fs.watch() watchers
-  startMtimePolling(state, callbacks);
+  startMtimePolling(state, callbacks, pollInterval);
 };
 
 /**
