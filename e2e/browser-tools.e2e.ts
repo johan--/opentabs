@@ -15,7 +15,14 @@
  */
 
 import { test, expect } from './fixtures.js';
-import { waitForExtensionConnected, waitForLog, parseToolResult, waitFor, BROWSER_TOOL_NAMES } from './helpers.js';
+import {
+  waitForExtensionConnected,
+  waitForLog,
+  parseToolResult,
+  waitFor,
+  BROWSER_TOOL_NAMES,
+  openSidePanel,
+} from './helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { McpClient, McpServer, TestServer } from './fixtures.js';
@@ -2830,6 +2837,44 @@ test.describe('Extension debugging tools', () => {
 
     const data = parseToolResult(result.content);
     expect(data.open).toBe(false);
+  });
+
+  test('extension_get_side_panel returns { open: true } when side panel is open', async ({
+    mcpServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    await initAndListTools(mcpServer, mcpClient);
+
+    // Open the side panel as a regular extension page in the Playwright browser context.
+    // The React app registers a chrome.runtime.onMessage listener for 'sp:getState',
+    // which the background service worker uses to detect whether the panel is open.
+    const sidePanelPage = await openSidePanel(extensionContext);
+
+    try {
+      // Poll until the side panel's message listener is registered and responds.
+      // The React app needs time to mount before it handles the 'sp:getState' message.
+      let data: Record<string, unknown> = {};
+      await waitFor(
+        async () => {
+          try {
+            const r = await mcpClient.callTool('extension_get_side_panel');
+            if (r.isError) return false;
+            data = parseToolResult(r.content);
+            return data.open === true;
+          } catch {
+            return false;
+          }
+        },
+        15_000,
+        500,
+        'extension_get_side_panel returns open: true',
+      );
+
+      expect(data.open).toBe(true);
+    } finally {
+      await sidePanelPage.close();
+    }
   });
 
   test('extension_check_adapter returns diagnostics for e2e-test plugin', async ({
