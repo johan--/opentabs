@@ -281,7 +281,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
   }
 
   if (options.background) {
-    const logStream = createWriteStream(logFilePath, { flags: 'a' });
+    const logStream = createWriteStream(logFilePath, { flags: 'a', mode: 0o600 });
     const child = spawn(platformExec('node'), [serverEntry], {
       env: env as NodeJS.ProcessEnv,
       stdio: ['ignore', logStream, logStream],
@@ -295,7 +295,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
       process.exit(1);
     }
 
-    await writeFile(getPidFilePath(), String(pid));
+    await writeFile(getPidFilePath(), String(pid), { mode: 0o600 });
 
     console.log(`Server started in background (PID: ${String(pid)})`);
     console.log(pc.dim(`Logs: ${logFilePath}`));
@@ -306,7 +306,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
   console.log(pc.dim('  Press Ctrl+C to stop'));
   console.log('');
 
-  const logStream = createWriteStream(logFilePath, { flags: 'a' });
+  const logStream = createWriteStream(logFilePath, { flags: 'a', mode: 0o600 });
   logStream.on('error', (err: Error) => {
     console.warn(pc.yellow(`Warning: Failed to write to log file: ${toErrorMessage(err)}`));
   });

@@ -92,7 +92,7 @@ const installExtension = async (configDir: string): Promise<InstallExtensionResu
   mkdirSync(join(extensionDest, 'adapters'), { recursive: true, mode: 0o700 });
 
   // Write version marker
-  await writeFile(versionMarkerPath, version, 'utf-8');
+  await writeFile(versionMarkerPath, version, { encoding: 'utf-8', mode: 0o600 });
 
   // Verify installation
   if (!existsSync(join(extensionDest, 'manifest.json'))) {
