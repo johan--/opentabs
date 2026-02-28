@@ -945,19 +945,34 @@ const analyzeSite = async (
     }
 
     // Step 6: Get captured network requests
-    const networkResult = (await dispatchToExtension(state, 'browser.getNetworkRequests', {
-      tabId,
-      clear: true,
-    })) as { requests: NetworkRequest[] } | NetworkRequest[];
-    const networkRequests: NetworkRequest[] = Array.isArray(networkResult)
-      ? networkResult
-      : ((networkResult as { requests?: NetworkRequest[] }).requests ?? []);
+    let networkRequests: NetworkRequest[] = [];
+    try {
+      const networkResult = (await dispatchToExtension(state, 'browser.getNetworkRequests', {
+        tabId,
+        clear: true,
+      })) as { requests: NetworkRequest[] } | NetworkRequest[];
+      networkRequests = Array.isArray(networkResult)
+        ? networkResult
+        : ((networkResult as { requests?: NetworkRequest[] }).requests ?? []);
+    } catch {
+      // Partial analysis: network requests unavailable
+      try {
+        await dispatchToExtension(state, 'browser.disableNetworkCapture', { tabId });
+      } catch {
+        // Best-effort cleanup — ignore errors
+      }
+    }
 
     // Get cookies via extension API (includes HttpOnly cookies)
-    const cookieResult = (await dispatchToExtension(state, 'browser.getCookies', { url })) as {
-      cookies?: CookieEntry[];
-    } | null;
-    const cookies: CookieEntry[] = cookieResult?.cookies ?? [];
+    let cookies: CookieEntry[] = [];
+    try {
+      const cookieResult = (await dispatchToExtension(state, 'browser.getCookies', { url })) as {
+        cookies?: CookieEntry[];
+      } | null;
+      cookies = cookieResult?.cookies ?? [];
+    } catch {
+      // Partial analysis: cookie data unavailable
+    }
 
     // Step 7: Run detection modules
     const auth = detectAuth({
