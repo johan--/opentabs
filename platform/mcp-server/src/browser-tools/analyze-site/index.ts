@@ -834,6 +834,7 @@ const analyzeSite = async (
       tabId,
       maxRequests: 200,
     });
+    state.activeNetworkCaptures.add(tabId);
 
     // Step 3: Navigate to the target URL — network capture is already active
     await dispatchToExtension(state, 'browser.navigateTab', { tabId, url });
@@ -965,6 +966,7 @@ const analyzeSite = async (
       } catch {
         // Best-effort cleanup — ignore errors
       }
+      state.activeNetworkCaptures.delete(tabId);
     }
 
     // Get captured WebSocket frames
@@ -1042,6 +1044,7 @@ const analyzeSite = async (
     } catch {
       // Best-effort cleanup — ignore errors
     }
+    state.activeNetworkCaptures.delete(tabId);
     try {
       await dispatchToExtension(state, 'browser.closeTab', { tabId });
     } catch {
