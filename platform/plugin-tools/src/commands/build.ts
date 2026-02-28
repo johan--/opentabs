@@ -23,7 +23,7 @@ import pc from 'picocolors';
 import { z } from 'zod';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, rmSync, statSync, watch } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
 import { access, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve, join, relative, dirname } from 'node:path';
@@ -61,9 +61,14 @@ const STALE_LOCK_THRESHOLD_MS = 5 * 60 * 1_000;
  */
 const acquireConfigLock = async (configPath: string): Promise<() => void> => {
   const lockDir = configPath + '.lock';
-  for (let attempt = 0; attempt < CONFIG_LOCK_MAX_RETRIES; attempt++) {
+  const pidFile = join(lockDir, 'pid.txt');
+
+  // Atomically create the lock directory and write our PID. Returns a release
+  // function on success, or null if the directory already exists (EEXIST).
+  const tryAcquire = (): (() => void) | null => {
     try {
       mkdirSync(lockDir);
+      writeFileSync(pidFile, String(process.pid));
       return () => {
         try {
           rmSync(lockDir, { recursive: true });
@@ -73,29 +78,73 @@ const acquireConfigLock = async (configPath: string): Promise<() => void> => {
       };
     } catch (err: unknown) {
       if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
-        // Check for stale lock — if the lock directory is older than the
-        // threshold, the owning process likely crashed without releasing it.
-        try {
-          const lockStat = statSync(lockDir);
-          const ageMs = Date.now() - lockStat.mtimeMs;
-          if (ageMs > STALE_LOCK_THRESHOLD_MS) {
-            console.warn(
-              pc.yellow(
-                `Warning: Stale config lock detected (${Math.round(ageMs / 1_000)}s old). Removing and retrying.`,
-              ),
-            );
-            rmSync(lockDir, { recursive: true });
-            continue;
-          }
-        } catch {
-          // stat or rmSync failed — lock may have been released concurrently
-        }
-        // Lock held by another process — retry
-        await new Promise<void>(r => setTimeout(r, CONFIG_LOCK_RETRY_DELAY_MS));
-        continue;
+        return null;
       }
       throw err;
     }
+  };
+
+  for (let attempt = 0; attempt < CONFIG_LOCK_MAX_RETRIES; attempt++) {
+    const release = tryAcquire();
+    if (release) return release;
+
+    // Check for stale lock — if the lock directory is older than the threshold
+    // AND the holding process is no longer alive, remove it and re-acquire.
+    try {
+      const lockStat = statSync(lockDir);
+      const ageMs = Date.now() - lockStat.mtimeMs;
+      if (ageMs > STALE_LOCK_THRESHOLD_MS) {
+        // Verify whether the holding process is still alive.
+        let holderAlive = false;
+        try {
+          const pid = parseInt(readFileSync(pidFile, 'utf8'), 10);
+          if (!isNaN(pid)) {
+            try {
+              process.kill(pid, 0);
+              holderAlive = true;
+            } catch (killErr: unknown) {
+              // EPERM means the process exists but we lack permission to signal it.
+              if (
+                killErr instanceof Error &&
+                'code' in killErr &&
+                (killErr as NodeJS.ErrnoException).code === 'EPERM'
+              ) {
+                holderAlive = true;
+              }
+              // ESRCH means the process is gone — lock is truly stale.
+            }
+          }
+        } catch {
+          // pid.txt missing or unreadable — assume stale
+        }
+
+        if (!holderAlive) {
+          console.warn(
+            pc.yellow(
+              `Warning: Stale config lock detected (${Math.round(ageMs / 1_000)}s old). Removing and retrying.`,
+            ),
+          );
+          try {
+            rmSync(lockDir, { recursive: true });
+          } catch {
+            // Already removed by a concurrent process — benign
+          }
+          // Immediately try to re-acquire atomically. This closes the TOCTOU
+          // window: without this step, another process that also detected the
+          // stale lock could win mkdirSync between our rmSync and the next
+          // loop iteration.
+          const staleRelease = tryAcquire();
+          if (staleRelease) return staleRelease;
+          // Another process won the race — fall through to retry delay
+        }
+      }
+    } catch {
+      // stat failed — lock was released concurrently; retry immediately
+      continue;
+    }
+
+    // Lock held by another process — wait before retrying
+    await new Promise<void>(r => setTimeout(r, CONFIG_LOCK_RETRY_DELAY_MS));
   }
   throw new Error('Could not acquire config lock — another build may be running');
 };
