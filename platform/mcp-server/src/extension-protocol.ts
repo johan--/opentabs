@@ -105,6 +105,8 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
 interface DispatchOptions {
   /** Human-readable description for timeout error messages (e.g., "browser.openTab" or "slack/send_message") */
   label?: string;
+  /** Override the dispatch timeout in milliseconds (defaults to DISPATCH_TIMEOUT_MS = 30s) */
+  timeoutMs?: number;
   /** MCP progressToken from the tools/call request's _meta — stored on PendingDispatch for progress forwarding */
   progressToken?: string | number;
   /** Callback to emit an MCP ProgressNotification when tool.progress arrives for this dispatch */
@@ -140,14 +142,15 @@ const dispatchToExtension = (
   };
 
   const dispatchLabel = opts.label ?? method;
+  const timeoutMs = opts.timeoutMs ?? DISPATCH_TIMEOUT_MS;
 
   return new Promise((resolve, reject) => {
     const timerId = setTimeout(() => {
       if (state.pendingDispatches.has(id)) {
         state.pendingDispatches.delete(id);
-        reject(new Error(`Dispatch ${dispatchLabel} timed out after ${DISPATCH_TIMEOUT_MS}ms`));
+        reject(new Error(`Dispatch ${dispatchLabel} timed out after ${timeoutMs}ms`));
       }
-    }, DISPATCH_TIMEOUT_MS);
+    }, timeoutMs);
 
     const pending: PendingDispatch = {
       resolve,
