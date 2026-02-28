@@ -83,8 +83,8 @@ export const handleBrowserDeleteCookies = async (
     if (url === null) return;
     const name = requireStringParam(params, 'name', id);
     if (name === null) return;
-    await chrome.cookies.remove({ url, name });
-    sendSuccessResult(id, { deleted: true, name, url });
+    const result = (await chrome.cookies.remove({ url, name })) as chrome.cookies.CookieDetails | null;
+    sendSuccessResult(id, { deleted: result !== null, name, url });
   } catch (err) {
     sendErrorResult(id, err);
   }
