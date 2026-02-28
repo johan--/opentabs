@@ -34,7 +34,6 @@ const TOOL_TIERS: Record<string, ToolTier> = {
   browser_wait_for_element: 'observe',
   browser_get_tab_content: 'observe',
   browser_get_console_logs: 'observe',
-  browser_clear_console_logs: 'observe',
   browser_list_resources: 'observe',
   browser_get_resource_content: 'observe',
   browser_disable_network_capture: 'observe',
@@ -42,10 +41,9 @@ const TOOL_TIERS: Record<string, ToolTier> = {
   extension_get_logs: 'observe',
   extension_get_side_panel: 'observe',
   extension_check_adapter: 'observe',
-  extension_force_reconnect: 'observe',
-  extension_reload: 'observe',
 
   // Interact tier — modifies page state or captures content
+  browser_clear_console_logs: 'interact',
   browser_click_element: 'interact',
   browser_type_text: 'interact',
   browser_select_option: 'interact',
@@ -61,6 +59,8 @@ const TOOL_TIERS: Record<string, ToolTier> = {
   browser_get_page_html: 'interact',
   browser_enable_network_capture: 'interact',
   browser_get_network_requests: 'interact',
+  extension_force_reconnect: 'interact',
+  extension_reload: 'interact',
   plugin_analyze_site: 'interact',
 
   // Sensitive tier — access credentials, execute arbitrary code, modify auth
