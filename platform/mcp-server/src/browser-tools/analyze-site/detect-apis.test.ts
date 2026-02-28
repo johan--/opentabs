@@ -619,6 +619,30 @@ describe('detectApis', () => {
       const result = detectApis([]);
       expect(result.primaryApiBaseUrl).toBeUndefined();
     });
+
+    test('does not let a single heavily-called endpoint satisfy the multi-endpoint threshold', () => {
+      // One endpoint called 10 times + one unrelated endpoint on the same origin.
+      // Before the fix, callCount=10 inflated prefix counts so '/api/v1/users' (only
+      // contributed to by the first endpoint) appeared to satisfy minCount=2.
+      // After the fix, prefix counts are based on distinct endpoint count, so the
+      // only prefix with count >= 2 is the shared origin.
+      const heavilyCalledReqs = Array.from({ length: 10 }, () =>
+        req({ url: 'https://api.example.com/api/v1/users', method: 'GET', mimeType: 'application/json', status: 200 }),
+      );
+      const result = detectApis([
+        ...heavilyCalledReqs,
+        req({ url: 'https://api.example.com/health', method: 'GET', mimeType: 'application/json', status: 200 }),
+      ]);
+      expect(result.primaryApiBaseUrl).toBe('https://api.example.com');
+    });
+
+    test('correctly identifies shared prefix from two distinct endpoints', () => {
+      const result = detectApis([
+        req({ url: 'https://api.example.com/api/v1/users', method: 'GET', mimeType: 'application/json', status: 200 }),
+        req({ url: 'https://api.example.com/api/v1/items', method: 'GET', mimeType: 'application/json', status: 200 }),
+      ]);
+      expect(result.primaryApiBaseUrl).toBe('https://api.example.com/api/v1');
+    });
   });
 
   // -----------------------------------------------------------------------
