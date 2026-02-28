@@ -45,11 +45,11 @@ export const listChannels = defineTool({
       body.exclude_archived = params.exclude_archived;
     }
     const data = await slackApi<{
-      channels: SlackChannel[];
+      channels?: SlackChannel[];
       response_metadata?: { next_cursor: string };
     }>('conversations.list', body);
     return {
-      channels: data.channels.map(mapChannel),
+      channels: (data.channels ?? []).map(mapChannel),
       response_metadata: data.response_metadata,
     };
   },

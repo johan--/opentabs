@@ -34,11 +34,11 @@ export const listMembers = defineTool({
       body.cursor = params.cursor;
     }
     const data = await slackApi<{
-      members: string[];
+      members?: string[];
       response_metadata?: { next_cursor: string };
     }>('conversations.members', body);
     return {
-      members: data.members,
+      members: data.members ?? [],
       response_metadata: data.response_metadata,
     };
   },

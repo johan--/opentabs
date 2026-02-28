@@ -40,7 +40,7 @@ export const listUsers = defineTool({
       body.cursor = params.cursor;
     }
     const data = await slackApi<{
-      members: Array<{
+      members?: Array<{
         id: string;
         name: string;
         real_name?: string;
@@ -50,7 +50,7 @@ export const listUsers = defineTool({
       response_metadata?: { next_cursor: string };
     }>('users.list', body);
     return {
-      members: data.members.map(m => ({
+      members: (data.members ?? []).map(m => ({
         id: m.id,
         name: m.name,
         real_name: m.real_name ?? '',
