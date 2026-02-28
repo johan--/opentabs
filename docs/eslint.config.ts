@@ -2,13 +2,16 @@ import { fixupConfigRules } from '@eslint/compat';
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
 import { flatConfigs as importXFlatConfig } from 'eslint-plugin-import-x';
-import jsxA11y from 'eslint-plugin-jsx-a11y';
+import jsxA11yUntyped from 'eslint-plugin-jsx-a11y';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import reactPlugin from 'eslint-plugin-react';
 import { browser, es2020, node } from 'globals';
 import { configs as tseslintConfigs, parser as tseslintParser } from 'typescript-eslint';
 import type { FixupConfigArray } from '@eslint/compat';
 import type { Linter } from 'eslint';
+
+// eslint-plugin-jsx-a11y has no TypeScript declarations; cast to known shape
+const jsxA11y = jsxA11yUntyped as unknown as { flatConfigs: { recommended: Linter.Config } };
 
 const config: Linter.Config[] = [
   // Shared configs
@@ -43,6 +46,7 @@ const config: Linter.Config[] = [
         ecmaFeatures: { jsx: true },
         projectService: {
           allowDefaultProject: ['eslint.config.ts', 'knip.config.ts'],
+          defaultProject: './tsconfig.configs.json',
         },
       },
       globals: {
