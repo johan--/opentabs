@@ -11,7 +11,7 @@ This guide walks you through creating an OpenTabs plugin from scratch. By the en
 The fastest way to start is with the scaffolder:
 
 ```bash
-npx create-opentabs-plugin my-app --domain .example.com --display "My App"
+npx @opentabs-dev/create-plugin my-app --domain .example.com --display "My App"
 cd my-app
 npm install
 ```
@@ -90,6 +90,8 @@ Here's what each field does:
 - **`urlPatterns`** — [Chrome match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns) that determine which tabs get your adapter injected. Use `*://*.example.com/*` to match all subdomains.
 - **`tools`** — array of tool definitions (covered below).
 - **`isReady()`** — return `true` when the user is authenticated. The extension calls this to determine whether the plugin's tab is ready for tool dispatch.
+
+Beyond tools, your plugin can also declare `resources` (read-only data the agent can browse) and `prompts` (reusable message templates). Both require the `override` keyword because they are optional properties with default values on the base class — `tools` is abstract and does not require `override`. See [Resources & Prompts](/docs/guides/resources-prompts) for the full guide.
 
 ### Implementing isReady()
 
