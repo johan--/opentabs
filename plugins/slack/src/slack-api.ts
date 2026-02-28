@@ -395,9 +395,16 @@ const slackApi = async <T extends Record<string, unknown>>(
   });
 
   if (response.status === 429) {
-    const retryAfterStr = response.headers.get('Retry-After') ?? 'unknown';
-    const retryMs = retryAfterStr ? parseInt(retryAfterStr, 10) * 1000 : 60000;
-    throw ToolError.rateLimited(`Slack API rate limited (429). Retry after ${retryAfterStr} seconds.`, retryMs);
+    const retryAfterHeader = response.headers.get('Retry-After');
+    let retryMs: number | undefined;
+    if (retryAfterHeader !== null) {
+      const parsed = parseInt(retryAfterHeader, 10);
+      retryMs = Number.isNaN(parsed) ? undefined : parsed * 1000;
+    }
+    throw ToolError.rateLimited(
+      `Slack API rate limited (429)${retryAfterHeader ? `. Retry after ${retryAfterHeader} seconds` : ''}`,
+      retryMs,
+    );
   }
 
   if (!response.ok) {
