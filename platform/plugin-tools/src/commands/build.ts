@@ -41,6 +41,11 @@ import type { FSWatcher } from 'node:fs';
 
 const DEBOUNCE_MS = 100;
 
+// Rotating cache key for bounded module cache growth in watch mode.
+// Alternates between 0 and 1 so the ESM module cache holds at most 2 entries
+// for the plugin entry point, instead of accumulating one entry per rebuild.
+let pluginCacheKey = 0;
+
 /** Write config atomically with restrictive permissions via the shared helper. */
 const atomicWriteConfig = (configPath: string, content: string): Promise<void> =>
   atomicWrite(configPath, content, 0o600);
@@ -1025,8 +1030,10 @@ const runBuild = async (projectDir: string): Promise<void> => {
   }
 
   // Step 2: Dynamically import the plugin module (cache-bust for watch mode rebuilds)
+  // Rotate between two keys so the module cache stays bounded to 2 entries.
+  pluginCacheKey = (pluginCacheKey + 1) % 2;
   console.log(pc.dim('Loading plugin module...'));
-  const mod = (await import(`${entryPoint}?t=${String(Date.now())}`)) as { default?: OpenTabsPlugin };
+  const mod = (await import(`${entryPoint}?t=${String(pluginCacheKey)}`)) as { default?: OpenTabsPlugin };
   const defaultExport = mod.default;
   if (!defaultExport) {
     throw new Error('Plugin module must export a default instance of OpenTabsPlugin.');
