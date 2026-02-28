@@ -486,6 +486,63 @@ export const setupIsolatedIifeTest = async (configDirPrefix: string): Promise<Is
 };
 
 // ---------------------------------------------------------------------------
+// File watcher write-and-wait
+// ---------------------------------------------------------------------------
+
+/**
+ * Write a file and wait for the file watcher to detect the change. If the
+ * watcher misses it (FSEvents registration race on macOS), re-write with a
+ * trivial modification and poll again.
+ *
+ * Replaces the `waitForLog('File watcher: Watching') + sleep(500)` pattern
+ * that is brittle under CI load.
+ *
+ * @param server          MCP server whose logs to poll
+ * @param writeFile       Callback that writes the file. Called with the retry
+ *                        attempt number (0 on first try). On retries the caller
+ *                        should produce a slightly different write to guarantee
+ *                        a new FSEvents notification (e.g., append a comment).
+ * @param expectedLog     Log substring that indicates the watcher processed the change
+ * @param outerTimeoutMs  Total budget for all retries (default 20s)
+ * @param innerTimeoutMs  Per-attempt poll budget (default 5s)
+ */
+export const writeAndWaitForWatcher = async (
+  server: McpServer,
+  writeFile: (attempt: number) => void,
+  expectedLog: string,
+  outerTimeoutMs = 20_000,
+  innerTimeoutMs = 5_000,
+): Promise<void> => {
+  // Wait for the file watcher to be set up first
+  await waitForLog(server, 'File watcher: Watching', 10_000);
+
+  const outerDeadline = Date.now() + outerTimeoutMs;
+  let attempt = 0;
+
+  while (Date.now() < outerDeadline) {
+    // Count existing occurrences so we can detect a NEW one after our write.
+    const logsBefore = server.logs.filter(line => line.includes(expectedLog)).length;
+
+    writeFile(attempt);
+
+    // Poll for a new occurrence of the expected log
+    const innerDeadline = Math.min(Date.now() + innerTimeoutMs, outerDeadline);
+    while (Date.now() < innerDeadline) {
+      const logsNow = server.logs.filter(line => line.includes(expectedLog)).length;
+      if (logsNow > logsBefore) return;
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    attempt++;
+  }
+
+  throw new Error(
+    `writeAndWaitForWatcher timed out after ${outerTimeoutMs}ms waiting for "${expectedLog}".\n` +
+      `Logs so far:\n${server.logs.join('\n')}`,
+  );
+};
+
+// ---------------------------------------------------------------------------
 // IIFE manipulation
 // ---------------------------------------------------------------------------
 
