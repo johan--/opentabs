@@ -1,6 +1,6 @@
 ---
 title: Browser Tools
-description: 39 built-in browser tools that give AI agents direct control over Chrome tabs, DOM, network, cookies, and more — independent of any plugin.
+description: 40 built-in browser tools that give AI agents direct control over Chrome tabs, DOM, network, cookies, and more — independent of any plugin.
 lastUpdated: 2026-02-28
 ---
 
@@ -293,6 +293,10 @@ These tools control and diagnose the OpenTabs Chrome extension itself. They use 
       <Table.Cell className="font-medium">`plugin_analyze_site`</Table.Cell>
       <Table.Cell>Comprehensively analyze a web page to produce actionable intelligence for building OpenTabs plugins. Opens the URL, captures network traffic, detects auth methods (cookies, JWT, Bearer, API keys, CSRF), classifies API endpoints by protocol (REST, GraphQL, gRPC-Web, JSON-RPC, tRPC, WebSocket, SSE), identifies frontend frameworks with SPA/SSR flags, scans globals, forms, and storage keys, and generates concrete tool suggestions. Input: `{ url, waitSeconds? }` — `waitSeconds` defaults to 5, max 25.</Table.Cell>
     </Table.Row>
+    <Table.Row>
+      <Table.Cell className="font-medium">`plugin_list_tabs`</Table.Cell>
+      <Table.Cell>List open browser tabs that match a plugin's URL patterns, with per-tab readiness status. Returns tab IDs, URLs, titles, and readiness for each matching tab. Use this to discover available tabs before targeting a specific one with the tabId parameter on plugin tools. When called without a plugin argument, returns tabs for all plugins.</Table.Cell>
+    </Table.Row>
   </Table.Body>
 </Table>
 
@@ -349,7 +353,7 @@ These tools control and diagnose the OpenTabs Chrome extension itself. They use 
     </Table.Row>
     <Table.Row>
       <Table.Cell>Site Analysis</Table.Cell>
-      <Table.Cell>1</Table.Cell>
+      <Table.Cell>2</Table.Cell>
       <Table.Cell>`plugin_`</Table.Cell>
     </Table.Row>
     <Table.Row>
@@ -359,7 +363,7 @@ These tools control and diagnose the OpenTabs Chrome extension itself. They use 
     </Table.Row>
     <Table.Row>
       <Table.Cell className="font-medium">Total</Table.Cell>
-      <Table.Cell className="font-medium">39</Table.Cell>
+      <Table.Cell className="font-medium">40</Table.Cell>
       <Table.Cell></Table.Cell>
     </Table.Row>
   </Table.Body>
