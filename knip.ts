@@ -49,7 +49,7 @@ const config: KnipConfig = {
     'platform/create-plugin': {},
   },
   tags: ['+@public'],
-  ignore: ['plugins/**', 'docs/**', 'platform/browser-extension/side-panel/**/*.{js,css}', '**/storybook-static/**'],
+  ignore: ['plugins/**', 'docs/**', 'platform/browser-extension/side-panel/**/*.{js,css}'],
   ignoreExportsUsedInFile: true,
 };
 
