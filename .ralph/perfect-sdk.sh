@@ -134,8 +134,12 @@ Key parameters for SDK PRDs:
 - Every story must have concrete, verifiable acceptance criteria
 - Skip clarifying questions — this prompt provides all the context needed
 
+### Validation: genuine issues vs style preferences
+
+Before filing any issue, ask: "Is this a real problem with a concrete consequence, or just a different way to write the same thing?" Two valid approaches to the same browser API call do not make one of them a bug. If the existing code handles the concern correctly using a recognized pattern, it is not an issue. Only file issues where you can name a specific harm: crash, resource leak, SecurityError, silent failure, wrong data, or missing cleanup.
+
 Do NOT create stories for:
-- Style preferences or alternative implementations
+- Style preferences or alternative implementations (different-but-equivalent code is not a bug)
 - Browser compatibility issues for browsers the project doesn't target (only Chromium is used via the extension)
 - Theoretical issues with no reachable execution path
 - Features that work correctly but could be done differently

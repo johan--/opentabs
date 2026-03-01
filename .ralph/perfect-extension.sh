@@ -102,12 +102,12 @@ For each file, analyze for these categories of concrete problems:
 
 Before including any finding in a PRD, verify it meets ALL of these criteria:
 
-- **Concrete consequence**: Can you name a specific observable outcome? (crash, leak, wrong UI state, lost message, stale data)
-- **Not a style preference**: The existing code is functionally incorrect or has a demonstrable hazard — not just a different-but-equivalent approach
-- **Not already handled**: Check if a guard, catch, or cleanup already addresses the issue elsewhere in the code
+- **Concrete consequence**: Can you name a specific observable outcome? (crash, leak, wrong UI state, lost message, stale data, confusing error, wasted user time)
+- **Not a style preference**: The existing code is functionally incorrect or has a demonstrable hazard — not just a different-but-equivalent approach. Two valid ways to write the same logic do not make one of them a bug. If the code uses a recognized pattern and works correctly, it is not an issue.
+- **Not already handled**: Check if a guard, catch, or cleanup already addresses the issue elsewhere in the code. Read the full function, not just the line in question.
 - **Reproducible path**: There exists a sequence of events that triggers the issue (even if unlikely)
 
-Discard any finding that is purely stylistic, already mitigated, or has no concrete consequence.
+Discard any finding that is purely stylistic, already mitigated, or has no concrete consequence. Keep all genuine issues regardless of severity — minor issues (edge case error messages, small inconsistencies) still deserve fixes if they have real consequences.
 
 ## Step 5: Create PRD(s) using the ralph skill
 

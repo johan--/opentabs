@@ -107,11 +107,11 @@ Read through ALL test files in e2e/. Do not skim — read every test case, every
 ### Validation criteria for each finding:
 
 For each candidate issue, ask yourself:
-1. Is this a real test quality problem or a style preference?
-2. Can I articulate a concrete consequence? (false positive, false negative, flaky failure, resource leak, CI instability)
-3. Does the existing test code already handle this case in a way I missed?
+1. **Is this a real test quality problem or a style preference?** Two valid ways to write the same assertion do not make one of them wrong. A test that uses `toContain` when `toEqual` would be equally correct is a preference, not a bug.
+2. **Can I articulate a concrete consequence?** Name the specific harm: false positive (passes when it should fail), false negative (fails when it should pass), flaky failure, resource leak, CI instability, orphaned processes, misleading error on failure. "I would structure this test differently" is not a consequence.
+3. **Does the existing test code already handle this case?** Check if a guard, retry, cleanup, or timeout already addresses the concern.
 
-**Discard any finding that fails this validation.** Only keep issues with concrete, articulable consequences.
+**Discard any finding that fails this validation.** A different-but-equivalent test pattern is NOT an issue. Only keep findings with concrete consequences — including minor ones (all genuine issues deserve fixes, regardless of severity).
 
 ## Step 4: Check for missing E2E coverage
 

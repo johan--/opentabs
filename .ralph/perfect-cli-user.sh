@@ -178,12 +178,14 @@ Key parameters:
 - Concrete, verifiable acceptance criteria
 - Skip clarifying questions — this prompt provides all context
 
-Severity triage:
+Severity triage (for prioritization, not for filtering):
 - **HIGH**: Broken flows (user copies output that doesn't work), silent data loss, crashes
 - **MEDIUM**: Confusing output, missing information, poor discoverability
-- **LOW**: Cosmetic issues, minor inconsistencies, edge case polish
+- **LOW**: Minor inconsistencies, edge case polish
 
-Only create PRDs for HIGH and MEDIUM issues. Document LOW issues in the PRD description.
+Create PRDs for ALL severity levels — HIGH, MEDIUM, and LOW. Every genuine issue deserves a fix. Use severity to order stories (HIGH first) and to decide model (opus for complex HIGH issues, sonnet for straightforward fixes).
+
+However, ruthlessly distinguish genuine issues from style preferences. Before filing any issue, ask: "Is this a real problem with a concrete consequence, or just a different way to write the same thing?" A different-but-equivalent approach is NOT an issue. Only file issues where you can articulate a specific harm: user confusion, broken workflow, misleading output, silent failure, wasted time, or incorrect behavior.
 PROMPT_EOF
 
 echo "=== perfect-cli-user.sh ==="

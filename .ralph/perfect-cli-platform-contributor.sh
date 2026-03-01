@@ -276,12 +276,14 @@ Key parameters:
 - Every story must have concrete, verifiable acceptance criteria
 - Skip clarifying questions — this prompt provides all the context needed
 
-Severity triage:
+Severity triage (for prioritization, not for filtering):
 - **HIGH**: Quality checks that fail on clean checkout, documented commands that don't work
 - **MEDIUM**: Missing fast paths, confusing naming, Docker-specific test failures
-- **LOW**: Cosmetic issues, minor inconsistencies
+- **LOW**: Minor inconsistencies, edge case polish
 
-Only create PRDs for HIGH and MEDIUM issues. Document LOW issues in the PRD description field as known minor issues but do not create stories for them.
+Create PRDs for ALL severity levels — HIGH, MEDIUM, and LOW. Every genuine issue deserves a fix. Use severity to order stories (HIGH first) and to decide model (opus for complex HIGH issues, sonnet for straightforward fixes).
+
+However, ruthlessly distinguish genuine issues from style preferences. Before filing any issue, ask: "Is this a real problem with a concrete consequence, or just a different way to write the same thing?" A different-but-equivalent approach is NOT an issue. Only file issues where you can articulate a specific harm: broken build, contributor confusion, wasted time, misleading documentation, or incorrect behavior.
 
 Do NOT create stories for:
 - Chrome extension UI not working in Docker (expected — no GUI)

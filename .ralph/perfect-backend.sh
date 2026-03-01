@@ -61,11 +61,11 @@ Read through ALL source files in each backend package. Do not skim — read ever
 ### Validation criteria for each finding:
 
 For each candidate issue, ask yourself:
-1. Is this a real problem or a different opinion?
-2. Can I articulate a concrete consequence? (runtime crash, data loss, resource leak, security bypass, corrupted output, silent wrong behavior)
-3. Is the existing code following a recognized pattern that works correctly?
+1. **Is this a real problem or a different opinion?** Two valid approaches to the same problem do not make one of them a bug. If the existing code uses a recognized pattern and works correctly, it is not an issue — even if you would write it differently.
+2. **Can I articulate a concrete consequence?** Name the specific observable harm: runtime crash, data loss, resource leak, security bypass, corrupted output, silent wrong behavior, unhelpful error message, user confusion, or wasted time. "I prefer a different approach" is not a consequence.
+3. **Is the existing code already handling this correctly?** Check if a guard, catch, cleanup, or fallback already addresses the concern elsewhere in the code.
 
-**Discard any finding that fails this validation.** Only keep issues with concrete, articulable consequences.
+**Discard any finding that fails this validation.** A different-but-equivalent way to write working code is NOT an issue. Only keep findings with concrete, articulable consequences — including minor ones (LOW severity issues still deserve fixes if they are genuine problems).
 
 ## Step 3: Create PRD(s) using the ralph skill
 

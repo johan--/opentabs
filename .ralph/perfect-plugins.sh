@@ -75,11 +75,11 @@ For each plugin, read EVERY source file. The key areas are:
 ### Validation criteria for each finding:
 
 For each candidate issue, ask yourself:
-1. Is this a real problem or a different opinion?
-2. Can I articulate a concrete consequence? (tool failure, wrong data returned, silent error, resource leak, auth breakdown)
-3. Is the existing code following the SDK's documented patterns correctly?
+1. **Is this a real problem or a different opinion?** Two valid approaches to the same API call do not make one of them wrong. If the plugin follows the SDK's documented patterns and works correctly, it is not an issue — even if you would write it differently.
+2. **Can I articulate a concrete consequence?** Name the specific harm: tool failure, wrong data returned, silent error, resource leak, auth breakdown, unhelpful error message, or data loss. "I prefer a different approach" is not a consequence.
+3. **Is the existing code following the SDK's documented patterns correctly?** Check if the code already handles the concern through error handling, retries, or validation.
 
-**Discard any finding that fails this validation.** Only keep issues with concrete, articulable consequences.
+**Discard any finding that fails this validation.** A different-but-equivalent way to call the SDK is NOT an issue. Only keep findings with concrete consequences — including minor ones (all genuine issues deserve fixes, regardless of severity).
 
 ## Step 4: Check SDK compatibility
 

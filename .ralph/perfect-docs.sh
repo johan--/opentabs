@@ -120,8 +120,12 @@ Key parameters for docs PRDs:
 - Every story must have concrete, verifiable acceptance criteria
 - Skip clarifying questions — this prompt provides all the context needed
 
+### Validation: genuine issues vs style preferences
+
+Before filing any issue, ask: "Is this a real inaccuracy, or just a different way to phrase something that is already correct?" Rewording that changes the meaning to be accurate is a fix. Rewording that says the same thing differently is a style preference — not an issue.
+
 Do NOT create stories for:
-- Cosmetic preferences or stylistic rewording that does not fix an inaccuracy
+- Stylistic rewording that does not fix an inaccuracy (different phrasing of correct content is not a bug)
 - Content that is already correct and up-to-date
 - Adding documentation for internal implementation details that users/plugin developers do not need
 - Bumping `lastUpdated` dates without accompanying content changes
