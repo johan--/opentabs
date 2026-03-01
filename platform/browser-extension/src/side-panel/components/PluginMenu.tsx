@@ -12,9 +12,10 @@ interface PluginMenuProps {
   onRemove: () => void;
   updating: boolean;
   removing: boolean;
+  className?: string;
 }
 
-const PluginMenu = ({ plugin, onUpdate, onRemove, updating, removing }: PluginMenuProps) => {
+const PluginMenu = ({ plugin, onUpdate, onRemove, updating, removing, className }: PluginMenuProps) => {
   const [confirmPending, setConfirmPending] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -35,6 +36,7 @@ const PluginMenu = ({ plugin, onUpdate, onRemove, updating, removing }: PluginMe
 
   return (
     <div
+      className={className}
       onClick={e => e.stopPropagation()}
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
