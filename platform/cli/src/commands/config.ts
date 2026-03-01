@@ -58,7 +58,7 @@ const normalizeConfigForDisplay = (config: Record<string, unknown>): Record<stri
   return normalized;
 };
 
-const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
+const handleConfigShow = async (options: ConfigShowOptions & { port?: number }): Promise<void> => {
   const configPath = getConfigPath();
   const result = await readConfig(configPath);
 
@@ -80,7 +80,7 @@ const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
   if (options.json) {
     let mcpClients: Record<string, { name: string; file: string; json: Record<string, unknown> }> | undefined;
     if (options.showSecret) {
-      const port = typeof config.port === 'number' ? config.port : DEFAULT_PORT;
+      const port = resolvePort(options);
       const mcpUrl = `http://127.0.0.1:${port}/mcp`;
       mcpClients = Object.fromEntries(
         getMcpClientConfigs(mcpUrl, secret).map(({ label, file, json }) => [label, { name: label, file, json }]),
@@ -200,7 +200,7 @@ const handleConfigShow = async (options: ConfigShowOptions): Promise<void> => {
     }
 
     if (options.showSecret && secret) {
-      const port = typeof config.port === 'number' ? config.port : DEFAULT_PORT;
+      const port = resolvePort(options);
       const mcpUrl = `http://127.0.0.1:${port}/mcp`;
       console.log('');
       console.log(pc.dim('  MCP client config (add to your client):'));
@@ -806,7 +806,7 @@ Examples:
   $ opentabs config show --json
   $ opentabs config show --show-secret`,
     )
-    .action((options: ConfigShowOptions) => handleConfigShow(options));
+    .action((_options: ConfigShowOptions, command: Command) => handleConfigShow(command.optsWithGlobals()));
 
   configCmd
     .command('reset')
