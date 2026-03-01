@@ -328,30 +328,9 @@ docker exec opentabs-platform-contributor-test bash -c "
    ```
    Compare this list against the CONTRIBUTING.md table. Note any missing.
 
-### Phase 9: Test documentation vs source code accuracy
+### Phase 9: Skip — documentation accuracy is audited by perfect-docs.sh
 
-This is critical. Documentation claims must be verified against the actual source code.
-
-1. **Verify documented file paths exist** — every file path mentioned in CLAUDE.md / CONTRIBUTING.md should actually exist:
-   ```bash
-   docker exec -w /root/opentabs opentabs-platform-contributor-test bash -c "
-     # Sample check: verify key files mentioned in docs exist
-     ls platform/mcp-server/src/index.ts platform/mcp-server/src/dev-proxy.ts \
-        platform/mcp-server/src/config.ts platform/mcp-server/src/discovery.ts 2>&1
-   "
-   ```
-
-2. **Verify documented behavior matches source** — for any behavior documented in CLAUDE.md (e.g., where secrets are stored, how auth works, what dev mode does), read the source code and confirm it matches. Specifically:
-   - Read the scripts that implement documented commands (e.g., `scripts/dev.ts`, `scripts/dev-mcp.ts`, `scripts/clean.ts`) and verify they do what the docs say
-   - Check that file paths mentioned in docs for configuration/secrets match the paths used in source code
-   - Verify that hook descriptions in CONTRIBUTING.md match `.husky/pre-commit` and `.husky/pre-push` content
-
-3. **Check CONTRIBUTING.md command reference accuracy**:
-   - Does each script description match the actual `package.json` script definition?
-   - Are there scripts in package.json not mentioned in the table?
-   - Does `npm run type-check` use `--noEmit` as some docs may claim, or is it `tsc --build`?
-
-4. **Check for stale cross-references** — do CLAUDE.md files reference functions, files, or patterns that no longer exist?
+Do NOT audit documentation accuracy (CLAUDE.md, CONTRIBUTING.md, docs/*.mdx) against source code. This is the exclusive responsibility of `perfect-docs.sh`, which performs a comprehensive audit of all documentation pages against the current source code. Filing issues here would create duplicate PRDs targeting the same files.
 
 ### Phase 10: Test git hooks (if possible)
 
@@ -367,7 +346,7 @@ This is critical. Documentation claims must be verified against the actual sourc
    "
    ```
 
-2. Verify the hook content matches what CONTRIBUTING.md describes.
+2. Verify the hooks execute correctly (e.g., lint-staged runs on pre-commit). Do NOT audit whether CONTRIBUTING.md accurately describes the hooks — documentation accuracy is handled by perfect-docs.sh.
 
 ### Phase 11: Test CLI entrypoints
 
@@ -397,7 +376,7 @@ For each step, evaluate from a first-time platform contributor's perspective:
 4. **Incremental workflow**: Is there a fast path for TypeScript-only changes?
 5. **Dev mode**: Does `npm run dev` and `npm run dev:mcp` work correctly?
 6. **Error messages**: When things fail, do errors tell the contributor what to do?
-7. **Documentation accuracy**: Does CONTRIBUTING.md match reality? Do CLAUDE.md files match the actual source code?
+7. **Documentation accuracy**: Do documented commands and workflows actually work when followed? (execution-based discovery only — static text accuracy is audited by perfect-docs.sh)
 8. **Build pipeline**: Is it clear which commands to run and when?
 9. **Tooling exclusions**: Does .prettierignore/.eslintignore cover all generated artifacts?
 10. **Cross-package imports**: Do workspace packages resolve each other correctly?
@@ -436,14 +415,20 @@ Do NOT create stories for:
 
 DO create stories for:
 - Quality checks that fail on clean checkout or after building docs
-- Documentation inaccuracies (CONTRIBUTING.md, CLAUDE.md) — including file paths, command descriptions, and behavioral claims that don't match the source code
 - Source code that contradicts documented architecture (e.g., reading config from the wrong file, using the wrong API)
-- E2E tests that consistently fail in Docker
+- E2E tests that consistently fail in Docker (but NOT flaky test code quality — that is audited by perfect-e2e.sh)
 - Missing .prettierignore / .eslintignore entries for generated files
 - Error messages that don't help the contributor fix the problem
 - Tooling that produces confusing output
 - CLI entrypoints that fail or produce wrong help text
 - Workspace resolution issues between packages
+
+Do NOT create stories for (audited by other scripts):
+- Static documentation inaccuracies you notice by reading (stale descriptions, outdated text without execution failure) — audited by perfect-docs.sh
+- E2E test code quality (flaky patterns, wrong assertions, missing coverage) — audited by perfect-e2e.sh
+
+DO create docs PRDs for:
+- Documentation instructions that fail when followed (execution-discovered). For these, use: project "OpenTabs Docs", workingDirectory "docs", qualityChecks "cd docs && npm run build && npm run type-check && npm run lint && npm run knip && npm run format:check". Create SEPARATE PRDs for docs vs platform fixes.
 PROMPT_EOF
 
 echo "=== perfect-cli-platform-contributor.sh ==="

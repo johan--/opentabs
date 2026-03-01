@@ -241,8 +241,9 @@ After completing all testing, compile findings and use the skill tool to load th
 
 Key parameters:
 - Target project: "OpenTabs Platform" (root monorepo) unless the fix is docs-only
-- For docs-only fixes: project "OpenTabs Docs", workingDirectory "docs", qualityChecks "cd docs && npm run build && npm run type-check && npm run lint && npm run knip && npm run format:check"
-- Do NOT set workingDirectory or qualityChecks for root monorepo
+- For docs-only fixes discovered through execution (e.g., quick-start instructions that don't work when followed): project "OpenTabs Docs", workingDirectory "docs", qualityChecks "cd docs && npm run build && npm run type-check && npm run lint && npm run knip && npm run format:check"
+- Do NOT set workingDirectory or qualityChecks for root monorepo PRDs
+- **Scope rule for docs PRDs**: Only create docs PRDs for issues discovered through execution — "I followed the docs and it didn't work." Do NOT create docs PRDs for static inaccuracies you notice by reading (stale API signatures, outdated descriptions) — those are covered by perfect-docs.sh's static audit.
 - Group related fixes into the same PRD (fixes to the same file go together)
 - All stories: e2eCheckpoint: false (CLI/docs changes are not browser-observable)
 - Small stories (1-3 files per story)

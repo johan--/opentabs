@@ -103,6 +103,7 @@ Read through ALL test files in e2e/. Do not skim — read every test case, every
 - **Test structure preferences** — organizing tests differently is not a quality issue
 - **Missing tests for internal implementation details** — E2E tests verify user-visible behavior, not internals
 - **Slow tests that are correct** — slowness without flakiness is not a bug (unless there's a clear optimization)
+- **Docker environment issues** — if tests fail due to Docker-specific constraints (port conflicts, missing GPU, etc.), that is not a test quality issue. The perfect-cli-platform-contributor.sh script handles Docker-specific friction separately.
 
 ### Validation criteria for each finding:
 

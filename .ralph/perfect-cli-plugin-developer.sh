@@ -267,7 +267,7 @@ Test what happens when a developer runs build tools using npx without having the
 
 ### Phase 9: Compile and test documentation code examples
 
-This phase verifies that code snippets from the docs actually compile when copied into a real plugin project.
+This phase verifies that code snippets from the docs actually compile when copied into a real plugin project. This is an execution-based test that perfect-docs.sh (static audit) cannot replicate.
 
 1. **First-plugin tutorial**: Create a fresh plugin (`tutorial-test`), copy the exact code from `docs/content/docs/first-plugin.mdx` steps 2 and 3 into it, run `npm run build`, `npm run type-check`, `npm run lint`, `npm run format:check`. ALL must pass.
 
@@ -305,6 +305,9 @@ After completing all testing, compile your findings and use the skill tool to lo
 
 Key parameters:
 - Determine the target project for each PRD based on which files need to change (see ralph skill instructions for project identification rules)
+- For platform code fixes: project "OpenTabs Platform", no workingDirectory or qualityChecks
+- For docs-only fixes discovered through execution (e.g., doc code examples that don't compile when followed): project "OpenTabs Docs", workingDirectory "docs", qualityChecks "cd docs && npm run build && npm run type-check && npm run lint && npm run knip && npm run format:check"
+- **Scope rule for docs PRDs**: Only create docs PRDs for issues discovered through execution — "I followed/compiled the doc example and it failed." Do NOT create docs PRDs for static inaccuracies you notice by reading (stale descriptions, outdated text) — those are covered by perfect-docs.sh's static audit.
 - If fixes span both platform code and docs, create SEPARATE PRDs for each target project
 - Group related fixes into the same PRD to avoid merge conflicts (fixes to the same file go together)
 - All stories: e2eCheckpoint: false (CLI/scaffold changes are not browser-observable)
@@ -328,15 +331,17 @@ Do NOT create stories for:
 - Stylistic preferences about CLI output formatting
 - Features that work correctly but you would design differently
 - Zod version migration issues (e.g., z.record() signature changes in Zod 4) — these are upstream library changes, not platform bugs
+- Static documentation inaccuracies you notice by reading (stale descriptions, outdated text without execution failure) — audited by perfect-docs.sh
+- SDK source code bugs (platform/plugin-sdk/src/) — audited by perfect-sdk.sh. If you find an SDK type signature issue while testing, note it in the PRD story's notes for context, but the SDK source fix belongs to perfect-sdk.sh.
 
 DO create stories for:
 - Scaffolded code that fails lint/format/type-check out of the box
 - Documented commands that return errors
-- Doc code examples that don't compile under the scaffolded tsconfig
+- Doc code examples that don't compile when copied into a real plugin (execution-discovered)
 - Missing TypeScript guidance that causes confusing compiler errors
-- SDK function signatures that produce surprising types (e.g., returning T | undefined when docs show T)
 - Error messages that don't help the developer fix the problem
-- Documentation inaccuracies or inconsistencies between pages
+- CLI/scaffolding/plugin-tools bugs (platform/cli/, platform/plugin-tools/, platform/create-plugin/)
+- Documentation that leads developers astray when followed (execution-discovered, create docs PRD)
 PROMPT_EOF
 
 echo "=== perfect-cli-plugin-developer.sh ==="

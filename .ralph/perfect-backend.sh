@@ -36,11 +36,14 @@ Read through ALL source files in each backend package. Do not skim — read ever
 ### Packages to audit (in order):
 
 1. **platform/mcp-server/src/** — the MCP server (highest priority, most complex)
-2. **platform/plugin-sdk/src/** — the plugin SDK (runs in browser context)
-3. **platform/cli/src/** — the user-facing CLI
-4. **platform/plugin-tools/src/** — the plugin developer CLI
-5. **platform/create-plugin/src/** — the scaffolding CLI
-6. **platform/shared/src/** — shared utilities
+2. **platform/cli/src/** — the user-facing CLI
+3. **platform/plugin-tools/src/** — the plugin developer CLI
+4. **platform/create-plugin/src/** — the scaffolding CLI
+5. **platform/shared/src/** — shared utilities
+
+**Do NOT audit these packages** (they have dedicated perfect-*.sh scripts):
+- `platform/plugin-sdk/src/` — audited by perfect-sdk.sh (browser-context-specific audit)
+- `platform/browser-extension/src/` — audited by perfect-extension.sh
 
 ### What to look for:
 
@@ -74,7 +77,7 @@ After completing the audit, use the skill tool to load the "ralph" skill, then f
 Key parameters for backend PRDs:
 - Target project: "OpenTabs Platform" (root monorepo)
 - Do NOT set workingDirectory or qualityChecks (root monorepo uses defaults)
-- Split into multiple PRDs by package boundary to allow parallel execution (e.g., one PRD for mcp-server, one for plugin-sdk + plugin-tools, one for shared + cli)
+- Split into multiple PRDs by package boundary to allow parallel execution (e.g., one PRD for mcp-server, one for plugin-tools + create-plugin, one for shared + cli)
 - Stories that touch the same files must be in the same PRD to avoid merge conflicts
 - All stories: e2eCheckpoint: false EXCEPT the final story in a PRD that touches browser-observable behavior
 - Always use small stories (1-3 files per story)

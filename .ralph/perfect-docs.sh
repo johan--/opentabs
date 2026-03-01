@@ -120,6 +120,10 @@ Key parameters for docs PRDs:
 - Every story must have concrete, verifiable acceptance criteria
 - Skip clarifying questions — this prompt provides all the context needed
 
+### Scope boundary with experiential scripts
+
+This script performs a **static audit** — comparing docs text against source code. Other scripts (perfect-cli-user.sh, perfect-cli-plugin-developer.sh, perfect-cli-platform-contributor.sh) discover docs issues through **execution** — following the docs and hitting real failures. Those scripts may also create docs PRDs for issues they discover by running commands or compiling code examples. This is not a collision — static comparison and execution-based testing find different classes of issues.
+
 ### Validation: genuine issues vs style preferences
 
 Before filing any issue, ask: "Is this a real inaccuracy, or just a different way to phrase something that is already correct?" Rewording that changes the meaning to be accurate is a fix. Rewording that says the same thing differently is a style preference — not an issue.

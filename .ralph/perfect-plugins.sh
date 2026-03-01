@@ -114,7 +114,7 @@ Do NOT create stories for:
 - Stylistic preferences or alternative coding approaches
 - Adding new tools or features to plugins
 - Cosmetic changes to tool descriptions or parameter names
-- Issues in the SDK itself (those belong in the backend audit)
+- Issues in the SDK itself (those belong in perfect-sdk.sh)
 
 DO create stories for:
 - Bugs in tool handle functions
