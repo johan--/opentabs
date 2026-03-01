@@ -8,6 +8,10 @@ const config: KnipConfig = {
         // Peer dependencies required by ESLint plugins at runtime
         '@typescript-eslint/parser',
         'eslint-plugin-react-hooks',
+        // Referenced as Babel preset/plugin strings in build-side-panel.ts config, not as imports
+        '@babel/preset-react',
+        '@babel/preset-typescript',
+        'babel-plugin-react-compiler',
       ],
     },
     'platform/shared': {
@@ -35,18 +39,17 @@ const config: KnipConfig = {
         'src/side-panel/styles.css',
         'src/**/*.test.ts',
         'src/**/*.stories.tsx',
+        'esbuild-plugin-babel.d.ts',
       ],
       ignoreDependencies: [
         // CSS-only dependency imported via @import in styles.css (knip cannot trace CSS imports)
         'tw-animate-css',
-        // Vite plugin used in .storybook/main.ts via dynamic import (knip cannot trace dynamic imports)
-        '@vitejs/plugin-react',
       ],
     },
     'platform/create-plugin': {},
   },
   tags: ['+@public'],
-  ignore: ['plugins/**', 'docs/**', 'platform/browser-extension/side-panel/**/*.{js,css}'],
+  ignore: ['plugins/**', 'docs/**', 'platform/browser-extension/side-panel/**/*.{js,css}', '**/storybook-static/**'],
   ignoreExportsUsedInFile: true,
 };
 
