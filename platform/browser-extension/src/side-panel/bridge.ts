@@ -177,7 +177,7 @@ const getConnectionState = (): Promise<ConnectionStateResult> =>
   });
 
 /** Request full state from MCP server via config.getState */
-const fetchConfigState = () => sendRequest('config.getState') as Promise<ConfigStateResult>;
+const fetchConfigState = () => sendRequest('config.getState') as Promise<Partial<ConfigStateResult>>;
 
 /** Toggle a single tool's enabled state */
 const setToolEnabled = (plugin: string, tool: string, enabled: boolean): Promise<unknown> =>
