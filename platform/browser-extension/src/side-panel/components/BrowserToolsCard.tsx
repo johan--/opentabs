@@ -91,7 +91,7 @@ const BrowserToolsCard = ({
   return (
     <Accordion.Item value="browser-tools">
       <AccordionPrimitive.Header className="flex">
-        <AccordionPrimitive.Trigger className="font-head flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 focus:outline-hidden [&[data-state=open]>svg.chevron]:rotate-180">
+        <AccordionPrimitive.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 focus:outline-hidden [&[data-state=open]>svg.chevron]:rotate-180">
           <div className="border-border bg-muted/50 flex h-8 w-8 shrink-0 items-center justify-center rounded border-2">
             <ChromeIcon className="h-4 w-4" />
           </div>
