@@ -6,6 +6,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./browser-tools-catalog": {
+      "types": "./dist/generated/browser-tools-catalog.d.ts",
+      "import": "./dist/generated/browser-tools-catalog.js"
     }
   },
   "types": "./dist/index.d.ts",

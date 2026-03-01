@@ -20,7 +20,7 @@ import { Tooltip } from './components/retro/Tooltip.js';
 import { SearchResults } from './components/SearchResults.js';
 import { ERROR_DISPLAY_DURATION_MS } from './constants.js';
 import { useServerNotifications } from './hooks/useServerNotifications.js';
-import { BROWSER_TOOLS_CATALOG } from '@opentabs-dev/shared';
+import { BROWSER_TOOLS_CATALOG } from '@opentabs-dev/shared/browser-tools-catalog';
 import { Search, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import type { BrowserToolState, FailedPluginState, PluginSearchResult, PluginState } from './bridge.js';
