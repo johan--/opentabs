@@ -49,7 +49,6 @@ test.describe('Side panel auth failed', () => {
 
         // It should NOT show the other disconnect states
         await expect(sidePanelPage.getByText('Cannot Reach MCP Server')).not.toBeVisible();
-        await expect(sidePanelPage.getByText('No Plugins Installed')).not.toBeVisible();
 
         // Verify /health still shows extension disconnected
         const health2 = await server.health();

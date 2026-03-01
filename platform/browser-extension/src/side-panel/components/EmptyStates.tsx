@@ -67,17 +67,6 @@ const DisconnectedState = ({ reason }: { reason?: DisconnectReason }) => {
   return <ConnectionRefusedState />;
 };
 
-const NoPluginsState = () => (
-  <Empty>
-    <Empty.Content>
-      <Empty.Title>No Plugins Installed</Empty.Title>
-      <Empty.Separator />
-      <Empty.Description>Search for plugins above or install via CLI:</Empty.Description>
-      <code className="rounded border-2 px-3 py-2 font-mono text-sm">opentabs plugin</code>
-    </Empty.Content>
-  </Empty>
-);
-
 const LoadingState = () => <Loader size="md" />;
 
-export { DisconnectedState, NoPluginsState, LoadingState };
+export { DisconnectedState, LoadingState };

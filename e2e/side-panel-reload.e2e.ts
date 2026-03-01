@@ -131,8 +131,7 @@ test.describe('Side panel auto-refresh — POST /reload', () => {
       expect(body.plugins).toBeGreaterThan(0);
 
       // Verify the side panel shows the plugin (from the sync.full pipeline)
-      await expect(sidePanelPage.locator('text=No Plugins Installed')).toBeHidden({ timeout: 30_000 });
-      await expect(sidePanelPage.locator('text=E2E Test')).toBeVisible({ timeout: 10_000 });
+      await expect(sidePanelPage.locator('text=E2E Test')).toBeVisible({ timeout: 30_000 });
 
       await sidePanelPage.close();
     } finally {

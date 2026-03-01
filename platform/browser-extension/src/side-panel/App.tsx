@@ -11,7 +11,7 @@ import {
 } from './bridge.js';
 import { BrowserToolsCard } from './components/BrowserToolsCard.js';
 import { ConfirmationDialog } from './components/ConfirmationDialog.js';
-import { DisconnectedState, NoPluginsState, LoadingState } from './components/EmptyStates.js';
+import { DisconnectedState, LoadingState } from './components/EmptyStates.js';
 import { Footer } from './components/Footer.js';
 import { PluginList } from './components/PluginList.js';
 import { Accordion } from './components/retro/Accordion.js';
@@ -57,7 +57,6 @@ const App = () => {
   const connectedRef = useRef(connected);
   const loadingRef = useRef(loading);
   const pluginsRef = useRef(plugins);
-  const [pluginsLoaded, setPluginsLoaded] = useState(false);
 
   useEffect(() => {
     connectedRef.current = connected;
@@ -208,7 +207,6 @@ const App = () => {
             });
             pendingTabStates.current.clear();
           }
-          setPluginsLoaded(true);
           setPlugins(updatedPlugins);
           setFailedPlugins(result.failedPlugins ?? []);
           setBrowserTools(prev =>
@@ -275,7 +273,6 @@ const App = () => {
           // Keep stale plugin list visible while fresh data loads (prevents flash of empty state)
           void loadPlugins();
         } else {
-          setPluginsLoaded(false);
           setPlugins([]);
           setFailedPlugins([]);
           setBrowserTools(BROWSER_TOOLS_CATALOG.map(t => ({ ...t, enabled: true })));
@@ -350,7 +347,6 @@ const App = () => {
   const hasContent = plugins.length > 0 || failedPlugins.length > 0 || browserTools.length > 0;
   const showPlugins = !loading && connected && (hasContent || !!searchQuery);
   const showSearchBar = connected && !loading;
-  const showNoPlugins = pluginsLoaded && !hasContent && !searchQuery;
 
   return (
     <Tooltip.Provider>
@@ -389,8 +385,6 @@ const App = () => {
             <LoadingState />
           ) : !connected ? (
             <DisconnectedState reason={disconnectReason} />
-          ) : showNoPlugins ? (
-            <NoPluginsState />
           ) : searchQuery ? (
             <SearchResults
               plugins={plugins}

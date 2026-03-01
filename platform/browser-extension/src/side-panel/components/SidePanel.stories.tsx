@@ -1,5 +1,5 @@
 import { BrowserToolsCard } from './BrowserToolsCard';
-import { DisconnectedState, NoPluginsState, LoadingState } from './EmptyStates';
+import { DisconnectedState, LoadingState } from './EmptyStates';
 import { Footer } from './Footer';
 import { PluginCard } from './PluginCard';
 import { PluginList } from './PluginList';
@@ -269,14 +269,6 @@ const Disconnected: Story = {
   render: () => (
     <SidePanelShell centered>
       <DisconnectedState />
-    </SidePanelShell>
-  ),
-};
-
-const NoPlugins: Story = {
-  render: () => (
-    <SidePanelShell centered>
-      <NoPluginsState />
     </SidePanelShell>
   ),
 };
@@ -848,7 +840,6 @@ export default meta;
 export {
   Loading,
   Disconnected,
-  NoPlugins,
   SinglePluginReady,
   SinglePluginClosed,
   SinglePluginUnavailable,

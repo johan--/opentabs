@@ -44,7 +44,7 @@ const postReload = async (port: number, configDir: string): Promise<Response> =>
 // ---------------------------------------------------------------------------
 
 test.describe('Empty states', () => {
-  test('extension with 0 plugins shows no-plugins card with opentabs plugin command', async () => {
+  test('extension with 0 plugins shows browser tools card', async () => {
     // Start MCP server with empty config (no plugins)
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-empty-fresh-'));
     writeTestConfig(configDir, { localPlugins: [], tools: {} });
@@ -76,7 +76,7 @@ test.describe('Empty states', () => {
     }
   });
 
-  test('adding a plugin transitions the side panel from no-plugins to plugin list', async () => {
+  test('adding a plugin transitions the side panel from browser tools to plugin list', async () => {
     // Start MCP server with empty config (no plugins)
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-empty-transition-'));
     writeTestConfig(configDir, { localPlugins: [], tools: {} });
@@ -124,7 +124,7 @@ test.describe('Empty states', () => {
     }
   });
 
-  test('disconnected state shows when server stops, not no-plugins', async () => {
+  test('disconnected state shows when server stops', async () => {
     // Start MCP server with empty config (no plugins)
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-empty-disconnect-'));
     writeTestConfig(configDir, { localPlugins: [], tools: {} });
@@ -148,9 +148,8 @@ test.describe('Empty states', () => {
       // Kill the MCP server
       await server.kill();
 
-      // Verify the disconnected state appears (not no-plugins)
+      // Verify the disconnected state appears
       await expect(sidePanelPage.locator('text=Cannot Reach MCP Server')).toBeVisible({ timeout: 30_000 });
-      await expect(sidePanelPage.locator('text=No Plugins Installed')).toBeHidden({ timeout: 5_000 });
 
       await sidePanelPage.close();
     } finally {
@@ -161,7 +160,7 @@ test.describe('Empty states', () => {
     }
   });
 
-  test('removing all plugins shows no-plugins card', async () => {
+  test('removing all plugins still shows browser tools card', async () => {
     // Start MCP server WITH the e2e-test plugin
     const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
     const prefixedToolNames = readPluginToolNames();

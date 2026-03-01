@@ -1,4 +1,4 @@
-import { DisconnectedState, NoPluginsState, LoadingState } from './EmptyStates';
+import { DisconnectedState, LoadingState } from './EmptyStates';
 import type { Meta, StoryObj } from '@storybook/react';
 
 const meta: Meta = {
@@ -9,8 +9,7 @@ const meta: Meta = {
 type Story = StoryObj;
 
 const Disconnected: Story = { render: () => <DisconnectedState /> };
-const NoPlugins: Story = { render: () => <NoPluginsState /> };
 const Loading: Story = { render: () => <LoadingState /> };
 
 export default meta;
-export { Disconnected, NoPlugins, Loading };
+export { Disconnected, Loading };
