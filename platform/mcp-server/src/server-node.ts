@@ -297,6 +297,10 @@ const createNodeServer = (options: NodeServerOptions): Promise<NodeServer> =>
     // Sec-WebSocket-Protocol is intentionally excluded here: ws selects the
     // protocol automatically (first value from the client's requested list),
     // so injecting it again would produce a duplicate header.
+    wss.on('error', (err: Error) => {
+      log.error('WebSocket server error:', err);
+    });
+
     wss.on('headers', (headers: string[], request: IncomingMessage) => {
       const pending = pendingHeadersByReq.get(request);
       if (pending) {
