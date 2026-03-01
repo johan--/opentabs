@@ -1,15 +1,42 @@
 #!/bin/bash
-# perfect.sh — Run all perfect-*.sh scripts in parallel.
+# perfect.sh — Run all perfect-*.sh scripts in parallel with streamed output.
 #
 # Usage: bash .ralph/perfect.sh
 #
 # Discovers all scripts matching .ralph/perfect-*.sh and launches them
 # in parallel. Each script runs its own Claude session to audit a different
 # area of the codebase and produce PRDs via the ralph skill.
+#
+# Output from all scripts is interleaved on stdout with each line prefixed
+# by a timestamp and the script name, e.g.:
+#   14:32:05 [backend]   ▸ Read    platform/mcp-server/src/index.ts
+#   14:32:06 [extension]  ▸ Glob    platform/browser-extension/src/**/*.ts
 
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors
+CYAN='\033[36m'
+GREEN='\033[32m'
+RED='\033[31m'
+YELLOW='\033[33m'
+BOLD='\033[1m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+# Short PST timestamp for log lines.
+ts() {
+  TZ=America/Los_Angeles date +'%H:%M:%S'
+}
+
+# Pipe filter: prepends "HH:MM:SS [tag] " to every line read from stdin.
+ts_prefix() {
+  local tag="$1"
+  while IFS= read -r line; do
+    printf "%s ${CYAN}[%-20s]${RESET} %s\n" "$(ts)" "$tag" "$line"
+  done
+}
 
 # Find all perfect-*.sh scripts (excluding this file)
 SCRIPTS=()
@@ -23,38 +50,45 @@ if [ ${#SCRIPTS[@]} -eq 0 ]; then
   exit 0
 fi
 
-echo "Launching ${#SCRIPTS[@]} perfect scripts in parallel:"
+echo -e "$(ts) ${BOLD}Launching ${#SCRIPTS[@]} perfect scripts in parallel:${RESET}"
+echo ""
+
 PIDS=()
+NAMES=()
 for f in "${SCRIPTS[@]}"; do
+  # Strip "perfect-" prefix and ".sh" suffix for a clean tag.
   name=$(basename "$f" .sh)
-  log="/tmp/${name}.log"
-  echo "  $name → $log"
-  nohup bash "$f" > "$log" 2>&1 &
+  short="${name#perfect-}"
+  NAMES+=("$short")
+
+  echo -e "$(ts) ${DIM}  Starting: $short${RESET}"
+
+  # Launch script, pipe stdout+stderr through ts_prefix for live streaming.
+  bash "$f" 2>&1 | ts_prefix "$short" &
   PIDS+=($!)
 done
 
 echo ""
-echo "All launched. Monitor with:"
-echo "  tail -f /tmp/perfect-*.log"
+echo -e "$(ts) ${BOLD}All ${#SCRIPTS[@]} scripts launched. Output streaming below.${RESET}"
 echo ""
-echo "Waiting for all to finish..."
 
+# Wait for all background pipelines and track failures.
 FAILED=0
 for i in "${!PIDS[@]}"; do
   pid=${PIDS[$i]}
-  name=$(basename "${SCRIPTS[$i]}" .sh)
+  short="${NAMES[$i]}"
   if wait "$pid"; then
-    echo "  ✓ $name (PID $pid) completed"
+    echo -e "$(ts) ${GREEN}[${short}] completed successfully.${RESET}"
   else
-    echo "  ✗ $name (PID $pid) failed (exit $?)"
+    echo -e "$(ts) ${RED}[${short}] failed (exit $?).${RESET}"
     FAILED=$((FAILED + 1))
   fi
 done
 
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-  echo "All ${#SCRIPTS[@]} scripts completed successfully."
+  echo -e "$(ts) ${GREEN}${BOLD}All ${#SCRIPTS[@]} scripts completed successfully.${RESET}"
 else
-  echo "$FAILED of ${#SCRIPTS[@]} scripts failed."
+  echo -e "$(ts) ${RED}${BOLD}$FAILED of ${#SCRIPTS[@]} scripts failed.${RESET}"
   exit 1
 fi
