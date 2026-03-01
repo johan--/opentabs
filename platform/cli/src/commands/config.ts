@@ -473,16 +473,17 @@ const handleSetPort = async (value: string, options: { port?: number }): Promise
   console.log(`port: ${pc.cyan(String(newPort))}`);
 
   if (newPort !== oldPort) {
-    // Port is changing: notify the server on the old (currently running) port.
-    // If reached, show a restart reminder mentioning the old port.
+    // Port is changing: notify the server on the actual running port.
+    // If reached, show a restart reminder mentioning the running port.
+    const runningPort = resolvePort(options);
     await notifyServer({
-      port: options.port ?? oldPort,
+      port: runningPort,
       warnIfNotRunning: true,
-      successMessage: pc.yellow(`Server running on port ${oldPort}. Restart to apply port change.`),
+      successMessage: pc.yellow(`Server running on port ${runningPort}. Restart to apply port change.`),
     });
   } else {
     console.log(pc.yellow('Restart the MCP server for the port change to take effect.'));
-    await notifyServer({ port: options.port, warnIfNotRunning: true });
+    await notifyServer({ port: resolvePort(options), warnIfNotRunning: true });
   }
 };
 
