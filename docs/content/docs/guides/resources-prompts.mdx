@@ -157,7 +157,7 @@ class MyPlugin extends OpenTabsPlugin {
 }
 ```
 
-`override` is required on the `resources` property because it has a default value in the base class and TypeScript's `noImplicitOverride` rule requires the keyword when overriding non-abstract inherited members. Abstract properties like `name` do not require `override`.
+`override` is required on the `resources` property because it is a non-abstract property declared on the base class and TypeScript's `noImplicitOverride` rule requires the keyword when overriding non-abstract inherited members. Abstract properties like `name` do not require `override`.
 
 ### How Resources Are Exposed to AI Agents
 
@@ -375,7 +375,7 @@ class MyPlugin extends OpenTabsPlugin {
 }
 ```
 
-`override` is required on the `prompts` property because it has a default value in the base class and TypeScript's `noImplicitOverride` rule requires the keyword when overriding non-abstract inherited members. Abstract properties like `name` do not require `override`.
+`override` is required on the `prompts` property because it is a non-abstract property declared on the base class and TypeScript's `noImplicitOverride` rule requires the keyword when overriding non-abstract inherited members. Abstract properties like `name` do not require `override`.
 
 ### How Prompts Are Exposed to AI Agents
 
