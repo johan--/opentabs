@@ -109,7 +109,7 @@ export const fetchJSONImpl = async (url: string, init?: FetchFromPageOptions, sc
       return undefined;
     }
     throw ToolError.validation(
-      `fetchJSON: expected JSON response from ${url} but received 204 No Content — the server returned no body to validate`,
+      `fetchJSON: expected JSON response from ${url} but received HTTP ${response.status} with no body to validate`,
     );
   } else {
     try {

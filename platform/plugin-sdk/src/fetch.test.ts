@@ -172,6 +172,12 @@ beforeAll(
           return;
         }
 
+        if (url.pathname === '/empty-200') {
+          res.writeHead(200, { 'Content-Length': '0' });
+          res.end();
+          return;
+        }
+
         if (url.pathname === '/echo-form') {
           const chunks: Buffer[] = [];
           req.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -623,9 +629,30 @@ describe('fetchJSON', () => {
       const toolError = error as ToolError;
       expect(toolError.code).toBe('VALIDATION_ERROR');
       expect(toolError.category).toBe('validation');
-      expect(toolError.message).toContain('204 No Content');
+      expect(toolError.message).toContain('HTTP 204');
       expect(toolError.message).toContain('no body to validate');
     }
+  });
+
+  test('throws ToolError.validation with actual status for 200 + content-length: 0 when schema is provided', async () => {
+    const schema = z.object({ status: z.string() });
+    try {
+      await fetchJSON(`${baseUrl}/empty-200`, undefined, schema);
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ToolError);
+      const toolError = error as ToolError;
+      expect(toolError.code).toBe('VALIDATION_ERROR');
+      expect(toolError.category).toBe('validation');
+      expect(toolError.message).toContain('HTTP 200');
+      expect(toolError.message).not.toContain('204 No Content');
+      expect(toolError.message).toContain('no body to validate');
+    }
+  });
+
+  test('returns undefined for 200 + content-length: 0 when no schema is provided', async () => {
+    const data = await fetchJSON(`${baseUrl}/empty-200`);
+    expect(data).toBeUndefined();
   });
 });
 
