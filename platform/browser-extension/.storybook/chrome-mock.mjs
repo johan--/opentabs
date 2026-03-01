@@ -18,34 +18,43 @@ function makeListenerHub() {
 
 const store = {};
 
+const storageMock = {
+  local: {
+    get: keys => {
+      const result = {};
+      const keyList = typeof keys === 'string' ? [keys] : keys;
+      for (const k of keyList) {
+        if (k in store) result[k] = store[k];
+      }
+      return Promise.resolve(result);
+    },
+    set: items => {
+      Object.assign(store, items);
+      return Promise.resolve();
+    },
+    remove: keys => {
+      const keyList = typeof keys === 'string' ? [keys] : keys;
+      for (const k of keyList) delete store[k];
+      return Promise.resolve();
+    },
+  },
+  onChanged: makeListenerHub(),
+};
+
+const runtimeMock = {
+  sendMessage: () => Promise.resolve(),
+  onMessage: makeListenerHub(),
+  lastError: null,
+};
+
+// In Chrome browsers, `globalThis.chrome` exists but without extension APIs
+// like `chrome.storage`. Patch the existing object rather than replacing it
+// so the mock works in both Chrome and non-Chrome browsers.
 if (typeof globalThis.chrome === 'undefined') {
-  globalThis.chrome = {
-    storage: {
-      local: {
-        get: keys => {
-          const result = {};
-          const keyList = typeof keys === 'string' ? [keys] : keys;
-          for (const k of keyList) {
-            if (k in store) result[k] = store[k];
-          }
-          return Promise.resolve(result);
-        },
-        set: items => {
-          Object.assign(store, items);
-          return Promise.resolve();
-        },
-        remove: keys => {
-          const keyList = typeof keys === 'string' ? [keys] : keys;
-          for (const k of keyList) delete store[k];
-          return Promise.resolve();
-        },
-      },
-      onChanged: makeListenerHub(),
-    },
-    runtime: {
-      sendMessage: () => Promise.resolve(),
-      onMessage: makeListenerHub(),
-      lastError: null,
-    },
-  };
+  globalThis.chrome = {};
 }
+
+globalThis.chrome.storage ??= storageMock;
+globalThis.chrome.storage.local ??= storageMock.local;
+globalThis.chrome.storage.onChanged ??= storageMock.onChanged;
+globalThis.chrome.runtime ??= runtimeMock;
