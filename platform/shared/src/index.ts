@@ -205,10 +205,13 @@ export interface SyncFullParams {
 
 /** tool.dispatch request: server → extension */
 export interface ToolDispatchParams {
+  /** Plugin name (e.g. "googledocs") */
   plugin: string;
+  /** Tool base name without plugin prefix (e.g. "get_document") */
   tool: string;
+  /** Validated tool input — tabId has been stripped before this reaches the plugin */
   input: Record<string, unknown>;
-  /** Optional tab ID for targeted dispatch to a specific browser tab */
+  /** Optional tab ID for targeted dispatch to a specific browser tab. When present, the extension dispatches to exactly this tab (with URL pattern validation). When absent, the extension auto-selects the best-ranked ready tab. */
   tabId?: number;
 }
 
@@ -242,16 +245,19 @@ export interface PluginTabInfo {
   ready: boolean;
 }
 
-/** tab.stateChanged notification: extension → server */
+/** tab.stateChanged notification: extension → server — sent whenever any tab state changes for a plugin */
 export interface TabStateChangedParams {
+  /** Plugin name */
   plugin: string;
+  /** Aggregate state: 'ready' if any tab is ready, 'unavailable' if tabs exist but none ready, 'closed' if no tabs */
   state: TabState;
   /** All matching tabs for this plugin with per-tab readiness */
   tabs: PluginTabInfo[];
 }
 
-/** tab.syncAll notification: extension → server */
+/** tab.syncAll notification: extension → server — sent on connect/reconnect with full state for all plugins */
 export interface TabSyncAllParams {
+  /** Map from plugin name to its aggregate state and full tab list */
   tabs: Record<string, { state: TabState; tabs: PluginTabInfo[] }>;
 }
 
