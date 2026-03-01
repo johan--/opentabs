@@ -12,16 +12,11 @@ export const indeterminateProgress = defineTool({
     ok: z.boolean().describe('Whether the operation completed successfully'),
   }),
   handle: async (_params, context) => {
-    // Use progress: 0, total: 0 as the indeterminate sentinel — the adapter
-    // fills these values when progress/total are omitted. The published SDK
-    // (v0.0.16) has progress and total as required fields, so we pass the
-    // sentinel values explicitly to match what would happen at runtime when
-    // the optional-fields version is published.
-    context?.reportProgress({ progress: 0, total: 0, message: 'Step 1: Initializing...' });
+    context?.reportProgress({ message: 'Step 1: Initializing...' });
     await sleep(100);
-    context?.reportProgress({ progress: 0, total: 0, message: 'Step 2: Processing...' });
+    context?.reportProgress({ message: 'Step 2: Processing...' });
     await sleep(100);
-    context?.reportProgress({ progress: 0, total: 0, message: 'Step 3: Finishing...' });
+    context?.reportProgress({ message: 'Step 3: Finishing...' });
     return { ok: true };
   },
 });
