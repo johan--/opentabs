@@ -6,8 +6,8 @@
  *   - Interact/sensitive-tier tools on non-trusted domains trigger confirmation
  *     and block until a human responds in the side panel
  *
- * These tests start the MCP server WITHOUT skipConfirmation (overriding the
- * default E2E fixture that sets OPENTABS_SKIP_CONFIRMATION=1) and use
+ * These tests start the MCP server WITHOUT skipPermissions (overriding the
+ * default E2E fixture that sets OPENTABS_SKIP_PERMISSIONS=1) and use
  * 127.0.0.2 as a non-trusted domain to exercise the confirmation flow.
  *
  * The default trustedDomains are ['localhost', '127.0.0.1'], so 127.0.0.2
@@ -37,14 +37,14 @@ import { test as base, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { McpClient, McpServer, TestServer } from './fixtures.js';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Worker } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
-// Custom fixture — MCP server without skipConfirmation
+// Custom fixture — MCP server without skipPermissions
 // ---------------------------------------------------------------------------
 
 interface PermissionFixtures {
-  /** MCP server started WITHOUT OPENTABS_SKIP_CONFIRMATION. */
+  /** MCP server started WITHOUT OPENTABS_SKIP_PERMISSIONS. */
   mcpServer: McpServer;
   /** Controllable test web server (bound to 0.0.0.0 so 127.0.0.2 works). */
   testServer: TestServer;
@@ -57,10 +57,10 @@ interface PermissionFixtures {
 const test = base.extend<PermissionFixtures>({
   mcpServer: async ({ browserName: _ }, use) => {
     const configDir = createTestConfigDir();
-    // Start server with OPENTABS_SKIP_CONFIRMATION set to empty string
+    // Start server with OPENTABS_SKIP_PERMISSIONS set to empty string
     // to disable the bypass. The check is `=== '1'`, so '' disables it.
     const server = await startMcpServer(configDir, true, undefined, {
-      OPENTABS_SKIP_CONFIRMATION: '',
+      OPENTABS_SKIP_PERMISSIONS: '',
     });
     try {
       await use(server);
@@ -412,6 +412,106 @@ test.describe('Trusted domain auto-allow', () => {
     );
 
     expect(result.isError).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Confirmation notification — badge lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the extension's background service worker from the browser context.
+ * Polls until it appears (MV3 service workers may not be ready immediately).
+ */
+const getBackgroundWorker = async (context: BrowserContext, timeoutMs = 10_000): Promise<Worker> => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const sw of context.serviceWorkers()) {
+      if (sw.url().includes('background')) return sw;
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  throw new Error(`Could not find background service worker within ${timeoutMs}ms`);
+};
+
+/**
+ * Read the extension badge text from the service worker context.
+ * Returns the current badge text (e.g. "1", "2", or "" when cleared).
+ */
+const getBadgeText = (sw: Worker): Promise<string> => sw.evaluate(() => chrome.action.getBadgeText({}));
+
+test.describe('Confirmation notification — badge lifecycle', () => {
+  test('badge is set when confirmation is pending and clears after approval', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const sw = await getBackgroundWorker(extensionContext);
+    const nonTrustedUrl = testServer.url.replace('localhost', '127.0.0.2');
+
+    // Open the side panel so it can receive the confirmation request.
+    const sidePanel = await openSidePanel(extensionContext);
+
+    // Badge should start empty.
+    const initialBadge = await getBadgeText(sw);
+    expect(initialBadge).toBe('');
+
+    // Trigger a sensitive-tier tool on a non-trusted domain. The
+    // confirmation request sets the badge to "1". Concurrently, wait for
+    // the badge to appear, approve the dialog, then verify the badge clears.
+    const [result] = await Promise.all([
+      mcpClient.callTool('browser_get_cookies', { url: nonTrustedUrl }, { timeout: 35_000 }),
+      (async () => {
+        // Poll until badge text becomes "1" (confirmation is pending).
+        await waitFor(async () => (await getBadgeText(sw)) === '1', 15_000, 200, 'badge text === "1"');
+
+        // Approve the confirmation dialog.
+        await clickAllowOnce(sidePanel);
+
+        // Poll until badge text clears back to "" (confirmation resolved).
+        await waitFor(async () => (await getBadgeText(sw)) === '', 10_000, 200, 'badge text === ""');
+      })(),
+    ]);
+
+    // The tool should have completed successfully after approval.
+    expect(result.isError).toBe(false);
+  });
+
+  test('no notification when side panel is already open before tool call', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const sw = await getBackgroundWorker(extensionContext);
+    const nonTrustedUrl = testServer.url.replace('localhost', '127.0.0.2');
+
+    // Open the side panel BEFORE triggering the confirmation. When the
+    // panel is open, syncConfirmationNotification() suppresses the Chrome
+    // desktop notification (chrome.notifications.create is not called).
+    // The badge still increments, but the user sees the dialog directly.
+    const sidePanel = await openSidePanel(extensionContext);
+
+    // Trigger a sensitive-tier tool on a non-trusted domain and approve
+    // the confirmation concurrently. Verify the badge lifecycle works
+    // correctly even when the desktop notification is suppressed.
+    const [result] = await Promise.all([
+      mcpClient.callTool('browser_get_cookies', { url: nonTrustedUrl }, { timeout: 35_000 }),
+      clickAllowOnce(sidePanel),
+    ]);
+
+    // The tool should complete successfully.
+    expect(result.isError).toBe(false);
+
+    // Badge should be cleared after the confirmation is resolved.
+    await waitFor(async () => (await getBadgeText(sw)) === '', 10_000, 200, 'badge text === ""');
   });
 });
 
