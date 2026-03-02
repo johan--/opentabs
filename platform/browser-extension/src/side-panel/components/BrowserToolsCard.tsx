@@ -110,6 +110,7 @@ const BrowserToolsCard = ({
           t.description.toLowerCase().includes(filterLower),
       )
     : tools;
+  const hasActiveTool = tools.some(t => activeTools.has(`browser:${t.name}`));
 
   return (
     <Accordion.Item value="browser-tools">
@@ -121,6 +122,7 @@ const BrowserToolsCard = ({
             size={32}
             iconSvg={CHROME_ICON_SVG}
             iconInactiveSvg={CHROME_ICON_SVG}
+            active={hasActiveTool}
           />
           <div className="font-head text-foreground flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm">
             Browser
