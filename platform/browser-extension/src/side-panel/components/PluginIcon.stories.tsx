@@ -94,5 +94,9 @@ const WithIconInactive: Story = {
   },
 };
 
+const Active: Story = {
+  args: { pluginName: 'slack', displayName: 'Slack', tabState: 'ready', size: 32, active: true },
+};
+
 export default meta;
-export { Ready, Unavailable, Closed, ReadyWithUpdate, Palette, Sizes, WithIcon, WithIconInactive };
+export { Ready, Unavailable, Closed, ReadyWithUpdate, Palette, Sizes, WithIcon, WithIconInactive, Active };
