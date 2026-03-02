@@ -11,21 +11,21 @@ interface ToolIconProps {
 }
 
 const FallbackIcon = ({ enabled = true }: { enabled?: boolean }) => (
-  <Wrench className={cn('h-3 w-3 transition-colors', enabled ? 'text-foreground' : 'text-muted-foreground')} />
+  <Wrench className={cn('h-3 w-3 transition-colors', enabled ? 'text-primary-foreground' : 'text-muted-foreground')} />
 );
 
 const ToolIcon = ({ icon, className = '', enabled = true }: ToolIconProps) => (
   <div
     className={cn(
       'flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors',
-      enabled ? 'border-border bg-muted/50' : 'border-border/60 bg-muted/30',
+      enabled ? 'border-border bg-primary' : 'border-border/40 bg-muted/40',
       className,
     )}>
     {icon ? (
       <Suspense fallback={<FallbackIcon enabled={enabled} />}>
         <DynamicIcon
           name={icon as IconName}
-          className={cn('h-3 w-3 transition-colors', enabled ? 'text-foreground' : 'text-muted-foreground')}
+          className={cn('h-3 w-3 transition-colors', enabled ? 'text-primary-foreground' : 'text-muted-foreground')}
           fallback={() => <FallbackIcon enabled={enabled} />}
         />
       </Suspense>

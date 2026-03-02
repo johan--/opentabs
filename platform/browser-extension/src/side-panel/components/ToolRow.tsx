@@ -2,6 +2,7 @@ import { Loader } from './retro/Loader.js';
 import { Switch } from './retro/Switch.js';
 import { Tooltip } from './retro/Tooltip.js';
 import { ToolIcon } from './ToolIcon.js';
+import { cn } from '../lib/cn.js';
 
 const ToolRow = ({
   name,
@@ -21,7 +22,11 @@ const ToolRow = ({
   onToggle: () => void;
 }) => (
   <div
-    className={`border-border hover:bg-muted/50 flex items-center gap-2 border-b px-3 py-2 transition-colors last:border-b-0 ${active ? 'bg-accent/20' : ''}`}>
+    className={cn(
+      'border-border flex items-center gap-2 border-b px-3 py-2 transition-colors last:border-b-0',
+      enabled ? 'hover:bg-primary/10' : 'hover:bg-muted/50',
+      active && 'bg-accent/20',
+    )}>
     <ToolIcon icon={icon} enabled={enabled} />
     <Tooltip>
       <Tooltip.Trigger asChild>
