@@ -116,12 +116,12 @@ export const getToolTier = (toolName: string): ToolTier => TOOL_TIERS[toolName] 
  *
  * @param toolName - Browser tool name (e.g., 'browser_execute_script')
  * @param domain - Target domain hostname (e.g., 'mail.google.com'), or null for tools with no target
- * @param state - Server state (for skipConfirmation flag and permissions config)
+ * @param state - Server state (for skipPermissions flag and permissions config)
  * @returns 'allow', 'ask', or 'deny'
  */
 export const evaluatePermission = (toolName: string, domain: string | null, state: ServerState): ToolPermission => {
-  // Bypass: if skipConfirmation is active, all tools are auto-allowed
-  if (state.skipConfirmation) return 'allow';
+  // Bypass: if skipPermissions is active, all tools are auto-allowed
+  if (state.skipPermissions) return 'allow';
 
   const permissions = state.permissions;
 

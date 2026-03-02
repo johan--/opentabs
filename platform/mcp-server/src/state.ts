@@ -332,8 +332,8 @@ export interface ServerState {
   discoveryErrors: ReadonlyArray<{ specifier: string; error: string }>;
   /** Circular buffer of recent tool invocations for diagnostics and monitoring */
   auditLog: AuditEntry[];
-  /** Whether confirmation prompts are bypassed (from CLI flag, env var, or config) */
-  skipConfirmation: boolean;
+  /** Whether permission prompts are bypassed (from CLI flag, env var, or config) */
+  skipPermissions: boolean;
 
   /** Permission rules for browser tool confirmation */
   permissions: PermissionsConfig;
@@ -400,7 +400,7 @@ export const createState = (): ServerState => ({
   startedAt: Date.now(),
   discoveryErrors: [],
   auditLog: [],
-  skipConfirmation: false,
+  skipPermissions: false,
 
   permissions: {
     trustedDomains: ['localhost', '127.0.0.1'],

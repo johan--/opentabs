@@ -67,6 +67,7 @@ interface StartOptions {
   port?: number;
   showConfig?: boolean;
   background?: boolean;
+  dangerouslySkipPermissions?: boolean;
 }
 
 const resolveServerEntry = (): string => {
@@ -318,6 +319,17 @@ const handleStart = async (options: StartOptions): Promise<void> => {
   const env: Record<string, string | undefined> = { ...process.env };
   env.PORT = String(port);
 
+  const serverArgs = options.dangerouslySkipPermissions ? ['--dangerously-skip-permissions'] : [];
+
+  if (options.dangerouslySkipPermissions) {
+    console.warn(
+      pc.yellow(
+        'WARNING: All browser tool confirmations are bypassed. Sensitive operations will execute without human approval.',
+      ),
+    );
+    console.log('');
+  }
+
   const logFilePath = getLogFilePath();
 
   const printStartupHeader = (): void => {
@@ -349,7 +361,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
       console.error(pc.red(`Error: Failed to open log file ${logFilePath}: ${toErrorMessage(err)}`));
       process.exit(1);
     });
-    const child = spawn(platformExec('node'), [serverEntry], {
+    const child = spawn(platformExec('node'), [serverEntry, ...serverArgs], {
       env: env as NodeJS.ProcessEnv,
       stdio: ['ignore', logStream, logStream],
       detached: true,
@@ -407,7 +419,7 @@ const handleStart = async (options: StartOptions): Promise<void> => {
     console.warn(pc.yellow(`Warning: Failed to write to log file: ${toErrorMessage(err)}`));
   });
 
-  const proc = spawnStreaming(platformExec('node'), [serverEntry], {
+  const proc = spawnStreaming(platformExec('node'), [serverEntry, ...serverArgs], {
     env: env,
     stdin: 'inherit',
   });
@@ -438,6 +450,10 @@ const registerStartCommand = (program: Command): void => {
     .option('--port <number>', 'Server port (default: 9515)', parsePort)
     .option('--background', 'Start the server in the background')
     .option('--show-config', 'Print full MCP client configuration even on subsequent runs')
+    .option(
+      '--dangerously-skip-permissions',
+      'Bypass all browser tool confirmation dialogs (WARNING: sensitive operations execute without human approval)',
+    )
     .addHelpText(
       'after',
       `
@@ -445,7 +461,8 @@ Examples:
   $ opentabs start
   $ opentabs start --background
   $ opentabs start --port 3000
-  $ opentabs start --show-config`,
+  $ opentabs start --show-config
+  $ opentabs start --dangerously-skip-permissions`,
     )
     .action((_options: StartOptions, command: Command) => handleStart(command.optsWithGlobals()));
 };

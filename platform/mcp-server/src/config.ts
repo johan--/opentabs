@@ -46,8 +46,8 @@ interface OpentabsConfig {
   browserToolPolicy: Record<string, boolean>;
   /** Permission configuration for browser tool confirmation */
   permissions: PermissionsConfig;
-  /** Whether to skip all confirmation prompts (dangerous — disables human-in-the-loop) */
-  skipConfirmation?: boolean;
+  /** Whether to skip all permission prompts (dangerous — disables human-in-the-loop) */
+  skipPermissions?: boolean;
 }
 
 /** Version marker file for the managed extension install */
@@ -246,9 +246,15 @@ const parseConfigRecord = (record: Record<string, unknown>): OpentabsConfig => {
   // Parse permissions config with defensive validation
   const permissions = parsePermissionsConfig(record.permissions);
 
-  const skipConfirmation = typeof record.skipConfirmation === 'boolean' ? record.skipConfirmation : undefined;
+  // Read skipPermissions (new name); fall back to skipConfirmation (old name) for backward compatibility.
+  const skipPermissions =
+    typeof record.skipPermissions === 'boolean'
+      ? record.skipPermissions
+      : typeof record.skipConfirmation === 'boolean'
+        ? record.skipConfirmation
+        : undefined;
 
-  return { localPlugins, tools, browserToolPolicy, permissions, skipConfirmation };
+  return { localPlugins, tools, browserToolPolicy, permissions, skipPermissions };
 };
 
 /**
@@ -348,7 +354,7 @@ const saveToolConfig = async (
       tools,
       browserToolPolicy: current.browserToolPolicy,
       permissions: current.permissions,
-      skipConfirmation: current.skipConfirmation,
+      skipPermissions: current.skipPermissions,
     };
     await atomicWriteConfig(configPath, JSON.stringify(updated, null, 2) + '\n');
   })();
@@ -389,7 +395,7 @@ const saveBrowserToolPolicy = async (
       tools: current.tools,
       browserToolPolicy,
       permissions: current.permissions,
-      skipConfirmation: current.skipConfirmation,
+      skipPermissions: current.skipPermissions,
     };
     await atomicWriteConfig(configPath, JSON.stringify(updated, null, 2) + '\n');
   })();

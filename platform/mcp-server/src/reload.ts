@@ -29,7 +29,7 @@ import {
   notifyPromptListChanged,
 } from './mcp-setup.js';
 import { buildRegistry } from './registry.js';
-import { isCliSkipConfirmation } from './skip-confirmation.js';
+import { isCliSkipPermissions } from './skip-permissions.js';
 import { prefixedToolName } from './state.js';
 import { checkForUpdates } from './version-check.js';
 import type { McpServerInstance } from './mcp-setup.js';
@@ -226,7 +226,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     const newPluginPaths = [...config.localPlugins];
     const newDiscoveryErrors = errors;
     const newPermissions = config.permissions;
-    const newSkipConfirmation = isCliSkipConfirmation() || config.skipConfirmation === true;
+    const newSkipPermissions = isCliSkipPermissions() || config.skipPermissions === true;
 
     // Build the new cached browser tools on a staging object so a throw here
     // does not partially update state. rebuildCachedBrowserTools only reads
@@ -253,7 +253,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     state.pluginPaths = newPluginPaths;
     state.discoveryErrors = newDiscoveryErrors;
     state.permissions = newPermissions;
-    state.skipConfirmation = newSkipConfirmation;
+    state.skipPermissions = newSkipPermissions;
     state.cachedBrowserTools = newCachedBrowserTools;
 
     // Prune stale entries against the updated registry.

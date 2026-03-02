@@ -257,7 +257,7 @@ const createMockState = (overrides: Partial<ServerState> = {}): ServerState =>
     activeDispatches: new Map<string, number>(),
     auditLog: [],
     sessionPermissions: [],
-    skipConfirmation: false,
+    skipPermissions: false,
     permissions: {
       trustedDomains: ['localhost'],
       sensitiveDomains: [],
