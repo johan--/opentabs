@@ -1584,16 +1584,13 @@ describe('handleServerMessage', () => {
       expect(mockForwardToSidePanel).not.toHaveBeenCalled();
     });
 
-    test('forwards response messages (id without method) to side panel', () => {
+    test('does not forward response messages (id without method) to side panel', () => {
       const message = { id: 100, result: { ok: true } };
 
       handleServerMessage(message);
 
-      expect(mockForwardToSidePanel).toHaveBeenCalledTimes(1);
-      expect(mockForwardToSidePanel).toHaveBeenCalledWith({
-        type: 'sp:serverMessage',
-        data: message,
-      });
+      // Responses are consumed by server-request.ts, not forwarded to the side panel
+      expect(mockForwardToSidePanel).not.toHaveBeenCalled();
     });
 
     test('does not forward non-side-panel notification methods', () => {

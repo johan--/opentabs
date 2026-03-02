@@ -753,8 +753,22 @@ describe('handleConfigSetBrowserToolEnabled', () => {
     expect(state.browserToolPolicy.browser_list_tabs).toBe(false);
     // First message is plugins.changed notification, second is the result
     expect(messages).toHaveLength(2);
-    const notification = JSON.parse(messages[0] as string) as { method: string };
+    const notification = JSON.parse(messages[0] as string) as {
+      method: string;
+      params: { plugins: unknown[]; failedPlugins: unknown[]; browserTools: unknown[]; serverVersion: string };
+    };
     expect(notification.method).toBe('plugins.changed');
+    // Verify plugins.changed carries full ConfigStateResult payload
+    expect(notification.params).toBeDefined();
+    expect(Array.isArray(notification.params.plugins)).toBe(true);
+    expect(Array.isArray(notification.params.failedPlugins)).toBe(true);
+    expect(Array.isArray(notification.params.browserTools)).toBe(true);
+    expect(typeof notification.params.serverVersion).toBe('string');
+    // The disabled tool should be reflected in browserTools
+    const listTabsTool = notification.params.browserTools.find(
+      (t: unknown) => (t as { name: string }).name === 'browser_list_tabs',
+    ) as { enabled: boolean } | undefined;
+    expect(listTabsTool?.enabled).toBe(false);
     const response = JSON.parse(messages[1] as string) as { result: { ok: boolean }; id: string };
     expect(response.result).toEqual({ ok: true });
     expect(response.id).toBe('req-1');

@@ -543,12 +543,11 @@ const handleServerMessage = (message: Record<string, unknown>): void => {
     });
   }
 
-  // Forward to the side panel only if useful: responses (matched by id in the
-  // bridge's pending-request map) and the small set of notification methods the
-  // side panel actually handles. This avoids sending large payloads
-  // (sync.full metadata, tool.dispatch input) that the side panel would ignore.
-  const isResponse = id !== undefined && !method;
-  if (isResponse || (method && SIDE_PANEL_METHODS.has(method))) {
+  // Forward notifications to the side panel only if the method is in the
+  // allowed set. Responses (id without method) are NOT forwarded — the side
+  // panel no longer sends JSON-RPC requests through the background relay.
+  // Server responses are consumed by server-request.ts (US-006) instead.
+  if (method && SIDE_PANEL_METHODS.has(method)) {
     forwardToSidePanel({ type: 'sp:serverMessage', data: message });
   }
 
