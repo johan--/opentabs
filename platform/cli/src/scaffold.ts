@@ -381,10 +381,31 @@ class ${toPascalCase(args.name)}Plugin extends OpenTabsPlugin {
 
   // IMPORTANT: Implement this method to check if the user is authenticated.
   // The plugin reports 'unavailable' until this returns true.
-  // Examples:
+  //
+  // Simple examples (synchronous checks):
   //   return document.cookie.includes('session=');
   //   return document.querySelector('[data-user-id]') !== null;
   //   return getPageGlobal('APP.currentUser') !== undefined;
+  //   return localStorage.getItem('token') !== null;
+  //
+  // For SPAs that hydrate auth asynchronously, poll for readiness:
+  //   const waitForAuth = () => new Promise<boolean>(resolve => {
+  //     let elapsed = 0;
+  //     const timer = setInterval(() => {
+  //       elapsed += 500;
+  //       if (getPageGlobal('APP.currentUser') !== undefined) { clearInterval(timer); resolve(true); return; }
+  //       if (elapsed >= 5000) { clearInterval(timer); resolve(false); }
+  //     }, 500);
+  //   });
+  //   return waitForAuth();
+  //
+  // Some apps (e.g. Discord) delete window.localStorage. Use an iframe fallback:
+  //   const iframe = document.createElement('iframe');
+  //   iframe.style.display = 'none';
+  //   document.body.appendChild(iframe);
+  //   const token = iframe.contentWindow?.localStorage.getItem('token') ?? null;
+  //   document.body.removeChild(iframe);
+  //   return token !== null;
   async isReady(): Promise<boolean> {
     return false;
   }
