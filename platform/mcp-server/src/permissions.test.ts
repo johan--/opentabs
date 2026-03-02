@@ -111,16 +111,16 @@ describe('evaluatePermission — default tier behavior', () => {
 });
 
 describe('evaluatePermission — bypass flag', () => {
-  test('skipConfirmation bypasses all permissions', () => {
+  test('skipPermissions bypasses all permissions', () => {
     const state = createState();
-    state.skipConfirmation = true;
+    state.skipPermissions = true;
     state.permissions = defaultPermissions({ trustedDomains: [] });
     expect(evaluatePermission('browser_execute_script', 'evil.com', state)).toBe('allow');
   });
 
-  test('skipConfirmation bypasses even deny policies', () => {
+  test('skipPermissions bypasses even deny policies', () => {
     const state = createState();
-    state.skipConfirmation = true;
+    state.skipPermissions = true;
     state.permissions = defaultPermissions({
       toolPolicy: { browser_execute_script: 'deny' },
     });

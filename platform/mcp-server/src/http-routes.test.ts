@@ -258,7 +258,7 @@ interface HealthResponse {
   pluginToolCount: number;
   browserToolNames: string[];
   disabledBrowserTools: string[];
-  confirmationBypassed: boolean;
+  skipPermissions: boolean;
   uptime: number;
   reloadCount: number;
   lastReloadTimestamp: number;

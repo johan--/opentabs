@@ -319,7 +319,7 @@ const handleHealth = (
       pluginToolCount,
       browserToolNames,
       disabledBrowserTools,
-      confirmationBypassed: state.skipConfirmation,
+      skipPermissions: state.skipPermissions,
       uptime: uptimeSeconds,
       reloadCount: hs?.reloadCount ?? 0,
       lastReloadTimestamp: hs?.lastReloadTimestamp ?? 0,
