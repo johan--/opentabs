@@ -803,21 +803,23 @@ const analyzeSite = async (
   url: string,
   waitSeconds: number = DEFAULT_WAIT_SECONDS,
 ): Promise<SiteAnalysis> => {
-  // Step 1: Open a new tab to about:blank so network capture can be enabled
-  // before any target-URL requests fire
-  const openResult = await dispatchToExtension(state, 'browser.openTab', { url: 'about:blank' });
-  if (
-    typeof openResult !== 'object' ||
-    openResult === null ||
-    typeof (openResult as Record<string, unknown>).id !== 'number'
-  ) {
-    throw new Error(
-      `browser.openTab returned invalid result: expected { id: number }, got ${JSON.stringify(openResult)}`,
-    );
-  }
-  const tabId = (openResult as { id: number }).id;
+  let tabId: number | null = null;
 
   try {
+    // Step 1: Open a new tab to about:blank so network capture can be enabled
+    // before any target-URL requests fire
+    const openResult = await dispatchToExtension(state, 'browser.openTab', { url: 'about:blank' });
+    if (
+      typeof openResult !== 'object' ||
+      openResult === null ||
+      typeof (openResult as Record<string, unknown>).id !== 'number'
+    ) {
+      throw new Error(
+        `browser.openTab returned invalid result: expected { id: number }, got ${JSON.stringify(openResult)}`,
+      );
+    }
+    tabId = (openResult as { id: number }).id;
+
     // Step 2: Enable network capture before navigating to the target URL so
     // early page-load requests (auth token exchanges, initial data fetches) are captured
     await dispatchToExtension(state, 'browser.enableNetworkCapture', {
@@ -1030,17 +1032,19 @@ const analyzeSite = async (
       suggestions,
     };
   } finally {
-    // Clean up: disable network capture then close the tab
-    try {
-      await dispatchToExtension(state, 'browser.disableNetworkCapture', { tabId });
-    } catch {
-      // Best-effort cleanup — ignore errors
-    }
-    state.activeNetworkCaptures.delete(tabId);
-    try {
-      await dispatchToExtension(state, 'browser.closeTab', { tabId });
-    } catch {
-      // Best-effort cleanup — ignore errors
+    // Clean up: disable network capture then close the tab (only if a tab was successfully opened)
+    if (tabId !== null) {
+      try {
+        await dispatchToExtension(state, 'browser.disableNetworkCapture', { tabId });
+      } catch {
+        // Best-effort cleanup — ignore errors
+      }
+      state.activeNetworkCaptures.delete(tabId);
+      try {
+        await dispatchToExtension(state, 'browser.closeTab', { tabId });
+      } catch {
+        // Best-effort cleanup — ignore errors
+      }
     }
   }
 };
