@@ -350,7 +350,7 @@ const App = () => {
 
   return (
     <Tooltip.Provider>
-      <div className="text-foreground flex min-h-screen flex-col">
+      <div className="text-foreground flex h-screen flex-col overflow-hidden">
         {connected && pendingConfirmations.length > 0 && (
           <ConfirmationDialog
             confirmations={pendingConfirmations}
@@ -359,7 +359,7 @@ const App = () => {
           />
         )}
         {showSearchBar && (
-          <div className="pt-4 pr-5 pb-2 pl-4">
+          <div className="shrink-0 pt-4 pr-5 pb-2 pl-4">
             <div className="relative">
               <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2" />
               <Input
@@ -379,58 +379,60 @@ const App = () => {
             </div>
           </div>
         )}
-        <main
-          className={`flex-1 pr-5 pb-2 pl-4 ${showSearchBar ? 'pt-2' : 'pt-4'} ${showPlugins ? '' : 'flex items-center justify-center'}`}>
-          {loading ? (
-            <LoadingState />
-          ) : !connected ? (
-            <DisconnectedState reason={disconnectReason} />
-          ) : searchQuery ? (
-            <SearchResults
-              plugins={plugins}
-              failedPlugins={failedPlugins}
-              browserTools={browserTools}
-              activeTools={activeTools}
-              setPlugins={setPlugins}
-              setBrowserTools={setBrowserTools}
-              toolFilter={searchQuery}
-              npmResults={npmResults}
-              npmSearching={npmSearching}
-              installingPlugins={installingPlugins}
-              onInstall={handleInstall}
-              installErrors={installErrors}
-              onUpdate={handleUpdate}
-              onRemove={handleRemove}
-              removingPlugins={removingPlugins}
-              pluginErrors={pluginErrors}
-              serverVersion={serverVersion}
-            />
-          ) : hasContent ? (
-            <>
-              {browserTools.length > 0 && (
-                <Accordion type="multiple" className="mb-2 space-y-2">
-                  <BrowserToolsCard
-                    tools={browserTools}
-                    activeTools={activeTools}
-                    onToolsChange={setBrowserTools}
-                    serverVersion={serverVersion}
-                  />
-                </Accordion>
-              )}
-              <PluginList
+        <div className="scrollable-area min-h-0 flex-1 overflow-y-auto">
+          <main
+            className={`pr-5 pb-2 pl-4 ${showSearchBar ? 'pt-2' : 'pt-4'} ${showPlugins ? '' : 'flex min-h-full items-center justify-center'}`}>
+            {loading ? (
+              <LoadingState />
+            ) : !connected ? (
+              <DisconnectedState reason={disconnectReason} />
+            ) : searchQuery ? (
+              <SearchResults
                 plugins={plugins}
                 failedPlugins={failedPlugins}
+                browserTools={browserTools}
                 activeTools={activeTools}
                 setPlugins={setPlugins}
-                toolFilter=""
+                setBrowserTools={setBrowserTools}
+                toolFilter={searchQuery}
+                npmResults={npmResults}
+                npmSearching={npmSearching}
+                installingPlugins={installingPlugins}
+                onInstall={handleInstall}
+                installErrors={installErrors}
                 onUpdate={handleUpdate}
                 onRemove={handleRemove}
                 removingPlugins={removingPlugins}
                 pluginErrors={pluginErrors}
+                serverVersion={serverVersion}
               />
-            </>
-          ) : null}
-        </main>
+            ) : hasContent ? (
+              <>
+                {browserTools.length > 0 && (
+                  <Accordion type="multiple" className="mb-2 space-y-2">
+                    <BrowserToolsCard
+                      tools={browserTools}
+                      activeTools={activeTools}
+                      onToolsChange={setBrowserTools}
+                      serverVersion={serverVersion}
+                    />
+                  </Accordion>
+                )}
+                <PluginList
+                  plugins={plugins}
+                  failedPlugins={failedPlugins}
+                  activeTools={activeTools}
+                  setPlugins={setPlugins}
+                  toolFilter=""
+                  onUpdate={handleUpdate}
+                  onRemove={handleRemove}
+                  removingPlugins={removingPlugins}
+                  pluginErrors={pluginErrors}
+                />
+              </>
+            ) : null}
+          </main>
+        </div>
         <Footer />
       </div>
     </Tooltip.Provider>

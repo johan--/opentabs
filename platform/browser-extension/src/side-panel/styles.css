@@ -111,7 +111,8 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
@@ -119,7 +120,15 @@ body {
 
 #root {
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Hide scrollbar on the scrollable content area to prevent layout shift
+   when expanding plugin cards with long tool lists. Content remains
+   scrollable via trackpad, mousewheel, and keyboard. */
+.scrollable-area::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes pulse-dot {
