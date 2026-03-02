@@ -355,12 +355,7 @@ test.describe('Side panel data flow — tab state changes', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Side panel data flow — tool invocation animation', () => {
-  // Broken: tool dispatch returns empty SSE responses when the test creates its
-  // own MCP server + extension context. The tool call reliably returns no JSON-RPC
-  // messages despite the extension being connected (health check confirms). This
-  // is also masked by stale selectors ([role="status"][aria-label="Loading..."])
-  // that don't match the current ToolIcon activity-dot animation.
-  test.fixme('shows activity dot during tool call and removes it after', async () => {
+  test('shows activity indicator during tool call and removes it after', async () => {
     // 1. Full setup: MCP server + test server + extension + MCP client
     const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
     const prefixedToolNames = readPluginToolNames();
@@ -426,27 +421,27 @@ test.describe('Side panel data flow — tool invocation animation', () => {
       // 6. Set test server to slow mode (3s delay for tool responses)
       await testServer.setSlow(3_000);
 
-      // 7. Start tool call and check for loader in parallel
-      const loaderLocator = sidePanelPage.locator('[role="status"][aria-label="Loading..."]');
-      const activeRowLocator = sidePanelPage.locator('.bg-accent\\/20');
+      // 7. Verify activity indicator appears during tool execution.
+      // The activity flash dot appears on both the PluginIcon and the ToolIcon,
+      // so scope the locator to the Echo tool row to avoid strict mode violations.
+      // ToolRow renders as: <div class="border-border flex ..."> containing <ToolIcon> + <Tooltip> + <Switch>.
+      // Find the row that contains 'Echo' text, then look for the activity dot within it.
+      const echoRow = sidePanelPage.locator('div.border-b').filter({ hasText: 'Echo' });
+      const activityDotLocator = echoRow.locator('.animate-activity-flash');
 
-      // Verify no loader before tool call
-      await expect(loaderLocator).toBeHidden({ timeout: 2_000 });
+      // Verify no activity dot before tool call
+      await expect(activityDotLocator).toBeHidden({ timeout: 2_000 });
 
-      // Start the tool call (will take ~3s due to slow mode)
-      const toolCallPromise = mcpClient.callTool('e2e-test_echo', { message: 'spinner test' });
-
-      // 8. Verify the loader appears during tool execution
-      await expect(loaderLocator).toBeVisible({ timeout: 10_000 });
-      await expect(activeRowLocator).toBeVisible({ timeout: 2_000 });
-
-      // 9. Wait for tool to complete
-      const result = await toolCallPromise;
+      // Run tool call and UI assertion concurrently. The tool call takes ~3s
+      // due to slow mode, giving enough time to observe the activity dot.
+      const [result] = await Promise.all([
+        mcpClient.callTool('e2e-test_echo', { message: 'spinner test' }),
+        expect(activityDotLocator).toBeVisible({ timeout: 10_000 }),
+      ]);
       expect(result.isError).toBe(false);
 
-      // 10. Verify loader disappears after completion
-      await expect(loaderLocator).toBeHidden({ timeout: 10_000 });
-      await expect(activeRowLocator).toBeHidden({ timeout: 2_000 });
+      // 8. Verify activity dot disappears after completion
+      await expect(activityDotLocator).toBeHidden({ timeout: 10_000 });
 
       // Reset slow mode
       await testServer.setSlow(0);
