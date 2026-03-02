@@ -57,6 +57,8 @@ const {
   mockNotifyConfirmationRequest,
   mockUpdateServerStateCache,
   mockGetServerStateCache,
+  mockSendTabSyncAll,
+  mockStartReadinessPoll,
 } = vi.hoisted(() => {
   const asyncNoop = () => Promise.resolve();
   const syncNoop = (() => {}) as (params: Record<string, unknown>, id: string | number) => void;
@@ -176,6 +178,8 @@ const {
           serverVersion: string | undefined;
         },
     ),
+    mockSendTabSyncAll: vi.fn(() => Promise.resolve()),
+    mockStartReadinessPoll: vi.fn(),
   };
 });
 
@@ -222,7 +226,7 @@ vi.mock('./iife-injection.js', () => ({
 }));
 
 vi.mock('./tab-state.js', () => ({
-  sendTabSyncAll: vi.fn(() => Promise.resolve()),
+  sendTabSyncAll: mockSendTabSyncAll,
   computePluginTabState: vi.fn(() => Promise.resolve({ state: 'closed', tabs: [] })),
   clearTabStateCache: vi.fn(),
   clearPluginTabState: vi.fn(),
@@ -231,7 +235,7 @@ vi.mock('./tab-state.js', () => ({
   getAggregateState: vi.fn(() => 'closed'),
   checkTabRemoved: vi.fn(() => Promise.resolve()),
   checkTabChanged: vi.fn(() => Promise.resolve()),
-  startReadinessPoll: vi.fn(),
+  startReadinessPoll: mockStartReadinessPoll,
 }));
 
 vi.mock('./browser-commands/index.js', () => ({
@@ -815,6 +819,53 @@ describe('handleServerMessage', () => {
       expect(cacheArg.failedPlugins).toEqual([{ specifier: 'bad-plugin', error: 'failed' }]);
       expect(cacheArg.browserTools).toEqual([{ name: 'browser_list_tabs', description: 'List tabs', enabled: true }]);
       expect(cacheArg.serverVersion).toBe('3.0.0');
+    });
+
+    test('handleSyncFull sends plugins.changed before sendTabSyncAll', async () => {
+      const callOrder: string[] = [];
+
+      mockForwardToSidePanel.mockImplementation(() => {
+        callOrder.push('forwardToSidePanel');
+      });
+      mockSendTabSyncAll.mockImplementation(() => {
+        callOrder.push('sendTabSyncAll');
+        return Promise.resolve();
+      });
+      mockStartReadinessPoll.mockImplementation(() => {
+        callOrder.push('startReadinessPoll');
+      });
+
+      handleServerMessage({
+        method: 'sync.full',
+        params: {
+          plugins: [
+            {
+              name: 'test-plugin',
+              version: '1.0.0',
+              urlPatterns: ['*://example.com/*'],
+              tools: [
+                {
+                  name: 'do-thing',
+                  displayName: 'Do Thing',
+                  description: 'Does a thing',
+                  icon: 'wrench',
+                  enabled: true,
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      // handleSyncFull is async — flush microtasks so sendTabSyncAll and
+      // startReadinessPoll fire (sendTabSyncAll is fire-and-forget with .then)
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // forwardToSidePanel (plugins.changed) must be called BEFORE sendTabSyncAll
+      expect(callOrder.indexOf('forwardToSidePanel')).toBeLessThan(callOrder.indexOf('sendTabSyncAll'));
+
+      // startReadinessPoll is chained via .then() on sendTabSyncAll
+      expect(callOrder.indexOf('sendTabSyncAll')).toBeLessThan(callOrder.indexOf('startReadinessPoll'));
     });
   });
 

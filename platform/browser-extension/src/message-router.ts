@@ -364,18 +364,21 @@ const handleSyncFull = async (params: Record<string, unknown>): Promise<void> =>
     ...(rawServerVersion !== undefined ? { serverVersion: rawServerVersion } : {}),
   });
 
-  // Send tab.syncAll AFTER all plugins are stored and injected to avoid the
-  // race condition where tab.syncAll runs before plugins are in storage.
-  await sendTabSyncAll();
-
-  // Start periodic re-evaluation of isReady() for non-closed tabs so the
-  // side panel state stays accurate when auth expires without a navigation.
-  startReadinessPoll();
-
-  // Notify the side panel so it refreshes its plugin list without user interaction
+  // Notify the side panel immediately so it renders plugin cards from the
+  // background cache (metaCache + serverStateCache) without waiting for
+  // sendTabSyncAll to probe every plugin's isReady(). Tab states stream
+  // in progressively via tab.stateChanged as each probe completes.
   forwardToSidePanel({
     type: 'sp:serverMessage',
     data: { jsonrpc: '2.0', method: 'plugins.changed' },
+  });
+
+  // Fire-and-forget: send tab.syncAll after all plugins are stored and
+  // injected, then start the readiness poll once probes complete. This
+  // runs after the side panel notification so the UI is not blocked by
+  // the O(N × round-trip) latency of probing every matching tab.
+  void sendTabSyncAll().then(() => {
+    startReadinessPoll();
   });
 };
 
