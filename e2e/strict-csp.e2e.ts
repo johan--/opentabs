@@ -470,6 +470,259 @@ fixtureTest.describe('Strict CSP — connect-src blocks fetch', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Strict CSP — browser_execute_script bypasses CSP
+// ---------------------------------------------------------------------------
+
+/**
+ * Open a tab to a URL via browser_open_tab, wait for page load, return tabId.
+ * Uses browser_execute_script to poll readyState — works because the CSP fix
+ * ensures file-based injection has no eval-like constructs inside the wrapper.
+ */
+const openStrictCspTab = async (
+  mcpClient: McpClient,
+  mcpServer: McpServer,
+  strictCspServer: TestServer,
+): Promise<number> => {
+  await waitForExtensionConnected(mcpServer);
+  await waitForLog(mcpServer, 'tab.syncAll received');
+
+  const openResult = await mcpClient.callTool('browser_open_tab', { url: strictCspServer.url });
+  expect(openResult.isError).toBe(false);
+  const tabInfo = parseToolResult(openResult.content);
+  const tabId = tabInfo.id as number;
+
+  // Poll until the page finishes loading
+  await waitFor(
+    async () => {
+      try {
+        const result = await mcpClient.callTool('browser_execute_script', {
+          tabId,
+          code: 'return document.readyState',
+        });
+        if (result.isError) return false;
+        const data = parseToolResult(result.content);
+        const value = data.value as Record<string, unknown> | undefined;
+        return value?.value === 'complete';
+      } catch {
+        return false;
+      }
+    },
+    15_000,
+    300,
+    `strict-CSP tab ${tabId} readyState === complete`,
+  );
+
+  return tabId;
+};
+
+fixtureTest.describe('Strict CSP — browser_execute_script', () => {
+  fixtureTest(
+    'sync code execution returns correct result on strict-CSP page',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      const result = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'return document.title',
+      });
+      expect(result.isError).toBe(false);
+
+      const data = parseToolResult(result.content);
+      const value = data.value as Record<string, unknown>;
+      expect(value.value).toBe('Strict CSP Test App');
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'DOM access works on strict-CSP page',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      const result = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'return document.querySelectorAll("*").length',
+      });
+      expect(result.isError).toBe(false);
+
+      const data = parseToolResult(result.content);
+      const value = data.value as Record<string, unknown>;
+      expect(typeof value.value).toBe('number');
+      expect(value.value as number).toBeGreaterThan(0);
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'async code (Promise) resolves correctly on strict-CSP page',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      const result = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'return new Promise(resolve => setTimeout(() => resolve("csp-async"), 100))',
+      });
+      expect(result.isError).toBe(false);
+
+      const data = parseToolResult(result.content);
+      const value = data.value as Record<string, unknown>;
+      expect(value.value).toBe('csp-async');
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'code that throws returns an error object on strict-CSP page (not a CSP violation)',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      const result = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'throw new Error("strict-csp-error")',
+      });
+      expect(result.isError).toBe(false);
+
+      const data = parseToolResult(result.content);
+      const value = data.value as Record<string, unknown>;
+      expect(value).toHaveProperty('error');
+      expect(value.error).toBe('strict-csp-error');
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'code with no return produces null on strict-CSP page',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      const result = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'var x = 1 + 1',
+      });
+      expect(result.isError).toBe(false);
+
+      const data = parseToolResult(result.content);
+      const value = data.value as Record<string, unknown>;
+      expect(value.value).toBeNull();
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'sequential executions on strict-CSP page leave no leftover globalThis state',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      // Run 5 executions sequentially
+      for (let i = 0; i < 5; i++) {
+        const result = await mcpClient.callTool('browser_execute_script', {
+          tabId,
+          code: `return ${i}`,
+        });
+        expect(result.isError).toBe(false);
+        const data = parseToolResult(result.content);
+        const value = data.value as Record<string, unknown>;
+        expect(value.value).toBe(i);
+      }
+
+      // Verify no leftover namespaced exec globals
+      const checkResult = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'var ot = globalThis.__openTabs || {}; var resultKeys = Object.keys(ot).filter(function(k) { return k.indexOf("__execResult_") === 0; }); var asyncKeys = Object.keys(ot).filter(function(k) { return k.indexOf("__execAsync_") === 0; }); return { hasResult: resultKeys.length > 0, hasAsync: asyncKeys.length > 0 }',
+      });
+      expect(checkResult.isError).toBe(false);
+      const checkData = parseToolResult(checkResult.content);
+      const checkValue = (checkData.value as Record<string, unknown>).value as Record<string, unknown>;
+      expect(checkValue.hasResult).toBe(false);
+      expect(checkValue.hasAsync).toBe(false);
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'concurrent executions on strict-CSP page do not collide',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      // Execute two scripts concurrently on the same tab
+      const [result1, result2] = await Promise.all([
+        mcpClient.callTool('browser_execute_script', {
+          tabId,
+          code: 'return "csp-concurrent-a"',
+        }),
+        mcpClient.callTool('browser_execute_script', {
+          tabId,
+          code: 'return "csp-concurrent-b"',
+        }),
+      ]);
+
+      expect(result1.isError).toBe(false);
+      expect(result2.isError).toBe(false);
+
+      const data1 = parseToolResult(result1.content);
+      const data2 = parseToolResult(result2.content);
+      const value1 = (data1.value as Record<string, unknown>).value as string;
+      const value2 = (data2.value as Record<string, unknown>).value as string;
+
+      // Both should complete — order may vary due to concurrency
+      const values = [value1, value2].sort();
+      expect(values).toEqual(['csp-concurrent-a', 'csp-concurrent-b']);
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+
+  fixtureTest(
+    'strict-CSP page blocks eval (validates test environment is truly strict)',
+    async ({ mcpServer, strictCspServer, extensionContext: _extensionContext, mcpClient }) => {
+      const tabId = await openStrictCspTab(mcpClient, mcpServer, strictCspServer);
+
+      // eval() should throw a CSP error on this page
+      const evalResult = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'try { return eval("1+1") } catch(e) { return "CSP_BLOCKED:" + e.message }',
+      });
+      expect(evalResult.isError).toBe(false);
+
+      const evalData = parseToolResult(evalResult.content);
+      const evalValue = (evalData.value as Record<string, unknown>).value as string;
+      // eval() is blocked by CSP — the catch block returns a CSP error message
+      expect(evalValue).toMatch(/CSP_BLOCKED:/);
+
+      // new Function() should also be blocked
+      const funcResult = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'try { return new Function("return 1")() } catch(e) { return "CSP_BLOCKED:" + e.message }',
+      });
+      expect(funcResult.isError).toBe(false);
+
+      const funcData = parseToolResult(funcResult.content);
+      const funcValue = (funcData.value as Record<string, unknown>).value as string;
+      expect(funcValue).toMatch(/CSP_BLOCKED:/);
+
+      // Normal code still works (proves our wrapper bypasses CSP)
+      const normalResult = await mcpClient.callTool('browser_execute_script', {
+        tabId,
+        code: 'return 1 + 1',
+      });
+      expect(normalResult.isError).toBe(false);
+
+      const normalData = parseToolResult(normalResult.content);
+      const normalValue = (normalData.value as Record<string, unknown>).value;
+      expect(normalValue).toBe(2);
+
+      await mcpClient.callTool('browser_close_tab', { tabId });
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Strict CSP — file watcher IIFE change triggers force re-injection
 // ---------------------------------------------------------------------------
 
