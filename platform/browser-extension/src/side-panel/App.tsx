@@ -271,6 +271,12 @@ const App = () => {
           clearTimeout(npmSearchTimer.current);
           setNpmResults([]);
           setNpmSearching(false);
+          setInstallingPlugins(new Set());
+          setRemovingPlugins(new Set());
+          setInstallErrors(new Map());
+          for (const timer of pluginErrorTimers.current.values()) clearTimeout(timer);
+          pluginErrorTimers.current.clear();
+          setPluginErrors(new Map());
         }
         sendResponse({ ok: true });
         return true;
