@@ -577,8 +577,9 @@ describe('sendTabSyncAll', () => {
     expect(cached).toBeDefined();
     expect(getAggregateState(cached ?? '')).toBe('ready');
 
-    // Verify side panel was notified
-    expect(mockForwardToSidePanel).toHaveBeenCalledTimes(1);
+    // Verify side panel was notified: early notification (first ready tab) + final
+    // complete state. With a single ready tab, both fire.
+    expect(mockForwardToSidePanel).toHaveBeenCalledTimes(2);
   });
 });
 

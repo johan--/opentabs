@@ -124,29 +124,48 @@ const probeTabReadiness = async (tabId: number, pluginName: string): Promise<boo
  * with per-tab readiness. Aggregate state: 'ready' if any tab is ready,
  * 'unavailable' if tabs exist but none are ready, 'closed' if no tabs match.
  */
-const computePluginTabState = async (plugin: PluginMeta): Promise<PluginTabStateInfo> => {
+/**
+ * Optional callback invoked when the first ready tab is found during probing.
+ * Allows callers to send early notifications before all tabs finish probing.
+ */
+type OnFirstReady = (partialState: PluginTabStateInfo) => void;
+
+const computePluginTabState = async (plugin: PluginMeta, onFirstReady?: OnFirstReady): Promise<PluginTabStateInfo> => {
   const matchingTabs = await findAllMatchingTabs(plugin);
   if (matchingTabs.length === 0) {
     return { state: 'closed', tabs: [] };
   }
 
+  const validTabs = matchingTabs.filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined);
   const tabInfos: PluginTabInfo[] = [];
+  let firstReadyFired = false;
 
-  for (const tab of matchingTabs) {
-    if (tab.id === undefined) continue;
-    let ready = false;
-    try {
-      ready = await probeTabReadiness(tab.id, plugin.name);
-    } catch (err) {
-      console.warn(`[opentabs] computePluginTabState failed for plugin ${plugin.name} in tab ${tab.id}:`, err);
-    }
-    tabInfos.push({
-      tabId: tab.id,
-      url: tab.url ?? '',
-      title: tab.title ?? '',
-      ready,
-    });
-  }
+  // Probe all matching tabs in parallel so one slow/timing-out tab does not
+  // block the result for the entire plugin.
+  await Promise.allSettled(
+    validTabs.map(async tab => {
+      let ready = false;
+      try {
+        ready = await probeTabReadiness(tab.id, plugin.name);
+      } catch (err) {
+        console.warn(`[opentabs] computePluginTabState failed for plugin ${plugin.name} in tab ${tab.id}:`, err);
+      }
+
+      tabInfos.push({
+        tabId: tab.id,
+        url: tab.url ?? '',
+        title: tab.title ?? '',
+        ready,
+      });
+
+      // Notify the caller as soon as the first ready tab is found so they
+      // can update the UI without waiting for slow/timing-out tabs.
+      if (ready && !firstReadyFired && onFirstReady) {
+        firstReadyFired = true;
+        onFirstReady({ state: 'ready', tabs: [...tabInfos] });
+      }
+    }),
+  );
 
   const hasReady = tabInfos.some(t => t.ready);
   const state: TabState = hasReady ? 'ready' : 'unavailable';
@@ -159,6 +178,12 @@ const computePluginTabState = async (plugin: PluginMeta): Promise<PluginTabState
  * of all known plugins. Called after sync.full is processed so the extension
  * has up-to-date plugin metadata before reporting tab states.
  *
+ * Results stream to the side panel as each plugin's probes complete — fast
+ * plugins (e.g., Discord at 2ms) notify the side panel immediately instead of
+ * waiting for slow plugins (e.g., Slack with a 5s timeout tab). Within a
+ * single plugin, if the first ready tab resolves before slow tabs finish, an
+ * early notification is sent so the side panel shows the green dot instantly.
+ *
  * Also populates the lastKnownState cache so subsequent checkTabChanged /
  * checkTabRemoved calls can suppress redundant notifications.
  */
@@ -167,33 +192,55 @@ const sendTabSyncAll = async (): Promise<void> => {
   const plugins = Object.values(index);
   if (plugins.length === 0) return;
 
-  const settled = await Promise.allSettled(
-    plugins.map(async plugin => [plugin.name, await computePluginTabState(plugin)] as const),
-  );
   const entries: (readonly [string, PluginTabStateInfo])[] = [];
-  for (const result of settled) {
-    if (result.status === 'fulfilled') {
-      entries.push(result.value);
-    } else {
-      console.warn('[opentabs] Tab state computation failed during syncAll:', result.reason);
-    }
-  }
-  if (entries.length === 0) return;
-  const tabSyncPayload: Record<string, PluginTabStateInfo> = Object.fromEntries(entries);
-
-  // Write each plugin's state through the per-plugin lock so concurrent
-  // checkTabChanged / checkTabRemoved calls are properly serialized.
   const pluginNamesInSync = new Set<string>();
-  await Promise.all(
-    entries.map(([pluginName, stateInfo]) => {
-      pluginNamesInSync.add(pluginName);
-      return withPluginLock(pluginName, () => {
-        lastKnownState.set(pluginName, serializeTabState(stateInfo));
+
+  // Probe all plugins in parallel. Each plugin's result streams to the side
+  // panel as soon as it resolves. The onFirstReady callback sends an early
+  // notification when a plugin's first ready tab is found mid-probe.
+  await Promise.allSettled(
+    plugins.map(async plugin => {
+      pluginNamesInSync.add(plugin.name);
+
+      const stateInfo = await computePluginTabState(plugin, partialState => {
+        // Early notification: first ready tab found — update cache and notify
+        // the side panel immediately with the partial tab list.
+        void withPluginLock(plugin.name, () => {
+          lastKnownState.set(plugin.name, serializeTabState(partialState));
+          scheduleLastKnownStatePersist();
+          return Promise.resolve();
+        });
+        forwardToSidePanel({
+          type: 'sp:serverMessage',
+          data: {
+            jsonrpc: '2.0',
+            method: 'tab.stateChanged',
+            params: { plugin: plugin.name, state: partialState.state, tabs: partialState.tabs },
+          },
+        });
+      });
+
+      entries.push([plugin.name, stateInfo] as const);
+
+      // Final state: update cache and notify side panel with the complete tab list.
+      await withPluginLock(plugin.name, () => {
+        lastKnownState.set(plugin.name, serializeTabState(stateInfo));
         scheduleLastKnownStatePersist();
         return Promise.resolve();
       });
+      forwardToSidePanel({
+        type: 'sp:serverMessage',
+        data: {
+          jsonrpc: '2.0',
+          method: 'tab.stateChanged',
+          params: { plugin: plugin.name, state: stateInfo.state, tabs: stateInfo.tabs },
+        },
+      });
     }),
   );
+
+  if (entries.length === 0) return;
+
   // Remove entries for plugins no longer in the index
   let removedStale = false;
   for (const key of lastKnownState.keys()) {
@@ -205,24 +252,15 @@ const sendTabSyncAll = async (): Promise<void> => {
   }
   if (removedStale) scheduleLastKnownStatePersist();
 
+  // Send the complete snapshot to the server after all probes finish.
+  // Individual tab.stateChanged notifications are only sent to the side panel
+  // (via forwardToSidePanel) — the server receives the authoritative batch.
+  const tabSyncPayload: Record<string, PluginTabStateInfo> = Object.fromEntries(entries);
   sendToServer({
     jsonrpc: '2.0',
     method: 'tab.syncAll',
     params: { tabs: tabSyncPayload },
   });
-
-  // Forward individual tab.stateChanged messages to the side panel so it
-  // gets initial tab states on connect without a separate fetch round-trip.
-  for (const [pluginName, stateInfo] of entries) {
-    forwardToSidePanel({
-      type: 'sp:serverMessage',
-      data: {
-        jsonrpc: '2.0',
-        method: 'tab.stateChanged',
-        params: { plugin: pluginName, state: stateInfo.state, tabs: stateInfo.tabs },
-      },
-    });
-  }
 };
 
 /**
