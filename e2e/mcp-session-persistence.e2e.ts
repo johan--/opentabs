@@ -55,6 +55,184 @@ const openAndCloseSseStream = async (port: number, sessionId: string, secret?: s
   });
 };
 
+/**
+ * Open a GET /mcp SSE stream that stays open until the returned `destroy`
+ * function is called. Returns a promise that resolves once the proxy has
+ * had time to register the stream (500ms delay, matching openAndCloseSseStream).
+ */
+const openPersistentSseStream = async (
+  port: number,
+  sessionId: string,
+  secret?: string,
+): Promise<{ destroy: () => void }> => {
+  const headers: Record<string, string> = {
+    Accept: 'text/event-stream',
+    'mcp-session-id': sessionId,
+  };
+  if (secret) {
+    headers.Authorization = `Bearer ${secret}`;
+  }
+
+  const req = httpRequest({ hostname: '127.0.0.1', port, path: '/mcp', method: 'GET', headers }, res => {
+    res.resume();
+  });
+  req.on('error', () => {
+    // ECONNRESET expected after destroy
+  });
+  req.end();
+
+  // Give the proxy time to receive the GET, register the stream in sseStreams,
+  // and open the upstream SSE connection to the worker.
+  await new Promise<void>(r => setTimeout(r, 500));
+
+  return { destroy: () => req.destroy() };
+};
+
+test.describe('MCP session persistence — upstream SSE fan-out', () => {
+  test('multiple concurrent SSE GET streams share one upstream without 409 errors', async () => {
+    // Regression test: the dev proxy used to open one upstream SSE GET to the
+    // worker per client GET request. The MCP SDK enforces exactly one GET SSE
+    // stream per session — opening a second returns 409 Conflict. The proxy
+    // now maintains a single upstream SSE stream and fans out data to all
+    // client responses.
+    const configDir = createTestConfigDir();
+    const server = await startMcpServer(configDir, true);
+
+    try {
+      const client = createMcpClient(server.port, server.secret);
+      await client.initialize();
+
+      const sid = client.sessionId;
+      expect(sid).toBeTruthy();
+
+      server.logs.length = 0;
+
+      // Open two concurrent SSE GET streams for the same session.
+      // The proxy must open only one upstream GET to the worker.
+      const stream1 = await openPersistentSseStream(server.port, sid as string, server.secret);
+      const stream2 = await openPersistentSseStream(server.port, sid as string, server.secret);
+
+      // Give the proxy time to attempt upstream connections
+      await new Promise(r => setTimeout(r, 1_000));
+
+      // The server logs must NOT contain any 409 rejection
+      const has409 = server.logs.some(l => l.includes('status 409'));
+      expect(has409).toBe(false);
+
+      // Session must still function — list tools via POST
+      const tools = await client.listTools();
+      const expectedToolNames = readPluginToolNames();
+      for (const name of expectedToolNames) {
+        expect(tools.some(t => t.name === name)).toBe(true);
+      }
+
+      stream1.destroy();
+      stream2.destroy();
+      await client.close();
+    } finally {
+      await server.kill();
+      cleanupTestConfigDir(configDir);
+    }
+  });
+
+  test('hot reload with active SSE streams reconnects without 409 errors', async () => {
+    // Regression test: reinitializeSessions used to loop over sseStreams and
+    // call connectUpstreamSse for each client response. With >1 entry, the
+    // first succeeded but subsequent ones got 409 from the worker. The proxy
+    // now disconnects the old upstream and opens exactly one new connection.
+    const configDir = createTestConfigDir();
+    const server = await startMcpServer(configDir, true);
+
+    try {
+      const client = createMcpClient(server.port, server.secret);
+      await client.initialize();
+
+      const sid = client.sessionId;
+      expect(sid).toBeTruthy();
+
+      // Open two SSE streams before the hot reload
+      const stream1 = await openPersistentSseStream(server.port, sid as string, server.secret);
+      const stream2 = await openPersistentSseStream(server.port, sid as string, server.secret);
+
+      // Clear logs, trigger hot reload
+      server.logs.length = 0;
+      server.triggerHotReload();
+      await waitForLog(server, 'Hot reload complete', 15_000);
+
+      // Wait for the proxy to reconnect the upstream SSE
+      await new Promise(r => setTimeout(r, 1_000));
+
+      // No 409 errors should appear in the logs
+      const has409 = server.logs.some(l => l.includes('status 409'));
+      expect(has409).toBe(false);
+
+      // Session must still work
+      const tools = await client.listTools();
+      const expectedToolNames = readPluginToolNames();
+      for (const name of expectedToolNames) {
+        expect(tools.some(t => t.name === name)).toBe(true);
+      }
+
+      stream1.destroy();
+      stream2.destroy();
+      await client.close();
+    } finally {
+      await server.kill();
+      cleanupTestConfigDir(configDir);
+    }
+  });
+
+  test('SSE stream replacement after disconnect does not produce 409', async () => {
+    // Verifies that when a client disconnects its SSE stream and opens a new
+    // one, the proxy tears down the upstream connection (since no client
+    // streams remain) so the new GET succeeds without 409.
+    const configDir = createTestConfigDir();
+    const server = await startMcpServer(configDir, true);
+
+    try {
+      const client = createMcpClient(server.port, server.secret);
+      await client.initialize();
+
+      const sid = client.sessionId;
+      expect(sid).toBeTruthy();
+
+      // Open an SSE stream
+      const stream1 = await openPersistentSseStream(server.port, sid as string, server.secret);
+
+      // Destroy it — this removes the last client SSE stream, which triggers
+      // disconnectUpstreamSse in the proxy.
+      stream1.destroy();
+      // Wait for the close to propagate through the proxy and upstream
+      await new Promise(r => setTimeout(r, 1_000));
+
+      server.logs.length = 0;
+
+      // Open a new SSE stream — proxy must open a fresh upstream GET
+      const stream2 = await openPersistentSseStream(server.port, sid as string, server.secret);
+
+      // Give time for upstream connection attempt
+      await new Promise(r => setTimeout(r, 1_000));
+
+      // No 409 errors
+      const has409 = server.logs.some(l => l.includes('status 409'));
+      expect(has409).toBe(false);
+
+      // Session still works
+      const tools = await client.listTools();
+      const expectedToolNames = readPluginToolNames();
+      for (const name of expectedToolNames) {
+        expect(tools.some(t => t.name === name)).toBe(true);
+      }
+
+      stream2.destroy();
+      await client.close();
+    } finally {
+      await server.kill();
+      cleanupTestConfigDir(configDir);
+    }
+  });
+});
+
 test.describe('MCP session persistence — SSE stream lifecycle', () => {
   test('session survives after SSE GET stream closes', async () => {
     // Regression test: the dev proxy used to delete the entire session when
@@ -275,7 +453,9 @@ test.describe
 
       try {
         // Verify end-to-end tool dispatch works before reload
-        const beforeResult = await mcpClient.callTool('e2e-test_echo', { message: 'before-reload' });
+        const beforeResult = await mcpClient.callTool('e2e-test_echo', {
+          message: 'before-reload',
+        });
         expect(beforeResult.isError).toBe(false);
         expect(parseToolResult(beforeResult.content).message).toBe('before-reload');
 
@@ -292,7 +472,9 @@ test.describe
         await waitForToolResult(mcpClient, 'e2e-test_echo', { message: 'poll-check' }, { isError: false }, 20_000);
 
         // Verify full end-to-end tool dispatch: MCP client → proxy → worker → extension → adapter
-        const afterResult = await mcpClient.callTool('e2e-test_echo', { message: 'after-reload' });
+        const afterResult = await mcpClient.callTool('e2e-test_echo', {
+          message: 'after-reload',
+        });
         expect(afterResult.isError).toBe(false);
         expect(parseToolResult(afterResult.content).message).toBe('after-reload');
       } finally {
@@ -312,7 +494,9 @@ test.describe
 
       try {
         // Verify baseline tool dispatch
-        const baseline = await mcpClient.callTool('e2e-test_echo', { message: 'baseline' });
+        const baseline = await mcpClient.callTool('e2e-test_echo', {
+          message: 'baseline',
+        });
         expect(baseline.isError).toBe(false);
 
         // Start a slow tool call and trigger hot reload while it's in-flight
@@ -347,7 +531,9 @@ test.describe
         await waitForToolResult(mcpClient, 'e2e-test_echo', { message: 'poll-check' }, { isError: false }, 20_000);
 
         // Verify subsequent tool calls succeed after the interrupted call
-        const afterResult = await mcpClient.callTool('e2e-test_echo', { message: 'after-inflight-reload' });
+        const afterResult = await mcpClient.callTool('e2e-test_echo', {
+          message: 'after-inflight-reload',
+        });
         expect(afterResult.isError).toBe(false);
         expect(parseToolResult(afterResult.content).message).toBe('after-inflight-reload');
       } finally {

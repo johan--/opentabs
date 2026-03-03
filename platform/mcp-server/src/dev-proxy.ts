@@ -53,6 +53,19 @@ interface ProxySession {
   sseStreams: Set<ServerResponse>;
   /** Authorization header value from the client (forwarded to the worker). */
   authHeader: string | null;
+  /**
+   * The single upstream SSE connection to the worker for this session.
+   * The MCP SDK enforces exactly one GET SSE stream per session — opening a
+   * second returns 409 Conflict. The proxy maintains one upstream connection
+   * and fans out SSE data to all client responses in sseStreams.
+   *
+   * `req` is set when the GET is sent (used to abort during disconnect).
+   * `res` is set when the worker responds 200 (used for data fan-out).
+   */
+  upstreamSse: {
+    req: ReturnType<typeof httpRequest>;
+    res: IncomingMessage | null;
+  } | null;
 }
 
 /** Map from proxy session ID → session state. */
@@ -133,19 +146,26 @@ const reinitializeSessions = async (port: number): Promise<void> => {
       await fetch(`http://127.0.0.1:${port}/mcp`, {
         method: 'POST',
         headers: notifHeaders,
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'notifications/initialized',
+        }),
         signal: AbortSignal.timeout(READY_TIMEOUT_MS),
       }).catch(() => {});
 
       console.log(`[proxy] Session ${session.proxySessionId} re-initialized (worker session: ${newWorkerSessionId})`);
 
-      // Reconnect SSE streams for this session
+      // Prune dead client responses, then reconnect the single upstream SSE.
+      // The previous upstream died with the old worker — disconnect clears the
+      // reference so connectUpstreamSse opens a fresh one to the new worker.
       for (const clientRes of session.sseStreams) {
-        if (!clientRes.destroyed && !clientRes.writableEnded) {
-          connectUpstreamSse(session, clientRes, port);
-        } else {
+        if (clientRes.destroyed || clientRes.writableEnded) {
           session.sseStreams.delete(clientRes);
         }
+      }
+      if (session.sseStreams.size > 0) {
+        disconnectUpstreamSse(session);
+        connectUpstreamSse(session, port);
       }
     } catch (err) {
       console.error(
@@ -162,6 +182,7 @@ const cleanupSession = (proxySessionId: string): void => {
   const session = sessions.get(proxySessionId);
   if (!session) return;
   workerToProxySession.delete(session.workerSessionId);
+  disconnectUpstreamSse(session);
   for (const res of session.sseStreams) {
     if (!res.destroyed && !res.writableEnded) {
       res.end();
@@ -260,7 +281,13 @@ const whenReady = (fn: () => void, onTimeout: () => void): void => {
 /** Forward an HTTP request to the worker via node:http. */
 const proxyHttp = (req: IncomingMessage, res: ServerResponse, port: number): void => {
   const proxyReq = httpRequest(
-    { hostname: '127.0.0.1', port, path: req.url ?? '/', method: req.method, headers: req.headers },
+    {
+      hostname: '127.0.0.1',
+      port,
+      path: req.url ?? '/',
+      method: req.method,
+      headers: req.headers,
+    },
     proxyRes => {
       res.writeHead(proxyRes.statusCode ?? 200, proxyRes.headers);
       proxyRes.pipe(res);
@@ -288,11 +315,30 @@ const readBody = (req: IncomingMessage): Promise<string> =>
   });
 
 /**
- * Connect an upstream SSE stream from the worker to a client response.
- * Forwards SSE events from the worker to the client, rewriting the
- * mcp-session-id in any headers to the proxy session ID.
+ * Destroy the current upstream SSE connection for a session so the worker's
+ * transport removes its `_GET_stream` entry and a new GET can succeed.
  */
-const connectUpstreamSse = (session: ProxySession, clientRes: ServerResponse, port: number): void => {
+const disconnectUpstreamSse = (session: ProxySession): void => {
+  if (session.upstreamSse) {
+    session.upstreamSse.req.destroy();
+    session.upstreamSse = null;
+  }
+};
+
+/**
+ * Connect a single upstream SSE stream from the worker for this session.
+ * The MCP SDK enforces exactly one GET SSE stream per session (returns 409
+ * Conflict for a second). The proxy maintains one upstream connection and
+ * fans out SSE data to all client responses in session.sseStreams.
+ *
+ * If an upstream SSE is already active, this is a no-op. To force a
+ * reconnect (e.g., after worker restart), call disconnectUpstreamSse first.
+ */
+const connectUpstreamSse = (session: ProxySession, port: number): void => {
+  // Already connected or connection in flight — nothing to do. Data is
+  // fanned out to all client responses in the 'data' handler below.
+  if (session.upstreamSse) return;
+
   const headers: Record<string, string> = {
     Accept: 'text/event-stream',
     'mcp-session-id': session.workerSessionId,
@@ -315,38 +361,45 @@ const connectUpstreamSse = (session: ProxySession, clientRes: ServerResponse, po
           `[proxy] Upstream SSE rejected for session ${session.proxySessionId} (status ${upstreamRes.statusCode})`,
         );
         upstreamRes.resume();
-        session.sseStreams.delete(clientRes);
-        if (!clientRes.destroyed && !clientRes.writableEnded) {
-          clientRes.end();
-        }
+        // Connection failed — clear so a retry can be attempted
+        session.upstreamSse = null;
         return;
       }
 
-      // Forward SSE data chunks to the client
+      // Promote from "connecting" to "connected" by setting res
+      if (session.upstreamSse) {
+        session.upstreamSse.res = upstreamRes;
+      }
+
+      // Fan out SSE data to all active client responses
       upstreamRes.on('data', (chunk: Buffer) => {
-        if (!clientRes.destroyed && !clientRes.writableEnded) {
-          clientRes.write(chunk);
+        for (const clientRes of session.sseStreams) {
+          if (!clientRes.destroyed && !clientRes.writableEnded) {
+            clientRes.write(chunk);
+          }
         }
       });
 
-      // When upstream closes (worker restart), the proxy keeps the client
-      // response open. The reinitializeSessions() function will reconnect
-      // the upstream SSE stream after the new worker is ready.
+      // When upstream closes (worker restart), clear the reference so
+      // reinitializeSessions() can open a fresh connection.
       upstreamRes.on('end', () => {
-        // Upstream ended — do NOT close the client response.
-        // It will be reconnected after worker restart.
+        session.upstreamSse = null;
       });
 
       upstreamRes.on('error', () => {
-        // Upstream error — keep client response open for reconnection.
+        session.upstreamSse = null;
       });
     },
   );
 
   upstreamReq.on('error', () => {
-    // Worker is down — keep the client response open.
-    // reinitializeSessions() will reconnect after the worker restarts.
+    // Worker is down — clear the connection state so reconnection can be
+    // attempted after the worker restarts.
+    session.upstreamSse = null;
   });
+
+  // Set immediately so concurrent calls see a connection is in flight
+  session.upstreamSse = { req: upstreamReq, res: null };
 
   upstreamReq.end();
 };
@@ -409,6 +462,7 @@ const handleMcpPost = async (req: IncomingMessage, res: ServerResponse, port: nu
         initializeBody: body,
         sseStreams: new Set(),
         authHeader: authHeader ?? null,
+        upstreamSse: null,
       };
       sessions.set(proxySessionId, session);
       workerToProxySession.set(workerSessionId, proxySessionId);
@@ -446,7 +500,13 @@ const handleMcpPost = async (req: IncomingMessage, res: ServerResponse, port: nu
       }
 
       const proxyReq = httpRequest(
-        { hostname: '127.0.0.1', port, path: '/mcp', method: 'POST', headers: forwardHeaders },
+        {
+          hostname: '127.0.0.1',
+          port,
+          path: '/mcp',
+          method: 'POST',
+          headers: forwardHeaders,
+        },
         proxyRes => {
           // Rewrite the session ID in the response back to the proxy session ID
           const outHeaders: Record<string, string | string[] | undefined> = {};
@@ -476,7 +536,13 @@ const handleMcpPost = async (req: IncomingMessage, res: ServerResponse, port: nu
 
   // Unknown session or no session header — forward as-is
   const proxyReq = httpRequest(
-    { hostname: '127.0.0.1', port, path: '/mcp', method: 'POST', headers: req.headers },
+    {
+      hostname: '127.0.0.1',
+      port,
+      path: '/mcp',
+      method: 'POST',
+      headers: req.headers,
+    },
     proxyRes => {
       res.writeHead(proxyRes.statusCode ?? 200, proxyRes.headers);
       proxyRes.pipe(res);
@@ -524,17 +590,21 @@ const handleMcpGet = (req: IncomingMessage, res: ServerResponse, port: number): 
 
   res.on('close', () => {
     session.sseStreams.delete(res);
-    // Do NOT clean up the session when the SSE stream closes. The MCP client
-    // (e.g., OpenCode) still holds the proxy session ID and can re-establish
-    // an SSE stream with a new GET /mcp. Premature session cleanup causes the
-    // proxy to forget the session mapping, making subsequent POSTs from the
-    // client fall through as "unknown session" — the worker rejects them and
-    // the client's tool list becomes stale. Sessions are cleaned up only via
-    // explicit DELETE /mcp or when the proxy restarts.
+    // If this was the last client SSE stream, disconnect the upstream too —
+    // no point keeping it open with no one to fan out to.
+    if (session.sseStreams.size === 0) {
+      disconnectUpstreamSse(session);
+    }
+    // Do NOT clean up the session itself when SSE streams close. The MCP
+    // client (e.g., OpenCode) still holds the proxy session ID and can
+    // re-establish an SSE stream with a new GET /mcp. Sessions are cleaned
+    // up only via explicit DELETE /mcp or when the proxy restarts.
   });
 
-  // Connect the upstream SSE stream from the current worker
-  connectUpstreamSse(session, res, port);
+  // Connect the upstream SSE stream if not already active. The MCP SDK
+  // allows exactly one GET SSE stream per session — the proxy maintains one
+  // upstream and fans out data to all client responses in sseStreams.
+  connectUpstreamSse(session, port);
 };
 
 /**
@@ -564,7 +634,13 @@ const handleMcpDelete = (req: IncomingMessage, res: ServerResponse, port: number
   }
 
   const proxyReq = httpRequest(
-    { hostname: '127.0.0.1', port, path: '/mcp', method: 'DELETE', headers: forwardHeaders },
+    {
+      hostname: '127.0.0.1',
+      port,
+      path: '/mcp',
+      method: 'DELETE',
+      headers: forwardHeaders,
+    },
     proxyRes => {
       res.writeHead(proxyRes.statusCode ?? 200, proxyRes.headers);
       proxyRes.pipe(res);
@@ -602,7 +678,10 @@ const handleMcpRequest = (req: IncomingMessage, res: ServerResponse, port: numbe
 // WebSocketServer in noServer mode — used only to complete client-side upgrades.
 // handleProtocols returns false to suppress ws's automatic protocol selection;
 // the 'headers' event injects the Sec-WebSocket-Protocol echo from the worker.
-const wss = new WebSocketServer({ noServer: true, handleProtocols: () => false });
+const wss = new WebSocketServer({
+  noServer: true,
+  handleProtocols: () => false,
+});
 let pendingWsProtocol: string | null = null;
 wss.on('headers', (headers: string[]) => {
   if (pendingWsProtocol !== null) {
