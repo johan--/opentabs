@@ -332,7 +332,7 @@ const reloadExtension = async (): Promise<void> => {
     const response = await fetch(url, { method: 'POST', headers });
 
     if (response.ok) {
-      console.log(`${coloredPrefix} Extension reloaded.`);
+      console.log(`${coloredPrefix} Extension reloaded (full — via HTTP fallback).`);
     } else if (response.status === 503) {
       console.log(`${coloredPrefix} Extension not connected — reload skipped (will pick up changes on next connect).`);
     } else {
@@ -435,10 +435,14 @@ void pipeWithPrefix(mcpSpawn.stderr, '[mcp]', GREEN, process.stderr);
 // Print startup banner
 const port = process.env.PORT ?? '9515';
 const extensionPath = `${join(homedir(), '.opentabs', 'extension')}/`;
+const devReloadText = devReloadServer
+  ? `Dev Reload:  ws://localhost:${DEV_RELOAD_PORT}`
+  : `Dev Reload:  disabled (port ${DEV_RELOAD_PORT} in use)`;
 const contentLines = [
   { text: 'OpenTabs Dev Server', separatorAfter: true },
   { text: `MCP Server:  http://localhost:${port}/mcp` },
   { text: `Extension:   ${extensionPath}` },
+  { text: devReloadText },
   { text: 'Mode:        dev (hot reload)', separatorAfter: true },
   { text: 'Ready — watching for changes...', display: `${GREEN}${BOLD}Ready${RESET} — watching for changes...` },
 ];
@@ -501,7 +505,7 @@ const runTargetedRebuild = async (): Promise<void> => {
     if (ok) {
       if (devReloadServer) {
         devReloadServer.broadcast('extension');
-        console.log(`${coloredPrefix} Extension rebuilt (full — background + UI changed).`);
+        console.log(`${coloredPrefix} Extension reloaded (full — background + UI changed)`);
       } else {
         await reloadExtension();
       }
@@ -512,7 +516,7 @@ const runTargetedRebuild = async (): Promise<void> => {
     if (ok) {
       if (devReloadServer) {
         devReloadServer.broadcast('extension');
-        console.log(`${coloredPrefix} Extension rebuilt (background/offscreen).`);
+        console.log(`${coloredPrefix} Extension reloaded (full)`);
       } else {
         await reloadExtension();
       }
@@ -523,7 +527,7 @@ const runTargetedRebuild = async (): Promise<void> => {
     if (ok) {
       if (devReloadServer) {
         devReloadServer.broadcast('side-panel');
-        console.log(`${coloredPrefix} Side panel rebuilt (UI-only).`);
+        console.log(`${coloredPrefix} Side panel refreshed (UI-only)`);
       } else {
         await reloadExtension();
       }
