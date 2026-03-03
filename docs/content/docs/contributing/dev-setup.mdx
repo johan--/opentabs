@@ -1,7 +1,7 @@
 ---
 title: Development Setup
 description: Clone the repo, install dependencies, and run the full OpenTabs platform locally with hot reload.
-lastUpdated: 2026-03-01
+lastUpdated: 2026-03-02
 ---
 
 This guide walks you through setting up the OpenTabs monorepo for local development. By the end, you'll have the MCP server, Chrome extension, and a test plugin running with hot reload.
@@ -147,14 +147,14 @@ Run all checks before committing:
 ```bash
 npm run build         # Full production build
 npm run type-check    # TypeScript (tsc --build)
-npm run lint          # ESLint
-npm run format:check  # Prettier formatting check
+npm run lint          # Biome lint check
+npm run format:check  # Biome format check
 npm run knip          # Unused code detection
 npm run test          # Unit tests (Vitest)
 npm run test:e2e      # E2E tests (Playwright)
 ```
 
-Every command must exit 0. The pre-commit hook runs Prettier and ESLint on staged files via `lint-staged`.
+Every command must exit 0. The pre-commit hook runs Biome on staged files via `lint-staged`.
 
 ### E2E Tests
 
