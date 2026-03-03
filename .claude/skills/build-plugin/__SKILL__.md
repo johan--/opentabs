@@ -538,15 +538,25 @@ This phase is **mandatory**. Every plugin build surfaces friction in the platfor
 
 ### 1. Document Friction Encountered
 
-While building and testing, keep a running mental note of anything that slowed you down, required workarounds, or was confusing. After the plugin is working, identify the concrete, actionable friction points:
+While building and testing, keep a running mental note of anything that slowed you down, required workarounds, or was confusing. After the plugin is working, think across **three dimensions of friction**:
 
+**Platform bugs and rough edges** — things that were broken or wrong:
 - Scaffolder generated wrong versions, missing fields, or unhelpful defaults
 - A platform API returned an unexpected shape or error
 - A build/lint/type-check failure caused by a platform issue (not a plugin bug)
-- Missing documentation for an SDK feature
 - A browser tool limitation that required a workaround
 
-For each friction point, ask: **is this something the platform team can fix?** If yes, it belongs in a PRD.
+**Missing SDK capabilities** — things you had to hand-roll that the SDK should provide:
+- Ask: *"If the SDK had a `helper for X`, would it have saved meaningful code?"*
+- Examples: had to write custom cookie parsing that could be `getCookie(name)`; had to write a retry loop that `sdk.retry()` would cover; had to manually resolve a workspace/space ID that a `getWorkspaceId()` helper could handle; had to build response normalization logic that a common mapper could handle
+- The bar is: **would at least 2 different plugins benefit from this?** If yes, it belongs in the SDK.
+
+**Missing documentation or guidance** — things that required trial and error to discover:
+- Auth patterns not covered in the scaffold comments or skill
+- API behaviors that weren't obvious and required `browser_execute_script` experimentation
+- Conventions that exist in the codebase but aren't written down anywhere
+
+For each friction point, ask: **is this something the platform team can fix or add?** If yes, it belongs in a PRD.
 
 ### 2. Create PRDs for Friction Fixes
 
