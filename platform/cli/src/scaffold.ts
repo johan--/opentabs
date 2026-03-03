@@ -127,6 +127,7 @@ const generatePackageJson = async (args: ScaffoldArgs, urlPattern: string): Prom
     devDependencies: {
       '@biomejs/biome': '2.4.5',
       '@opentabs-dev/plugin-tools': openTabsVersion,
+      jiti: '^2.6.1',
       typescript: '^5.9.3',
       zod: zodVersion,
     },
