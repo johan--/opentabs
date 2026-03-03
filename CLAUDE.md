@@ -109,7 +109,7 @@ npm run dev:mcp         # MCP server only with hot reload (lightweight alternati
 npm run dev:docs        # Docs dev server (next dev)
 
 # Quality checks
-npm run check           # Root checks: build + lint + format:check + knip + test
+npm run check           # Root checks: build + build:plugins + lint + format:check + knip + test
 npm run check:everything # Everything: root checks + E2E + docs + plugins
 npm run check:docs      # Docs checks (delegates to docs/package.json check script)
 npm run check:plugins   # Plugin checks: type-check + lint + format:check (all plugins)
