@@ -95,6 +95,8 @@ export interface ManifestTool {
   description: string;
   /** Lucide icon name (kebab-case) displayed in the side panel */
   icon: string;
+  /** Tool group for visual grouping in the side panel */
+  group?: string;
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
   /** Optional SVG icon for the tool */
@@ -158,6 +160,8 @@ export interface WireToolDef {
   description: string;
   /** Lucide icon name (kebab-case) displayed in the side panel */
   icon: string;
+  /** Tool group for visual grouping in the side panel */
+  group?: string;
   enabled: boolean;
   /** Optional SVG icon for the tool */
   iconSvg?: string;
