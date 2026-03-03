@@ -135,13 +135,7 @@ What to look for:
 - If auth is HttpOnly cookie-based, skip trying to extract the token; instead detect auth from the DOM (meta tags, page globals) and let `credentials: 'include'` send the cookies automatically
 - Look for non-HttpOnly tokens that can be read with `getCookie()`
 
-**If CSP blocks `browser_execute_script`** (check for `script-src` that doesn't include `'unsafe-eval'`), use DOM-based exploration:
-
-- `browser_get_page_html(selector: "meta[name*=user], meta[name*=login], meta[name*=token]")` — finds embedded user/auth meta tags
-- `browser_get_storage()` — reads localStorage/sessionStorage
-- `browser_query_elements(selector: "[data-login], [data-user-id]")` — finds DOM auth indicators
-
-Use `opentabs_browser_execute_script` to probe the page for auth tokens only when CSP allows it. Try these strategies in order:
+Use `opentabs_browser_execute_script` to probe the page for auth tokens. The tool bypasses page CSP via file-based injection and works on all pages regardless of Content Security Policy. Try these strategies in order:
 
 **Strategy A: localStorage** (most common)
 
@@ -747,7 +741,7 @@ When using browser tools during testing (like `browser_navigate_tab`, `browser_e
 8. **Biome formatting** — always run `npm run format` after writing code; the project's config may differ from your defaults
 9. **The `opentabs` field in `package.json`** is how the platform discovers plugin metadata — `displayName`, `description`, and `urlPatterns` must be there
 10. **Browser tools require human approval** — `browser_navigate_tab`, `browser_execute_script`, etc. show a confirmation dialog that times out in 30 seconds
-11. **CSP may block `browser_execute_script`** — Sites with strict CSP (like GitHub: `script-src github.githubassets.com`) block eval/inline scripts. `browser_execute_script` runs in the MAIN world and is subject to the page's CSP. Use alternative exploration tools: `browser_get_page_html`, `browser_get_cookies`, `browser_get_storage`, `browser_query_elements`. The adapter IIFE itself bypasses CSP because it's injected as a file URL — plugin code works fine even on CSP-strict pages.
+11. **`browser_execute_script` bypasses page CSP** — The tool injects code via a file URL (`chrome.scripting.executeScript({ files: [...] })`), which runs as extension-origin code and is not subject to the page's Content Security Policy. This means `browser_execute_script` works on all pages, including strict-CSP sites like GitHub. The adapter IIFE uses the same file-based injection mechanism — plugin code also bypasses CSP on strict pages.
 12. **HttpOnly cookies are invisible to plugin code** — `getCookie()` uses `document.cookie`, which cannot read HttpOnly cookies. Most session cookies are HttpOnly. Always check the cookie `httpOnly` property when exploring auth (use `browser_get_cookies`). For HttpOnly cookie auth, detect auth indirectly: from `<meta>` tags the server embeds in HTML (e.g., `<meta name="user-login">`), from non-HttpOnly indicator cookies (e.g., Notion's `notion_user_id`), from page globals (`window.__APP_STATE__`), or from localStorage. The API calls still work with `credentials: 'include'` because the browser sends HttpOnly cookies automatically — you just can't read them in JS. Auth persistence still matters — persist the *user context* (user ID, workspace ID) on globalThis even when the auth token itself is in HttpOnly cookies. See the "Cookie-Based Auth Pattern" section below.
 13. **Cross-origin API + cookies = CORS conflict** — When the API is on a different subdomain (e.g., `api.github.com` for a `github.com` plugin), using `credentials: 'include'` fails if the API returns `Access-Control-Allow-Origin: *` (browser rejects credentials with wildcard origin). Solutions: (a) use the API without cookies if it supports token-based auth you can extract from the page, (b) use same-origin internal API endpoints if the app has them, (c) omit `credentials: 'include'` for public/unauthenticated endpoints. Verify CORS behavior with: `curl -sI -X OPTIONS <api-url> -H "Origin: <page-origin>" -H "Access-Control-Request-Method: GET"`.
 14. **Scaffolder uses double quotes; Biome wants single quotes** — The `opentabs plugin create` scaffold generates TypeScript with double quotes, but the Biome config uses `quoteStyle: 'single'`. Always run `npm run format` immediately after scaffolding.
