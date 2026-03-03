@@ -293,6 +293,7 @@ const getLastKnownStates = (): ReadonlyMap<string, string> => lastKnownState;
  * persisted before suspension.
  */
 const loadLastKnownStateFromSession = async (): Promise<void> => {
+  lastKnownState.clear();
   try {
     const data = await chrome.storage.session.get(LAST_KNOWN_STATE_SESSION_KEY);
     const stored = data[LAST_KNOWN_STATE_SESSION_KEY] as Record<string, string> | undefined;

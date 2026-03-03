@@ -907,6 +907,27 @@ describe('loadLastKnownStateFromSession', () => {
 
     expect(getLastKnownStates().size).toBe(0);
   });
+
+  test('clears pre-existing map entries before populating from session', async () => {
+    // Pre-populate the map with a stale entry
+    await updateLastKnownState('stale-plugin', makeStateInfo('ready'));
+    expect(getLastKnownStates().has('stale-plugin')).toBe(true);
+
+    // Session storage has different data
+    mockStorageSessionGet.mockResolvedValue({
+      lastKnownState: {
+        'new-plugin': JSON.stringify({ state: 'closed', tabs: [] }),
+      },
+    });
+
+    await loadLastKnownStateFromSession();
+
+    // Stale entry must be gone — not merged with session data
+    expect(getLastKnownStates().has('stale-plugin')).toBe(false);
+    // Only the session entry should be present
+    expect(getLastKnownStates().size).toBe(1);
+    expect(getAggregateState(getLastKnownStates().get('new-plugin') ?? '')).toBe('closed');
+  });
 });
 
 // ---------------------------------------------------------------------------
