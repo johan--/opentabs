@@ -430,6 +430,10 @@ class ${toPascalCase(args.name)}Plugin extends OpenTabsPlugin {
   //   const token = iframe.contentWindow?.localStorage.getItem('token') ?? null;
   //   document.body.removeChild(iframe);
   //   return token !== null;
+  //
+  // For apps with HttpOnly cookie auth (e.g. Notion), detect via a non-HttpOnly indicator cookie:
+  //   return document.cookie.includes('user_id=');
+  //   // HttpOnly session cookies are sent automatically with credentials: 'include'
   async isReady(): Promise<boolean> {
     return false;
   }
