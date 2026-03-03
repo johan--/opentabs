@@ -532,6 +532,59 @@ npm run check        # build + type-check + lint + format:check
 
 ---
 
+## Phase 7: Document Friction and Feed Back
+
+This phase is **mandatory**. Every plugin build surfaces friction in the platform and new learnings about how to develop plugins well. Capturing them closes the loop.
+
+### 1. Document Friction Encountered
+
+While building and testing, keep a running mental note of anything that slowed you down, required workarounds, or was confusing. After the plugin is working, identify the concrete, actionable friction points:
+
+- Scaffolder generated wrong versions, missing fields, or unhelpful defaults
+- A platform API returned an unexpected shape or error
+- A build/lint/type-check failure caused by a platform issue (not a plugin bug)
+- Missing documentation for an SDK feature
+- A browser tool limitation that required a workaround
+
+For each friction point, ask: **is this something the platform team can fix?** If yes, it belongs in a PRD.
+
+### 2. Create PRDs for Friction Fixes
+
+Use the `ralph` skill to create a PRD for any actionable friction. Run it at the end once all friction is identified — batch related fixes into one PRD where they touch the same files:
+
+```
+/ralph  create PRD for <brief description of friction>
+```
+
+Each PRD story must:
+- Target exactly one file or closely related set of files
+- Have a concrete acceptance criterion (not "works better")
+- Be completable by a fresh AI agent in one iteration
+
+### 3. Write Learnings Back to This Skill
+
+After building the plugin, update this file (`__SKILL__.md`) with any new patterns or gotchas discovered. Follow these rules:
+
+**Before adding anything:**
+- Read the existing Common Gotchas list and all named sections
+- Check whether the insight is already covered — if it is, skip or merge rather than add
+- Ask: *does this save meaningful time for the next agent, or is it obvious from context?*
+
+**What belongs here:**
+- Auth patterns specific to a new class of web app (not already covered)
+- API quirks that are non-obvious and will recur (e.g., response shape varies by endpoint)
+- Platform constraints that bite developers repeatedly
+- Concrete workarounds for known gotchas
+
+**What does NOT belong here:**
+- App-specific details that won't recur (e.g., "Notion uses space IDs")
+- Learnings already captured in an existing gotcha
+- Notes that belong in the plugin's own README
+
+**Deduplication is required:** After adding anything, scan the full gotcha list for overlap with existing items. Merge if two gotchas teach the same lesson. The list should always be the shortest version that conveys maximum value.
+
+---
+
 ## Key Conventions
 
 - **One file per tool** in `src/tools/`
@@ -684,16 +737,14 @@ When using browser tools during testing (like `browser_navigate_tab`, `browser_e
 9. **The `opentabs` field in `package.json`** is how the platform discovers plugin metadata — `displayName`, `description`, and `urlPatterns` must be there
 10. **Browser tools require human approval** — `browser_navigate_tab`, `browser_execute_script`, etc. show a confirmation dialog that times out in 30 seconds
 11. **CSP may block `browser_execute_script`** — Sites with strict CSP (like GitHub: `script-src github.githubassets.com`) block eval/inline scripts. `browser_execute_script` runs in the MAIN world and is subject to the page's CSP. Use alternative exploration tools: `browser_get_page_html`, `browser_get_cookies`, `browser_get_storage`, `browser_query_elements`. The adapter IIFE itself bypasses CSP because it's injected as a file URL — plugin code works fine even on CSP-strict pages.
-12. **HttpOnly cookies are invisible to plugin code** — `getCookie()` uses `document.cookie`, which cannot read HttpOnly cookies. Most session cookies are HttpOnly. Always check the cookie `httpOnly` property when exploring auth (use `browser_get_cookies`). For HttpOnly cookie auth, detect auth indirectly: from `<meta>` tags the server embeds in HTML (e.g., `<meta name="user-login">`), from page globals (`window.__APP_STATE__`), or from localStorage. The API calls still work with `credentials: 'include'` because the browser sends HttpOnly cookies automatically — you just can't read them in JS.
+12. **HttpOnly cookies are invisible to plugin code** — `getCookie()` uses `document.cookie`, which cannot read HttpOnly cookies. Most session cookies are HttpOnly. Always check the cookie `httpOnly` property when exploring auth (use `browser_get_cookies`). For HttpOnly cookie auth, detect auth indirectly: from `<meta>` tags the server embeds in HTML (e.g., `<meta name="user-login">`), from non-HttpOnly indicator cookies (e.g., Notion's `notion_user_id`), from page globals (`window.__APP_STATE__`), or from localStorage. The API calls still work with `credentials: 'include'` because the browser sends HttpOnly cookies automatically — you just can't read them in JS. Auth persistence still matters — persist the *user context* (user ID, workspace ID) on globalThis even when the auth token itself is in HttpOnly cookies. See the "Cookie-Based Auth Pattern" section below.
 13. **Cross-origin API + cookies = CORS conflict** — When the API is on a different subdomain (e.g., `api.github.com` for a `github.com` plugin), using `credentials: 'include'` fails if the API returns `Access-Control-Allow-Origin: *` (browser rejects credentials with wildcard origin). Solutions: (a) use the API without cookies if it supports token-based auth you can extract from the page, (b) use same-origin internal API endpoints if the app has them, (c) omit `credentials: 'include'` for public/unauthenticated endpoints. Verify CORS behavior with: `curl -sI -X OPTIONS <api-url> -H "Origin: <page-origin>" -H "Access-Control-Request-Method: GET"`.
 14. **Scaffolder uses double quotes; Biome wants single quotes** — The `opentabs plugin create` scaffold generates TypeScript with double quotes, but the Biome config uses `quoteStyle: 'single'`. Always run `npm run format` immediately after scaffolding.
-15. **Cookie-only auth (no extractable token)** — Some apps (like Notion) use HttpOnly cookies exclusively. The plugin cannot read the token, but API calls work via `credentials: 'include'`. Detect authentication by checking non-HttpOnly cookies (e.g., `notion_user_id`), page globals, or by making a test API call. Auth persistence still matters — persist the *user context* (user ID, workspace ID) on globalThis even if the auth token itself is in HttpOnly cookies.
-16. **Internal API format may differ between endpoints** — The same app may wrap API responses differently across endpoints. Example: Notion's `getRecordValues` returns `block[id].value` (direct), while `queryCollection` returns `block[id].value.value` (extra wrapper with `role` field). Always verify the response shape of each endpoint individually by inspecting the actual response in `browser_execute_script` rather than assuming consistency.
-17. **CRDT-enabled workspaces may reject write operations** — Modern web apps are migrating to CRDTs for real-time collaboration. The older `submitTransaction` API may fail with "User does not have edit access" even on pages the user owns. This is because the CRDT system requires operations in a different format. When write operations fail unexpectedly, check if the app has a CRDT migration flag or a different write endpoint.
-18. **`setPersistedToken` must avoid `??=` assignment-in-expression** — The Biome lint rule `noAssignInExpressions` forbids `(obj.prop ??= value)`. Use explicit if-checks instead: `if (!obj.prop) obj.prop = value`.
-19. **Scaffolder `package.json` needs manual adjustments** — The scaffold creates a minimal `package.json` that is missing fields that official plugins need: scoped `@opentabs-dev/` package name, matching version with platform, `publishConfig`, `jiti` dev dependency, correct `zod` version matching other plugins. Always compare with an existing plugin's `package.json` and align.
-20. **Test every tool against the live browser** — The `opentabs_plugin_list_tabs` tool is the first thing to verify (no confirmation needed). Then systematically test read-only tools (search, list, get) before write tools (create, update, delete). This catches auth issues, API format mismatches, and schema mapping errors early.
-21. **API response recordMap nesting varies** — Web apps that return `recordMap` data (Notion, Slack, etc.) may nest records differently in different endpoints. The same block might be at `block[id].value` in one response and `block[id].value.value` in another. Build defensive accessor functions or check both levels.
+15. **Internal API format may differ between endpoints** — The same app may wrap API responses differently across endpoints. Example: Notion's `getRecordValues` returns `block[id].value` (direct), while `queryCollection` returns `block[id].value.value` (extra wrapper with `role` field). Always verify the response shape of each endpoint individually by inspecting the actual response in `browser_execute_script` rather than assuming consistency. Build defensive accessor functions or check both nesting levels.
+16. **CRDT-enabled workspaces may reject write operations** — Modern web apps are migrating to CRDTs for real-time collaboration. The older `submitTransaction` API may fail with "User does not have edit access" even on pages the user owns. This is because the CRDT system requires operations in a different format. When write operations fail unexpectedly, check if the app has a CRDT migration flag or a different write endpoint.
+17. **`setPersistedToken` must avoid `??=` assignment-in-expression** — The Biome lint rule `noAssignInExpressions` forbids `(obj.prop ??= value)`. Use explicit if-checks instead: `if (!obj.prop) obj.prop = value`.
+18. **Scaffolder `package.json` needs manual adjustments** — The scaffold creates a minimal `package.json` that is missing fields that official plugins need: scoped `@opentabs-dev/` package name, matching version with platform, `publishConfig`, `jiti` dev dependency, correct `zod` version matching other plugins. Always compare with an existing plugin's `package.json` and align.
+19. **Test every tool against the live browser** — The `opentabs_plugin_list_tabs` tool is the first thing to verify (no confirmation needed). Then systematically test read-only tools (search, list, get) before write tools (create, update, delete). This catches auth issues, API format mismatches, and schema mapping errors early.
 
 ---
 
