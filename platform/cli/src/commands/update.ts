@@ -9,7 +9,7 @@
 
 import { getPidFilePath, parsePidFile } from '../config.js';
 import { resolvePort } from '../parse-port.js';
-import { DEFAULT_HOST, platformExec, toErrorMessage } from '@opentabs-dev/shared';
+import { DEFAULT_HOST, DEFAULT_PORT, platformExec, toErrorMessage } from '@opentabs-dev/shared';
 import pc from 'picocolors';
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -71,6 +71,73 @@ const isBackgroundServerRunning = async (): Promise<boolean> => {
   }
   const pidData = parsePidFile(content);
   return pidData !== null && isProcessAlive(pidData.pid);
+};
+
+/** Wait for a process to exit, polling every 200ms up to `timeoutMs`. */
+const waitForExit = (pid: number, timeoutMs: number): Promise<boolean> =>
+  new Promise(resolve => {
+    const start = Date.now();
+    const check = () => {
+      if (!isProcessAlive(pid)) {
+        resolve(true);
+        return;
+      }
+      if (Date.now() - start >= timeoutMs) {
+        resolve(false);
+        return;
+      }
+      setTimeout(check, 200);
+    };
+    check();
+  });
+
+/** Stop the background server via SIGTERM and restart it with `opentabs start --background`. */
+const restartBackgroundServer = async (port: number): Promise<void> => {
+  const pidPath = getPidFilePath();
+  let content: string;
+  try {
+    content = await readFile(pidPath, 'utf-8');
+  } catch {
+    console.log(pc.dim('  Run: opentabs start --background'));
+    return;
+  }
+  const pidData = parsePidFile(content);
+  if (pidData === null || !isProcessAlive(pidData.pid)) {
+    console.log(pc.dim('  Run: opentabs start --background'));
+    return;
+  }
+
+  const { pid } = pidData;
+  const restartPort = pidData.port ?? port;
+
+  process.kill(pid, 'SIGTERM');
+  const exited = await waitForExit(pid, 5_000);
+  if (!exited) {
+    console.log(pc.yellow('Warning: Old server did not stop in time. Restart manually:'));
+    console.log(pc.dim('  opentabs start --background'));
+    return;
+  }
+
+  const startArgs = ['start', '--background'];
+  if (restartPort !== DEFAULT_PORT) {
+    startArgs.push('--port', String(restartPort));
+  }
+
+  const cliEntry = process.argv[1];
+  if (!cliEntry) {
+    console.log(pc.yellow('Warning: Cannot determine CLI path. Run manually:'));
+    console.log(pc.dim('  opentabs start --background'));
+    return;
+  }
+
+  const result = spawnSync(platformExec('node'), [cliEntry, ...startArgs], {
+    stdio: 'inherit',
+  });
+
+  if ((result.status ?? 1) !== 0) {
+    console.log(pc.yellow('Warning: Failed to restart server. Run manually:'));
+    console.log(pc.dim('  opentabs start --background'));
+  }
 };
 
 /** Check if the MCP server is running on the given port and return its status info. */
@@ -139,7 +206,11 @@ const handleUpdate = async (options: UpdateOptions): Promise<void> => {
     const versionLabel = serverStatus.version ? ` (v${serverStatus.version})` : '';
     const typeLabel = serverStatus.serverType ? ` [${serverStatus.serverType}]` : '';
     console.log(pc.yellow(`Warning: MCP server${versionLabel}${typeLabel} is running on port ${port}.`));
-    console.log(pc.yellow('The server will need to be restarted after the update.'));
+    const restartNote =
+      serverStatus.serverType === 'background'
+        ? 'The server will be automatically restarted after the update.'
+        : 'The server will need to be restarted after the update.';
+    console.log(pc.yellow(restartNote));
     console.log('');
   }
 
@@ -160,9 +231,18 @@ const handleUpdate = async (options: UpdateOptions): Promise<void> => {
 
   if (serverStatus.running) {
     console.log('');
-    console.log('Restart the MCP server to use the new version:');
-    console.log(pc.dim('  1. Stop the current server (Ctrl+C or kill the process)'));
-    console.log(pc.dim('  2. Run: opentabs start'));
+    switch (serverStatus.serverType) {
+      case 'background':
+        await restartBackgroundServer(port);
+        break;
+      case 'dev':
+        console.log(pc.dim('Restart your dev server:'));
+        console.log(pc.dim('  npm run dev'));
+        break;
+      default:
+        console.log(pc.dim('Stop the server (Ctrl+C) and run:'));
+        console.log(pc.dim('  opentabs start'));
+    }
   }
 };
 
