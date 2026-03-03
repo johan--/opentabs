@@ -168,6 +168,9 @@ const validateTools = (tools: unknown, sourcePath: string): Result<ManifestTool[
     const iconSvg = typeof toolRecord.iconSvg === 'string' ? toolRecord.iconSvg : undefined;
     const iconInactiveSvg = typeof toolRecord.iconInactiveSvg === 'string' ? toolRecord.iconInactiveSvg : undefined;
 
+    // Optional group for visual grouping in the side panel
+    const group = typeof toolRecord.group === 'string' ? toolRecord.group : undefined;
+
     const inputSchema = toolRecord.input_schema;
     if (typeof inputSchema !== 'object' || inputSchema === null || Array.isArray(inputSchema)) {
       return err(`Invalid tools.json at ${sourcePath}: tools[${i}].input_schema must be an object`);
@@ -183,6 +186,7 @@ const validateTools = (tools: unknown, sourcePath: string): Result<ManifestTool[
       displayName,
       description,
       icon,
+      ...(group ? { group } : {}),
       iconSvg,
       iconInactiveSvg,
       input_schema: inputSchema as Record<string, unknown>,

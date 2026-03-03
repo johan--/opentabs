@@ -77,13 +77,68 @@ describe('validateTools', () => {
 
   test('rejects tool with missing name', () => {
     const result = validateTools(
-      [{ displayName: 'X', description: 'Y', icon: 'z', input_schema: {}, output_schema: {} }],
+      [
+        {
+          displayName: 'X',
+          description: 'Y',
+          icon: 'z',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
       '/test',
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('name must be a non-empty string');
     }
+  });
+
+  test('preserves group field when present', () => {
+    const result = validateTools(
+      [
+        {
+          name: 'send_message',
+          displayName: 'Send Message',
+          description: 'Send a message',
+          icon: 'send',
+          group: 'Messages',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
+      '/test',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value[0]?.group).toBe('Messages');
+  });
+
+  test('omits group field when not present in input', () => {
+    const result = validateTools(validTools(), '/test');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value[0]).not.toHaveProperty('group');
+  });
+
+  test('omits group field when value is not a string', () => {
+    const result = validateTools(
+      [
+        {
+          name: 't',
+          displayName: 'T',
+          description: 'D',
+          icon: 'i',
+          group: 42,
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
+      '/test',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value[0]).not.toHaveProperty('group');
   });
 
   test('rejects tool with description exceeding 1000 chars', () => {
@@ -277,7 +332,13 @@ describe('loadPlugin', () => {
     const pluginDir = join(tmpDir, 'bad-url');
     writePlugin(
       pluginDir,
-      validPackageJson({ opentabs: { displayName: 'X', description: 'Y', urlPatterns: ['not-a-pattern'] } }),
+      validPackageJson({
+        opentabs: {
+          displayName: 'X',
+          description: 'Y',
+          urlPatterns: ['not-a-pattern'],
+        },
+      }),
     );
 
     const result = await loadPlugin(pluginDir, 'local', 'local');
@@ -286,6 +347,37 @@ describe('loadPlugin', () => {
     if (!result.ok) {
       expect(result.error).toContain('URL pattern');
     }
+  });
+
+  test('preserves tool group field through full load', async () => {
+    const pluginDir = join(tmpDir, 'with-group');
+    writePlugin(pluginDir, validPackageJson(), [
+      {
+        name: 'send_message',
+        displayName: 'Send Message',
+        description: 'Send a message',
+        icon: 'send',
+        group: 'Messages',
+        input_schema: {},
+        output_schema: {},
+      },
+      {
+        name: 'list_users',
+        displayName: 'List Users',
+        description: 'List all users',
+        icon: 'users',
+        input_schema: {},
+        output_schema: {},
+      },
+    ]);
+
+    const result = await loadPlugin(pluginDir, 'local', 'local');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tools).toHaveLength(2);
+    expect(result.value.tools[0]?.group).toBe('Messages');
+    expect(result.value.tools[1]).not.toHaveProperty('group');
   });
 
   test('extracts sdkVersion from manifest object format', async () => {
@@ -367,7 +459,11 @@ describe('loadPlugin — SVG icon extraction', () => {
       name: 'opentabs-plugin-test',
       version: '1.0.0',
       main: 'dist/adapter.iife.js',
-      opentabs: { displayName: 'Test', description: 'Test', urlPatterns: ['http://localhost/*'] },
+      opentabs: {
+        displayName: 'Test',
+        description: 'Test',
+        urlPatterns: ['http://localhost/*'],
+      },
     },
   ) => {
     mkdirSync(join(dir, 'dist'), { recursive: true });
@@ -380,7 +476,16 @@ describe('loadPlugin — SVG icon extraction', () => {
     const pluginDir = join(tmpDir, 'with-icons');
     writePluginWithManifest(pluginDir, {
       sdkVersion: '0.0.16',
-      tools: [{ name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} }],
+      tools: [
+        {
+          name: 't',
+          displayName: 'T',
+          description: 'T',
+          icon: 'wrench',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
       iconSvg: '<svg>active</svg>',
       iconInactiveSvg: '<svg>inactive</svg>',
     });
@@ -397,7 +502,16 @@ describe('loadPlugin — SVG icon extraction', () => {
     const pluginDir = join(tmpDir, 'no-icons');
     writePluginWithManifest(pluginDir, {
       sdkVersion: '0.0.16',
-      tools: [{ name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} }],
+      tools: [
+        {
+          name: 't',
+          displayName: 'T',
+          description: 'T',
+          icon: 'wrench',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
     });
 
     const result = await loadPlugin(pluginDir, 'local', 'local');
@@ -412,7 +526,16 @@ describe('loadPlugin — SVG icon extraction', () => {
     const pluginDir = join(tmpDir, 'bad-icon');
     writePluginWithManifest(pluginDir, {
       sdkVersion: '0.0.16',
-      tools: [{ name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} }],
+      tools: [
+        {
+          name: 't',
+          displayName: 'T',
+          description: 'T',
+          icon: 'wrench',
+          input_schema: {},
+          output_schema: {},
+        },
+      ],
       iconSvg: 42,
       iconInactiveSvg: true,
     });
@@ -434,13 +557,24 @@ describe('loadPlugin — SVG icon extraction', () => {
         name: 'opentabs-plugin-test',
         version: '1.0.0',
         main: 'dist/adapter.iife.js',
-        opentabs: { displayName: 'Test', description: 'Test', urlPatterns: ['http://localhost/*'] },
+        opentabs: {
+          displayName: 'Test',
+          description: 'Test',
+          urlPatterns: ['http://localhost/*'],
+        },
       }),
     );
     writeFileSync(
       join(pluginDir, 'dist', 'tools.json'),
       JSON.stringify([
-        { name: 't', displayName: 'T', description: 'T', icon: 'wrench', input_schema: {}, output_schema: {} },
+        {
+          name: 't',
+          displayName: 'T',
+          description: 'T',
+          icon: 'wrench',
+          input_schema: {},
+          output_schema: {},
+        },
       ]),
     );
     writeFileSync(join(pluginDir, 'dist', 'adapter.iife.js'), '(function(){})()');

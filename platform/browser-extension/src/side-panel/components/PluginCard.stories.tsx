@@ -14,9 +14,27 @@ const mockPlugin = (overrides?: Partial<PluginState>): PluginState => ({
   urlPatterns: ['*://*.slack.com/*'],
   sdkVersion: '0.0.3',
   tools: [
-    { name: 'send_message', displayName: 'Send Message', description: 'Send a message', icon: 'send', enabled: true },
-    { name: 'list_channels', displayName: 'List Channels', description: 'List channels', icon: 'list', enabled: true },
-    { name: 'search', displayName: 'Search', description: 'Search messages', icon: 'search', enabled: false },
+    {
+      name: 'send_message',
+      displayName: 'Send Message',
+      description: 'Send a message',
+      icon: 'send',
+      enabled: true,
+    },
+    {
+      name: 'list_channels',
+      displayName: 'List Channels',
+      description: 'List channels',
+      icon: 'list',
+      enabled: true,
+    },
+    {
+      name: 'search',
+      displayName: 'Search',
+      description: 'Search messages',
+      icon: 'search',
+      enabled: false,
+    },
   ],
   ...overrides,
 });
@@ -72,7 +90,12 @@ const TabUnavailable: Story = {
 
 const ReadyWithUpdateDemo = () => {
   const [plugins, setPlugins] = useState([
-    mockPlugin({ update: { latestVersion: '0.2.0', updateCommand: 'npm update -g opentabs-plugin-slack@latest' } }),
+    mockPlugin({
+      update: {
+        latestVersion: '0.2.0',
+        updateCommand: 'npm update -g opentabs-plugin-slack@latest',
+      },
+    }),
   ]);
   const plugin = plugins[0];
   if (!plugin) return null;
@@ -167,7 +190,10 @@ const WithMenuAndUpdateDemo = () => {
       source: 'npm',
       trustTier: 'community',
       tabState: 'ready',
-      update: { latestVersion: '0.2.0', updateCommand: 'npm update -g opentabs-plugin-slack@latest' },
+      update: {
+        latestVersion: '0.2.0',
+        updateCommand: 'npm update -g opentabs-plugin-slack@latest',
+      },
     }),
   ]);
   const plugin = plugins[0];
@@ -207,6 +233,164 @@ const RemovingState: Story = {
   render: () => <RemovingStateDemo />,
 };
 
+const GroupedToolsDemo = () => {
+  const [plugins, setPlugins] = useState([
+    mockPlugin({
+      tools: [
+        {
+          name: 'send_message',
+          displayName: 'Send Message',
+          description: 'Send a message to a channel or DM conversation',
+          icon: 'send',
+          enabled: true,
+          group: 'Messages',
+        },
+        {
+          name: 'read_messages',
+          displayName: 'Read Messages',
+          description: 'Read recent messages from a channel',
+          icon: 'message-square',
+          enabled: true,
+          group: 'Messages',
+        },
+        {
+          name: 'search_messages',
+          displayName: 'Search Messages',
+          description: 'Search messages across channels using keywords and filters',
+          icon: 'search',
+          enabled: true,
+          group: 'Messages',
+        },
+        {
+          name: 'edit_message',
+          displayName: 'Edit Message',
+          description: 'Edit a previously sent message',
+          icon: 'pencil',
+          enabled: false,
+          group: 'Messages',
+        },
+        {
+          name: 'list_channels',
+          displayName: 'List Channels',
+          description: 'List all public and private channels in the workspace',
+          icon: 'list',
+          enabled: true,
+          group: 'Channels',
+        },
+        {
+          name: 'create_channel',
+          displayName: 'Create Channel',
+          description: 'Create a new public or private channel',
+          icon: 'plus',
+          enabled: true,
+          group: 'Channels',
+        },
+        {
+          name: 'get_channel_info',
+          displayName: 'Get Channel Info',
+          description: 'Get details about a channel including topic, purpose, and members',
+          icon: 'info',
+          enabled: true,
+          group: 'Channels',
+        },
+        {
+          name: 'list_users',
+          displayName: 'List Users',
+          description: 'List all users in the workspace',
+          icon: 'users',
+          enabled: true,
+          group: 'Users',
+        },
+        {
+          name: 'get_user_profile',
+          displayName: 'Get User Profile',
+          description: 'Retrieve a user profile including display name, email, and timezone',
+          icon: 'user',
+          enabled: true,
+          group: 'Users',
+        },
+        {
+          name: 'add_reaction',
+          displayName: 'Add Reaction',
+          description: 'Add an emoji reaction to a message',
+          icon: 'smile',
+          enabled: true,
+          group: 'Reactions',
+        },
+        {
+          name: 'pin_message',
+          displayName: 'Pin Message',
+          description: 'Pin a message to a channel',
+          icon: 'pin',
+          enabled: false,
+          group: 'Reactions',
+        },
+      ],
+    }),
+  ]);
+  const plugin = plugins[0];
+  if (!plugin) return null;
+  return <PluginCard plugin={plugin} activeTools={new Set(['slack:send_message'])} setPlugins={setPlugins} />;
+};
+
+const GroupedTools: Story = {
+  render: () => <GroupedToolsDemo />,
+};
+
+const MixedGroupedUngroupedDemo = () => {
+  const [plugins, setPlugins] = useState([
+    mockPlugin({
+      tools: [
+        {
+          name: 'send_message',
+          displayName: 'Send Message',
+          description: 'Send a message to a channel',
+          icon: 'send',
+          enabled: true,
+          group: 'Messages',
+        },
+        {
+          name: 'read_messages',
+          displayName: 'Read Messages',
+          description: 'Read recent messages from a channel',
+          icon: 'message-square',
+          enabled: true,
+          group: 'Messages',
+        },
+        {
+          name: 'list_channels',
+          displayName: 'List Channels',
+          description: 'List all channels in the workspace',
+          icon: 'list',
+          enabled: true,
+          group: 'Channels',
+        },
+        {
+          name: 'upload_file',
+          displayName: 'Upload File',
+          description: 'Upload a file to a channel with an optional comment',
+          icon: 'upload',
+          enabled: true,
+        },
+        {
+          name: 'open_dm',
+          displayName: 'Open DM',
+          description: 'Open a direct message conversation with a user',
+          icon: 'message-circle',
+          enabled: true,
+        },
+      ],
+    }),
+  ]);
+  const plugin = plugins[0];
+  if (!plugin) return null;
+  return <PluginCard plugin={plugin} activeTools={new Set()} setPlugins={setPlugins} />;
+};
+
+const MixedGroupedUngrouped: Story = {
+  render: () => <MixedGroupedUngroupedDemo />,
+};
+
 export default meta;
 export {
   Ready,
@@ -218,4 +402,6 @@ export {
   WithMenu,
   WithMenuAndUpdate,
   RemovingState,
+  GroupedTools,
+  MixedGroupedUngrouped,
 };
