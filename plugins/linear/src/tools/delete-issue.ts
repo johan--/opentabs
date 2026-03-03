@@ -1,0 +1,30 @@
+import { graphql } from '../linear-api.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+
+export const deleteIssue = defineTool({
+  name: 'delete_issue',
+  displayName: 'Delete Issue',
+  description: 'Move a Linear issue to the trash. Trashed issues can be restored within 30 days.',
+  icon: 'trash-2',
+  input: z.object({
+    issue_id: z.string().describe('Issue UUID to delete'),
+  }),
+  output: z.object({
+    success: z.boolean().describe('Whether the issue was successfully deleted'),
+  }),
+  handle: async params => {
+    const data = await graphql<{
+      issueDelete: { success: boolean };
+    }>(
+      `mutation DeleteIssue($id: String!) {
+        issueDelete(id: $id) {
+          success
+        }
+      }`,
+      { id: params.issue_id },
+    );
+
+    return { success: data.issueDelete.success };
+  },
+});
