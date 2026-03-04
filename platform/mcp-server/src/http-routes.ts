@@ -315,8 +315,9 @@ const handleHealth = async (
 
   const auditSummary = computeAuditSummary(state.auditLog);
 
+  const browserConfig = state.pluginPermissions.browser;
   const disabledBrowserTools = state.cachedBrowserTools
-    .filter(c => state.browserToolPolicy[c.name] === false)
+    .filter(c => (browserConfig?.tools?.[c.name] ?? browserConfig?.permission ?? 'off') === 'off')
     .map(c => c.name);
 
   const browserToolNames = state.cachedBrowserTools.map(c => c.name);

@@ -27,7 +27,7 @@ import { log } from './logger.js';
 import type { RequestHandlerExtra } from './mcp-tool-dispatch.js';
 import { handleBrowserToolCall, handlePluginToolCall } from './mcp-tool-dispatch.js';
 import type { CachedBrowserTool, ServerState, ToolLookupEntry } from './state.js';
-import { isBrowserToolEnabled, isToolEnabled, prefixedToolName } from './state.js';
+import { getToolPermission, prefixedToolName } from './state.js';
 import { version } from './version.js';
 
 /**
@@ -191,7 +191,7 @@ export const getEnabledToolsList = (
   for (const plugin of state.registry.plugins.values()) {
     for (const toolDef of plugin.tools) {
       const prefixed = prefixedToolName(plugin.name, toolDef.name);
-      if (!isToolEnabled(state, prefixed)) continue;
+      if (getToolPermission(state, plugin.name, toolDef.name) === 'off') continue;
       const clonedSchema = structuredClone(toolDef.input_schema);
       const properties = (clonedSchema.properties ?? {}) as Record<string, unknown>;
       properties.tabId = {
@@ -210,7 +210,7 @@ export const getEnabledToolsList = (
   }
 
   for (const cached of state.cachedBrowserTools) {
-    if (!isBrowserToolEnabled(state, cached.name)) continue;
+    if (getToolPermission(state, 'browser', cached.name) === 'off') continue;
     tools.push({
       name: cached.name,
       description: cached.description,
@@ -249,7 +249,8 @@ export type ToolCallableResult = ToolCallableOk | ToolCallableError;
 export const checkToolCallable = (state: ServerState, prefixedToolName: string): ToolCallableResult => {
   const lookup = state.registry.toolLookup.get(prefixedToolName);
   if (!lookup) return { ok: false, error: `Tool ${prefixedToolName} not found` };
-  if (!isToolEnabled(state, prefixedToolName)) return { ok: false, error: `Tool ${prefixedToolName} is disabled` };
+  if (getToolPermission(state, lookup.pluginName, lookup.toolName) === 'off')
+    return { ok: false, error: `Tool ${prefixedToolName} is disabled` };
   return { ok: true, pluginName: lookup.pluginName, toolName: lookup.toolName };
 };
 

@@ -18,8 +18,8 @@ import {
 import { log } from './logger.js';
 import { evaluatePermission } from './permissions.js';
 import { sanitizeErrorMessage } from './sanitize-error.js';
-import type { AuditEntry, CachedBrowserTool, ConfirmationDecision, ServerState, ToolLookupEntry } from './state.js';
-import { appendAuditEntry, isBrowserToolEnabled, isSessionAllowed } from './state.js';
+import type { AuditEntry, CachedBrowserTool, ServerState, ToolLookupEntry } from './state.js';
+import { appendAuditEntry, getToolPermission } from './state.js';
 
 /** Maximum concurrent tool dispatches per plugin to prevent tab performance degradation */
 const MAX_CONCURRENT_DISPATCHES_PER_PLUGIN = 5;
@@ -171,7 +171,7 @@ const handleBrowserToolCall = async (
   cachedBt: CachedBrowserTool,
   extra: RequestHandlerExtra,
 ): Promise<ToolCallResult> => {
-  if (!isBrowserToolEnabled(state, toolName)) {
+  if (getToolPermission(state, 'browser', toolName) === 'off') {
     return {
       content: [{ type: 'text' as const, text: `Tool ${toolName} is disabled via configuration` }],
       isError: true,
@@ -192,10 +192,8 @@ const handleBrowserToolCall = async (
   const parsedArgs = parseResult.data;
   const domain = await resolveToolDomain(toolName, parsedArgs, state);
 
-  // Check session permissions first (set by previous "Allow Always" actions)
-  const permission = isSessionAllowed(state.sessionPermissions, toolName, domain)
-    ? ('allow' as const)
-    : evaluatePermission(toolName, domain, state);
+  // Evaluate browser tool permission via the legacy permission engine
+  const permission = evaluatePermission(toolName, domain, state);
 
   if (permission === 'deny') {
     return {
@@ -231,7 +229,7 @@ const handleBrowserToolCall = async (
     try {
       const paramsPreview = truncateParamsPreview(parsedArgs);
       const tabIdArg = parsedArgs.tabId;
-      const decision: ConfirmationDecision = await sendConfirmationRequest(
+      const decision = await sendConfirmationRequest(
         state,
         toolName,
         domain,
@@ -250,8 +248,7 @@ const handleBrowserToolCall = async (
           isError: true,
         };
       }
-      // decision is 'allow_once' or 'allow_always' — proceed with dispatch
-      // (allow_always session rules are handled by handleConfirmationResponse in extension-protocol)
+      // decision is 'allow' — proceed with dispatch
     } catch (err) {
       const msg = toErrorMessage(err);
       if (msg === 'CONFIRMATION_TIMEOUT') {

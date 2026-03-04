@@ -30,8 +30,8 @@ import {
   searchNpmPlugins,
   updatePlugin,
 } from './plugin-management.js';
-import type { ConfirmationScope, RegisteredPlugin, ServerState, SessionPermissionRule, TabMapping } from './state.js';
-import { DISPATCH_TIMEOUT_MS, MAX_DISPATCH_TIMEOUT_MS, prefixedToolName, pushSessionPermission } from './state.js';
+import type { RegisteredPlugin, ServerState, TabMapping } from './state.js';
+import { DISPATCH_TIMEOUT_MS, MAX_DISPATCH_TIMEOUT_MS } from './state.js';
 import { version } from './version.js';
 
 /** Callbacks the extension protocol can invoke on the MCP side */
@@ -360,8 +360,10 @@ const handleConfigSetToolEnabled = (
     return;
   }
 
-  const prefixed = prefixedToolName(pluginName, tool);
-  state.toolConfig[prefixed] = permission !== 'off';
+  const pConfig = state.pluginPermissions[pluginName] ?? {};
+  const tools = pConfig.tools ?? {};
+  tools[tool] = permission as ToolPermission;
+  state.pluginPermissions[pluginName] = { ...pConfig, tools };
   callbacks.onToolConfigChanged();
   callbacks.onToolConfigPersist();
 
@@ -404,10 +406,8 @@ const handleConfigSetAllToolsEnabled = (
     return;
   }
 
-  for (const tool of plugin.tools) {
-    const prefixed = prefixedToolName(pluginName, tool.name);
-    state.toolConfig[prefixed] = permission !== 'off';
-  }
+  const pConfig = state.pluginPermissions[pluginName] ?? {};
+  state.pluginPermissions[pluginName] = { ...pConfig, permission: permission as ToolPermission };
   callbacks.onToolConfigChanged();
   callbacks.onToolConfigPersist();
 
@@ -464,10 +464,12 @@ const handleConfigSetToolsEnabled = (
     }
   }
 
+  const pConfig = state.pluginPermissions[pluginName] ?? {};
+  const toolOverrides = { ...(pConfig.tools ?? {}) };
   for (const tool of tools) {
-    const prefixed = prefixedToolName(pluginName, tool);
-    state.toolConfig[prefixed] = permission !== 'off';
+    toolOverrides[tool] = permission as ToolPermission;
   }
+  state.pluginPermissions[pluginName] = { ...pConfig, tools: toolOverrides };
   callbacks.onToolConfigChanged();
   callbacks.onToolConfigPersist();
 
@@ -509,7 +511,10 @@ const handleConfigSetBrowserToolEnabled = (
     return;
   }
 
-  state.browserToolPolicy[tool] = permission !== 'off';
+  const browserConfig = state.pluginPermissions.browser ?? {};
+  const browserTools = { ...(browserConfig.tools ?? {}) };
+  browserTools[tool] = permission as ToolPermission;
+  state.pluginPermissions.browser = { ...browserConfig, tools: browserTools };
   callbacks.onToolConfigChanged();
   callbacks.onBrowserToolPolicyPersist();
 
@@ -545,9 +550,7 @@ const handleConfigSetAllBrowserToolsEnabled = (
     return;
   }
 
-  for (const tool of state.cachedBrowserTools) {
-    state.browserToolPolicy[tool.name] = permission !== 'off';
-  }
+  state.pluginPermissions.browser = { permission: permission as ToolPermission };
   callbacks.onToolConfigChanged();
   callbacks.onBrowserToolPolicyPersist();
 
@@ -656,13 +659,9 @@ const handlePluginLog = (params: Record<string, unknown> | undefined, callbacks:
 
 // --- Confirmation handler ---
 
-/** Valid values for ConfirmationScope — used to validate extension input */
-const VALID_CONFIRMATION_SCOPES = new Set<ConfirmationScope>(['tool_domain', 'tool_all', 'domain_all']);
-
 /**
  * Handle a confirmation.response from the extension.
- * Resolves the pending confirmation promise with the user's decision.
- * For 'allow_always', also adds a session permission rule.
+ * Resolves the pending confirmation promise with the user's decision ('allow' or 'deny').
  */
 const handleConfirmationResponse = (state: ServerState, params: Record<string, unknown> | undefined): void => {
   if (!params) return;
@@ -671,52 +670,12 @@ const handleConfirmationResponse = (state: ServerState, params: Record<string, u
   if (typeof id !== 'string') return;
 
   const decision = params.decision;
-  if (decision !== 'allow_once' && decision !== 'allow_always' && decision !== 'deny') return;
+  if (decision !== 'allow' && decision !== 'deny') return;
 
   const pending = state.pendingConfirmations.get(id);
   if (!pending) return;
 
-  clearTimeout(pending.timerId);
   state.pendingConfirmations.delete(id);
-
-  // For allow_always, add a session permission rule based on the scope
-  if (decision === 'allow_always') {
-    const rawScope = typeof params.scope === 'string' ? params.scope : '';
-    if (rawScope && !VALID_CONFIRMATION_SCOPES.has(rawScope as ConfirmationScope)) {
-      log.warn(`Invalid confirmation scope '${rawScope}', falling back to 'tool_domain'`);
-    }
-    const scope: ConfirmationScope = VALID_CONFIRMATION_SCOPES.has(rawScope as ConfirmationScope)
-      ? (rawScope as ConfirmationScope)
-      : 'tool_domain';
-    const rule: SessionPermissionRule = {
-      tool: pending.tool,
-      domain: pending.domain,
-      scope,
-    };
-
-    // Adjust rule fields based on scope
-    if (scope === 'tool_all') {
-      rule.domain = null;
-    } else if (scope === 'domain_all') {
-      if (pending.domain === null) {
-        // domain_all without a domain context would match all domains — fall back to tool_domain
-        log.warn(
-          `domain_all scope requested for '${pending.tool}' but no domain context — falling back to tool_domain`,
-        );
-        rule.scope = 'tool_domain';
-      } else {
-        rule.tool = null;
-      }
-    }
-
-    const isDuplicate = state.sessionPermissions.some(
-      r => r.tool === rule.tool && r.domain === rule.domain && r.scope === rule.scope,
-    );
-    if (!isDuplicate) {
-      pushSessionPermission(state, rule);
-    }
-  }
-
   pending.resolve(decision);
 };
 
@@ -726,7 +685,6 @@ const handleConfirmationResponse = (state: ServerState, params: Record<string, u
  */
 const rejectAllPendingConfirmations = (state: ServerState): void => {
   for (const [id, pending] of state.pendingConfirmations) {
-    clearTimeout(pending.timerId);
     pending.reject(new Error('Extension disconnected — confirmation cancelled'));
     state.pendingConfirmations.delete(id);
   }

@@ -18,6 +18,22 @@ import type { ServerState } from './state.js';
 /** Legacy permission values used by the browser tool evaluation engine (pending removal in US-004) */
 type LegacyPermission = 'allow' | 'ask' | 'deny';
 
+/** Legacy permission configuration shape (pending removal in US-004) */
+interface LegacyPermissionsConfig {
+  trustedDomains: string[];
+  sensitiveDomains: string[];
+  toolPolicy: Record<string, LegacyPermission>;
+  domainToolPolicy: Record<string, Record<string, LegacyPermission>>;
+}
+
+/** Default legacy permissions config used by the browser tool evaluation engine (pending removal in US-004) */
+const DEFAULT_LEGACY_PERMISSIONS: LegacyPermissionsConfig = {
+  trustedDomains: ['localhost', '127.0.0.1'],
+  sensitiveDomains: [],
+  toolPolicy: {},
+  domainToolPolicy: {},
+};
+
 /** Security tier for browser tools */
 type ToolTier = 'observe' | 'interact' | 'sensitive';
 
@@ -125,7 +141,7 @@ export const evaluatePermission = (toolName: string, domain: string | null, stat
   // Bypass: if skipPermissions is active, all tools are auto-allowed
   if (state.skipPermissions) return 'allow';
 
-  const permissions = state.permissions;
+  const permissions = DEFAULT_LEGACY_PERMISSIONS;
 
   // 1. Per-domain per-tool override (most specific)
   if (domain) {

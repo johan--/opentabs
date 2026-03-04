@@ -42,8 +42,8 @@ import {
   serializePluginForExtension,
 } from './extension-handlers.js';
 import { log } from './logger.js';
-import type { ConfirmationDecision, PendingDispatch, ServerState } from './state.js';
-import { CONFIRMATION_TIMEOUT_MS, DISPATCH_TIMEOUT_MS, getNextRequestId } from './state.js';
+import type { PendingDispatch, ServerState } from './state.js';
+import { DISPATCH_TIMEOUT_MS, getNextRequestId } from './state.js';
 
 /** Maximum incoming WebSocket message size (10MB) */
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
@@ -226,14 +226,14 @@ const sendInvocationEnd = (
 
 /**
  * Send a confirmation request to the extension and return a promise that resolves
- * with the user's decision. The promise rejects on timeout (30s) or extension disconnect.
+ * with the user's decision. The promise rejects on extension disconnect.
  *
  * @param state - Server state
  * @param tool - Browser tool name (e.g., 'browser_execute_script')
  * @param domain - Target domain (e.g., 'mail.google.com'), or null
  * @param tabId - Target tab ID, if applicable
  * @param paramsPreview - Truncated preview of tool parameters
- * @returns The user's decision: 'allow_once', 'allow_always', or 'deny'
+ * @returns The user's decision: 'allow' or 'deny'
  */
 const sendConfirmationRequest = (
   state: ServerState,
@@ -241,22 +241,16 @@ const sendConfirmationRequest = (
   domain: string | null,
   tabId: number | undefined,
   paramsPreview: string,
-): Promise<ConfirmationDecision> => {
+): Promise<'allow' | 'deny'> => {
   const id = crypto.randomUUID();
 
-  return new Promise<ConfirmationDecision>((resolve, reject) => {
-    const timerId = setTimeout(() => {
-      state.pendingConfirmations.delete(id);
-      reject(new Error('CONFIRMATION_TIMEOUT'));
-    }, CONFIRMATION_TIMEOUT_MS);
-
+  return new Promise<'allow' | 'deny'>((resolve, reject) => {
     state.pendingConfirmations.set(id, {
       resolve,
       reject,
-      timerId,
       tool,
-      domain,
-      tabId,
+      plugin: 'browser',
+      params: { domain, tabId, paramsPreview },
     });
 
     const sent = sendToExtension(state, {
@@ -268,12 +262,10 @@ const sendConfirmationRequest = (
         domain,
         tabId,
         paramsPreview,
-        timeoutMs: CONFIRMATION_TIMEOUT_MS,
       },
     });
 
     if (!sent) {
-      clearTimeout(timerId);
       state.pendingConfirmations.delete(id);
       reject(new Error('Extension not connected — cannot request confirmation'));
     }

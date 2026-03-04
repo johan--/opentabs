@@ -15,8 +15,8 @@ import {
   rejectAllPendingConfirmations,
 } from './extension-handlers.js';
 import { clearAllLogs, getLogs } from './log-buffer.js';
-import type { PendingConfirmation, PendingDispatch, RegisteredPlugin, SessionPermissionRule } from './state.js';
-import { createState, DISPATCH_TIMEOUT_MS, MAX_DISPATCH_TIMEOUT_MS, MAX_SESSION_PERMISSIONS } from './state.js';
+import type { PendingConfirmation, PendingDispatch, RegisteredPlugin } from './state.js';
+import { createState, DISPATCH_TIMEOUT_MS, MAX_DISPATCH_TIMEOUT_MS } from './state.js';
 
 vi.mock('./plugin-management.js', () => ({
   searchNpmPlugins: vi.fn().mockResolvedValue([]),
@@ -39,9 +39,9 @@ const createPendingConfirmation = (
     reject: (err: Error) => {
       result.rejected = err;
     },
-    timerId: setTimeout(() => {}, 60_000),
     tool: 'slack_send_message',
-    domain: 'app.slack.com',
+    plugin: 'slack',
+    params: {},
     ...overrides,
   };
   return result;
@@ -58,14 +58,14 @@ const noopCallbacks: McpCallbacks = {
 };
 
 describe('handleConfirmationResponse', () => {
-  test('allow_once resolves the pending confirmation', () => {
+  test('allow resolves the pending confirmation', () => {
     const state = createState();
     const pending = createPendingConfirmation();
     state.pendingConfirmations.set('conf-1', pending);
 
-    handleConfirmationResponse(state, { id: 'conf-1', decision: 'allow_once' });
+    handleConfirmationResponse(state, { id: 'conf-1', decision: 'allow' });
 
-    expect(pending.resolved).toBe('allow_once');
+    expect(pending.resolved).toBe('allow');
     expect(state.pendingConfirmations.has('conf-1')).toBe(false);
   });
 
@@ -85,75 +85,16 @@ describe('handleConfirmationResponse', () => {
     const pending = createPendingConfirmation();
     state.pendingConfirmations.set('conf-3', pending);
 
-    handleConfirmationResponse(state, { id: 'nonexistent', decision: 'allow_once' });
+    handleConfirmationResponse(state, { id: 'nonexistent', decision: 'allow' });
 
     expect(pending.resolved).toBeUndefined();
     expect(state.pendingConfirmations.has('conf-3')).toBe(true);
-    clearTimeout(pending.timerId);
-  });
-
-  test('allow_always with default scope (tool_domain) adds session permission rule', () => {
-    const state = createState();
-    const pending = createPendingConfirmation({ tool: 'slack_send_message', domain: 'app.slack.com' });
-    state.pendingConfirmations.set('conf-4', pending);
-
-    handleConfirmationResponse(state, { id: 'conf-4', decision: 'allow_always' });
-
-    expect(pending.resolved).toBe('allow_always');
-    expect(state.sessionPermissions).toHaveLength(1);
-    const rule = state.sessionPermissions[0] as SessionPermissionRule;
-    expect(rule.tool).toBe('slack_send_message');
-    expect(rule.domain).toBe('app.slack.com');
-    expect(rule.scope).toBe('tool_domain');
-  });
-
-  test('allow_always with scope tool_all sets domain to null', () => {
-    const state = createState();
-    const pending = createPendingConfirmation({ tool: 'slack_send_message', domain: 'app.slack.com' });
-    state.pendingConfirmations.set('conf-5', pending);
-
-    handleConfirmationResponse(state, { id: 'conf-5', decision: 'allow_always', scope: 'tool_all' });
-
-    expect(state.sessionPermissions).toHaveLength(1);
-    const rule = state.sessionPermissions[0] as SessionPermissionRule;
-    expect(rule.tool).toBe('slack_send_message');
-    expect(rule.domain).toBeNull();
-    expect(rule.scope).toBe('tool_all');
-  });
-
-  test('allow_always with scope domain_all sets tool to null', () => {
-    const state = createState();
-    const pending = createPendingConfirmation({ tool: 'slack_send_message', domain: 'app.slack.com' });
-    state.pendingConfirmations.set('conf-6', pending);
-
-    handleConfirmationResponse(state, { id: 'conf-6', decision: 'allow_always', scope: 'domain_all' });
-
-    expect(state.sessionPermissions).toHaveLength(1);
-    const rule = state.sessionPermissions[0] as SessionPermissionRule;
-    expect(rule.tool).toBeNull();
-    expect(rule.domain).toBe('app.slack.com');
-    expect(rule.scope).toBe('domain_all');
-  });
-
-  test('allow_always with scope domain_all falls back to tool_domain when pending.domain is null', () => {
-    const state = createState();
-    const pending = createPendingConfirmation({ tool: 'browser_screenshot', domain: null });
-    state.pendingConfirmations.set('conf-6b', pending);
-
-    handleConfirmationResponse(state, { id: 'conf-6b', decision: 'allow_always', scope: 'domain_all' });
-
-    expect(state.sessionPermissions).toHaveLength(1);
-    const rule = state.sessionPermissions[0] as SessionPermissionRule;
-    expect(rule.tool).toBe('browser_screenshot');
-    expect(rule.domain).toBeNull();
-    expect(rule.scope).toBe('tool_domain');
   });
 
   test('missing params is silently ignored', () => {
     const state = createState();
     handleConfirmationResponse(state, undefined);
     expect(state.pendingConfirmations.size).toBe(0);
-    expect(state.sessionPermissions).toHaveLength(0);
   });
 
   test('invalid decision value is silently ignored', () => {
@@ -165,7 +106,6 @@ describe('handleConfirmationResponse', () => {
 
     expect(pending.resolved).toBeUndefined();
     expect(state.pendingConfirmations.has('conf-7')).toBe(true);
-    clearTimeout(pending.timerId);
   });
 
   test('non-string id is silently ignored', () => {
@@ -173,54 +113,10 @@ describe('handleConfirmationResponse', () => {
     const pending = createPendingConfirmation();
     state.pendingConfirmations.set('conf-8', pending);
 
-    handleConfirmationResponse(state, { id: 123, decision: 'allow_once' });
+    handleConfirmationResponse(state, { id: 123, decision: 'allow' });
 
     expect(pending.resolved).toBeUndefined();
     expect(state.pendingConfirmations.has('conf-8')).toBe(true);
-    clearTimeout(pending.timerId);
-  });
-
-  test('clears the pending confirmation timer', () => {
-    const state = createState();
-    let timerCleared = false;
-    const timerId = setTimeout(() => {
-      timerCleared = false;
-    }, 60_000);
-    const pending = createPendingConfirmation({ timerId });
-    state.pendingConfirmations.set('conf-9', pending);
-
-    handleConfirmationResponse(state, { id: 'conf-9', decision: 'allow_once' });
-
-    // The timer was cleared by clearTimeout — verify by checking the confirmation was removed
-    expect(state.pendingConfirmations.has('conf-9')).toBe(false);
-    expect(pending.resolved).toBe('allow_once');
-    // Suppress unused variable lint
-    void timerCleared;
-  });
-
-  test('sessionPermissions is capped at MAX_SESSION_PERMISSIONS — oldest entries are dropped', () => {
-    const state = createState();
-
-    // Pre-fill to the cap with distinct tool_domain rules
-    for (let i = 0; i < MAX_SESSION_PERMISSIONS; i++) {
-      const pending = createPendingConfirmation({ tool: `plugin_tool_${i}`, domain: `example-${i}.com` });
-      state.pendingConfirmations.set(`cap-${i}`, pending);
-      handleConfirmationResponse(state, { id: `cap-${i}`, decision: 'allow_always', scope: 'tool_domain' });
-    }
-
-    expect(state.sessionPermissions).toHaveLength(MAX_SESSION_PERMISSIONS);
-
-    // Add one more — the oldest entry should be dropped
-    const overflowPending = createPendingConfirmation({ tool: 'plugin_overflow', domain: 'overflow.com' });
-    state.pendingConfirmations.set('cap-overflow', overflowPending);
-    handleConfirmationResponse(state, { id: 'cap-overflow', decision: 'allow_always', scope: 'tool_domain' });
-
-    expect(state.sessionPermissions).toHaveLength(MAX_SESSION_PERMISSIONS);
-    // The newest entry should be present
-    const last = state.sessionPermissions[MAX_SESSION_PERMISSIONS - 1] as SessionPermissionRule;
-    expect(last.tool).toBe('plugin_overflow');
-    // The oldest entry (tool_0) should have been dropped
-    expect(state.sessionPermissions.some(r => r.tool === 'plugin_tool_0')).toBe(false);
   });
 });
 
@@ -704,7 +600,7 @@ describe('handleConfigGetState', () => {
       { name: 'browser_list_tabs', description: 'List tabs', inputSchema: {}, tool: null as never },
       { name: 'browser_screenshot', description: 'Screenshot', inputSchema: {}, tool: null as never },
     ];
-    state.browserToolPolicy = { browser_list_tabs: false };
+    state.pluginPermissions = { browser: { tools: { browser_list_tabs: 'off' } } };
 
     handleConfigGetState(state, 'req-3');
 
@@ -763,7 +659,7 @@ describe('handleConfigSetBrowserToolEnabled', () => {
 
     handleConfigSetBrowserToolEnabled(state, { tool: 'browser_list_tabs', permission: 'off' }, 'req-1', noopCallbacks);
 
-    expect(state.browserToolPolicy.browser_list_tabs).toBe(false);
+    expect(state.pluginPermissions.browser?.tools?.browser_list_tabs).toBe('off');
     // First message is plugins.changed notification, second is the result
     expect(messages).toHaveLength(2);
     const notification = JSON.parse(messages[0] as string) as {
@@ -854,18 +750,18 @@ describe('handleConfigSetBrowserToolEnabled', () => {
     expect(response.error.message).toContain('expected tool (string), permission (string)');
   });
 
-  test('re-enabling a disabled tool sets policy to true', () => {
+  test('re-enabling a disabled tool sets permission to auto', () => {
     const state = createState();
     const { ws } = createMockWs();
     state.extensionWs = ws;
     state.cachedBrowserTools = [
       { name: 'browser_list_tabs', description: 'List tabs', inputSchema: {}, tool: null as never },
     ];
-    state.browserToolPolicy = { browser_list_tabs: false };
+    state.pluginPermissions = { browser: { tools: { browser_list_tabs: 'off' } } };
 
     handleConfigSetBrowserToolEnabled(state, { tool: 'browser_list_tabs', permission: 'auto' }, 'req-6', noopCallbacks);
 
-    expect(state.browserToolPolicy.browser_list_tabs).toBe(true);
+    expect(state.pluginPermissions.browser?.tools?.browser_list_tabs).toBe('auto');
   });
 });
 
@@ -886,8 +782,7 @@ describe('handleConfigSetAllBrowserToolsEnabled', () => {
 
     handleConfigSetAllBrowserToolsEnabled(state, { permission: 'off' }, 'req-1', noopCallbacks);
 
-    expect(state.browserToolPolicy.browser_list_tabs).toBe(false);
-    expect(state.browserToolPolicy.browser_screenshot).toBe(false);
+    expect(state.pluginPermissions.browser?.permission).toBe('off');
     // First message is plugins.changed notification, second is the result
     expect(messages).toHaveLength(2);
     const notification = JSON.parse(messages[0] as string) as {
@@ -921,12 +816,11 @@ describe('handleConfigSetAllBrowserToolsEnabled', () => {
       { name: 'browser_list_tabs', description: 'List tabs', inputSchema: {}, tool: null as never },
       { name: 'browser_screenshot', description: 'Screenshot', inputSchema: {}, tool: null as never },
     ];
-    state.browserToolPolicy = { browser_list_tabs: false, browser_screenshot: false };
+    state.pluginPermissions = { browser: { tools: { browser_list_tabs: 'off', browser_screenshot: 'off' } } };
 
     handleConfigSetAllBrowserToolsEnabled(state, { permission: 'auto' }, 'req-2', noopCallbacks);
 
-    expect(state.browserToolPolicy.browser_list_tabs).toBe(true);
-    expect(state.browserToolPolicy.browser_screenshot).toBe(true);
+    expect(state.pluginPermissions.browser?.permission).toBe('auto');
   });
 
   test('calls onToolConfigChanged and onBrowserToolPolicyPersist', () => {
@@ -1043,7 +937,7 @@ describe('handleConfigSetToolEnabled', () => {
     expect(response.id).toBe('req-1');
   });
 
-  test('sets toolConfig correctly', () => {
+  test('sets pluginPermissions correctly', () => {
     const state = createState();
     const { ws } = createMockWs();
     state.extensionWs = ws;
@@ -1060,7 +954,7 @@ describe('handleConfigSetToolEnabled', () => {
       noopCallbacks,
     );
 
-    expect(state.toolConfig['test-plugin_do_thing']).toBe(false);
+    expect(state.pluginPermissions['test-plugin']?.tools?.do_thing).toBe('off');
   });
 
   test('calls onToolConfigChanged and onToolConfigPersist', () => {
@@ -1219,7 +1113,7 @@ describe('handleConfigSetAllToolsEnabled', () => {
     expect(response.id).toBe('req-1');
   });
 
-  test('disables all tools in toolConfig', () => {
+  test('sets plugin-level permission in pluginPermissions', () => {
     const state = createState();
     const { ws } = createMockWs();
     state.extensionWs = ws;
@@ -1231,8 +1125,7 @@ describe('handleConfigSetAllToolsEnabled', () => {
 
     handleConfigSetAllToolsEnabled(state, { plugin: 'test-plugin', permission: 'off' }, 'req-2', noopCallbacks);
 
-    expect(state.toolConfig['test-plugin_tool_a']).toBe(false);
-    expect(state.toolConfig['test-plugin_tool_b']).toBe(false);
+    expect(state.pluginPermissions['test-plugin']?.permission).toBe('off');
   });
 
   test('calls onToolConfigChanged and onToolConfigPersist', () => {

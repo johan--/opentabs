@@ -634,7 +634,7 @@ describe('sendSyncFull', () => {
     );
 
     // alpha_ping enabled (default), beta_pong explicitly disabled
-    state.toolConfig = { beta_pong: false };
+    state.pluginPermissions = { beta: { tools: { pong: 'off' } } };
 
     await sendSyncFull(state);
 
@@ -1122,7 +1122,7 @@ describe('handleExtensionMessage — config.getState', () => {
     });
   });
 
-  test('tools respect permission state from toolConfig', () => {
+  test('tools respect permission state from pluginPermissions', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
@@ -1153,7 +1153,7 @@ describe('handleExtensionMessage — config.getState', () => {
       ],
       [],
     );
-    state.toolConfig = { 'my-plugin_disabled-tool': false };
+    state.pluginPermissions = { 'my-plugin': { tools: { 'disabled-tool': 'off' } } };
 
     handleExtensionMessage(state, JSON.stringify({ jsonrpc: '2.0', method: 'config.getState', id: 2 }), noopCallbacks);
 
@@ -1412,7 +1412,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     ...overrides,
   });
 
-  test('valid params updates toolConfig with prefixed key and sends { ok: true }', () => {
+  test('valid params updates pluginPermissions and sends { ok: true }', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
@@ -1462,7 +1462,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       callbacks,
     );
 
-    expect(state.toolConfig['my-plugin_send']).toBe(false);
+    expect(state.pluginPermissions['my-plugin']?.tools?.send).toBe('off');
     expect(configChangedCalled).toBe(true);
     expect(configPersistCalled).toBe(true);
 
@@ -1476,11 +1476,11 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     expect(response.result).toEqual({ ok: true });
   });
 
-  test('enabling a tool sets toolConfig to true', () => {
+  test('enabling a tool sets pluginPermissions to auto', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
-    state.toolConfig = { 'my-plugin_send': false };
+    state.pluginPermissions = { 'my-plugin': { tools: { send: 'off' } } };
 
     state.registry = buildRegistry(
       [
@@ -1512,7 +1512,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       noopCallbacks,
     );
 
-    expect(state.toolConfig['my-plugin_send']).toBe(true);
+    expect(state.pluginPermissions['my-plugin']?.tools?.send).toBe('auto');
 
     // First message is plugins.changed notification, second is the result
     const rawEnable = ws.sent[1];
@@ -1745,7 +1745,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
     expect(configPersistCalled).toBe(false);
   });
 
-  test('nonexistent tool does not mutate toolConfig', () => {
+  test('nonexistent tool does not mutate pluginPermissions', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
@@ -1780,7 +1780,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       noopCallbacks,
     );
 
-    expect(state.toolConfig).toEqual({});
+    expect(state.pluginPermissions).toEqual({});
   });
 });
 
@@ -1795,7 +1795,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
     ...overrides,
   });
 
-  test('enabling all tools sets every tool in toolConfig to true', () => {
+  test('enabling all tools sets plugin-level permission to auto', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
@@ -1834,7 +1834,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       ],
       [],
     );
-    state.toolConfig = { 'my-plugin_alpha': false, 'my-plugin_beta': false, 'my-plugin_gamma': false };
+    state.pluginPermissions = { 'my-plugin': { tools: { alpha: 'off', beta: 'off', gamma: 'off' } } };
 
     handleExtensionMessage(
       state,
@@ -1847,9 +1847,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       noopCallbacks,
     );
 
-    expect(state.toolConfig['my-plugin_alpha']).toBe(true);
-    expect(state.toolConfig['my-plugin_beta']).toBe(true);
-    expect(state.toolConfig['my-plugin_gamma']).toBe(true);
+    expect(state.pluginPermissions['my-plugin']?.permission).toBe('auto');
 
     // First message is plugins.changed notification, second is the result
     const rawAllEnabled = ws.sent[1];
@@ -1860,7 +1858,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
     expect(response.result).toEqual({ ok: true });
   });
 
-  test('disabling all tools sets every tool in toolConfig to false', () => {
+  test('disabling all tools sets plugin-level permission to off', () => {
     const state = createState();
     const ws = createMockWs();
     state.extensionWs = ws;
@@ -1891,7 +1889,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       ],
       [],
     );
-    state.toolConfig = { 'my-plugin_alpha': true, 'my-plugin_beta': true };
+    state.pluginPermissions = { 'my-plugin': { tools: { alpha: 'auto', beta: 'auto' } } };
 
     handleExtensionMessage(
       state,
@@ -1904,8 +1902,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       noopCallbacks,
     );
 
-    expect(state.toolConfig['my-plugin_alpha']).toBe(false);
-    expect(state.toolConfig['my-plugin_beta']).toBe(false);
+    expect(state.pluginPermissions['my-plugin']?.permission).toBe('off');
   });
 
   test('both callbacks are invoked on valid request with existing plugin', () => {
