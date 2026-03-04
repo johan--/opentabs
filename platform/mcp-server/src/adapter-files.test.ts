@@ -75,7 +75,7 @@ describe('writeExecFile', () => {
     expect(content.startsWith('(function() {')).toBe(true);
     expect(content.endsWith('})();')).toBe(true);
     // User code is placed inline in an inner function (no eval/new Function)
-    expect(content).toContain('var __r = (function() {');
+    expect(content).toContain('var __r = (async function() {');
     expect(content).toContain('return 42');
     expect(content).not.toContain('new Function');
     // Contains the namespaced result capture mechanism

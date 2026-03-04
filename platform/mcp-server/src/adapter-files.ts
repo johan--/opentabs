@@ -180,7 +180,7 @@ const writeExecFile = async (state: ServerState, execId: string, code: string): 
     `  var __resultKey = ${JSON.stringify(resultKey)};`,
     `  var __asyncKey = ${JSON.stringify(asyncKey)};`,
     '  try {',
-    '    var __r = (function() {',
+    '    var __r = (async function() {',
     code,
     '    })();',
     '    if (__r && typeof __r === "object" && typeof __r.then === "function") {',
