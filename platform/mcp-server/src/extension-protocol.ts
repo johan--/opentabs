@@ -42,7 +42,7 @@ import {
   serializePluginForExtension,
 } from './extension-handlers.js';
 import { log } from './logger.js';
-import type { PendingDispatch, ServerState } from './state.js';
+import type { ConfirmationDecision, PendingDispatch, ServerState } from './state.js';
 import { DISPATCH_TIMEOUT_MS, getNextRequestId } from './state.js';
 
 /** Maximum incoming WebSocket message size (10MB) */
@@ -227,42 +227,30 @@ const sendInvocationEnd = (
 /**
  * Send a confirmation request to the extension and return a promise that resolves
  * with the user's decision. The promise rejects on extension disconnect.
- *
- * @param state - Server state
- * @param tool - Browser tool name (e.g., 'browser_execute_script')
- * @param domain - Target domain (e.g., 'mail.google.com'), or null
- * @param tabId - Target tab ID, if applicable
- * @param paramsPreview - Truncated preview of tool parameters
- * @returns The user's decision: 'allow' or 'deny'
+ * There is no timeout — the request hangs until the user responds or the
+ * WebSocket disconnects (at which point rejectAllPendingConfirmations fires).
  */
 const sendConfirmationRequest = (
   state: ServerState,
   tool: string,
-  domain: string | null,
-  tabId: number | undefined,
-  paramsPreview: string,
-): Promise<'allow' | 'deny'> => {
+  plugin: string,
+  params: Record<string, unknown>,
+): Promise<ConfirmationDecision> => {
   const id = crypto.randomUUID();
 
-  return new Promise<'allow' | 'deny'>((resolve, reject) => {
+  return new Promise<ConfirmationDecision>((resolve, reject) => {
     state.pendingConfirmations.set(id, {
       resolve,
       reject,
       tool,
-      plugin: 'browser',
-      params: { domain, tabId, paramsPreview },
+      plugin,
+      params,
     });
 
     const sent = sendToExtension(state, {
       jsonrpc: '2.0',
       method: 'confirmation.request',
-      params: {
-        id,
-        tool,
-        domain,
-        tabId,
-        paramsPreview,
-      },
+      params: { id, tool, plugin, params },
     });
 
     if (!sent) {

@@ -65,7 +65,7 @@ describe('handleConfirmationResponse', () => {
 
     handleConfirmationResponse(state, { id: 'conf-1', decision: 'allow' });
 
-    expect(pending.resolved).toBe('allow');
+    expect(pending.resolved).toEqual({ action: 'allow', alwaysAllow: false });
     expect(state.pendingConfirmations.has('conf-1')).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe('handleConfirmationResponse', () => {
 
     handleConfirmationResponse(state, { id: 'conf-2', decision: 'deny' });
 
-    expect(pending.resolved).toBe('deny');
+    expect(pending.resolved).toEqual({ action: 'deny', alwaysAllow: false });
     expect(state.pendingConfirmations.has('conf-2')).toBe(false);
   });
 

@@ -675,8 +675,10 @@ const handleConfirmationResponse = (state: ServerState, params: Record<string, u
   const pending = state.pendingConfirmations.get(id);
   if (!pending) return;
 
+  const alwaysAllow = params.alwaysAllow === true;
+
   state.pendingConfirmations.delete(id);
-  pending.resolve(decision);
+  pending.resolve({ action: decision, alwaysAllow });
 };
 
 /**

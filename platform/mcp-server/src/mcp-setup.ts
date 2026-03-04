@@ -24,7 +24,7 @@
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { log } from './logger.js';
-import type { RequestHandlerExtra } from './mcp-tool-dispatch.js';
+import type { DispatchCallbacks, RequestHandlerExtra } from './mcp-tool-dispatch.js';
 import { handleBrowserToolCall, handlePluginToolCall } from './mcp-tool-dispatch.js';
 import type { CachedBrowserTool, ServerState, ToolLookupEntry } from './state.js';
 import { getToolPermission, prefixedToolName } from './state.js';
@@ -108,6 +108,10 @@ const rebuildCachedBrowserTools = (state: ServerState): void => {
  *   2. Hot reload sequence in reload.ts — for existing sessions
  */
 const registerMcpHandlers = (server: McpServerInstance, state: ServerState): void => {
+  const dispatchCallbacks: DispatchCallbacks = {
+    onToolConfigChanged: () => notifyToolListChanged(server),
+  };
+
   // Handler: tools/list — return enabled plugin tools + browser tools.
   // Delegates to getEnabledToolsList() which filters disabled plugin tools
   // and always includes browser tools.
@@ -125,7 +129,7 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
     // Browser tools are few and fixed.
     const cachedBt = state.cachedBrowserTools.find(c => c.name === toolName);
     if (cachedBt) {
-      return handleBrowserToolCall(state, toolName, args, cachedBt, extra);
+      return handleBrowserToolCall(state, toolName, args, cachedBt, extra, dispatchCallbacks);
     }
 
     // O(1) plugin tool lookup + enabled check via pre-built map
@@ -142,7 +146,7 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
     // Safe to assert: checkToolCallable verified the tool exists in registry.toolLookup
     const lookup = state.registry.toolLookup.get(toolName) as ToolLookupEntry;
 
-    return handlePluginToolCall(state, toolName, args, foundPlugin, foundTool, lookup, extra);
+    return handlePluginToolCall(state, toolName, args, foundPlugin, foundTool, lookup, extra, dispatchCallbacks);
   });
 };
 

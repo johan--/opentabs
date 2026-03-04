@@ -6,9 +6,17 @@
  * mcp-setup.ts delegates to these functions after resolving the tool name.
  */
 
+import type { PluginPermissionConfig } from '@opentabs-dev/shared';
 import { toErrorMessage } from '@opentabs-dev/shared';
 import type { ZodError } from 'zod';
-import { dispatchToExtension, isDispatchError, sendInvocationEnd, sendInvocationStart } from './extension-protocol.js';
+import { savePluginPermissions } from './config.js';
+import {
+  dispatchToExtension,
+  isDispatchError,
+  sendConfirmationRequest,
+  sendInvocationEnd,
+  sendInvocationStart,
+} from './extension-protocol.js';
 import { log } from './logger.js';
 import { sanitizeErrorMessage } from './sanitize-error.js';
 import type { AuditEntry, CachedBrowserTool, ServerState, ToolLookupEntry } from './state.js';
@@ -92,22 +100,105 @@ interface RequestHandlerExtra {
   sendNotification: (notification: { method: string; params?: Record<string, unknown> }) => Promise<void>;
 }
 
+/** Callbacks from the MCP setup layer for persisting config changes */
+interface DispatchCallbacks {
+  onToolConfigChanged: () => void;
+}
+
 /**
- * Handle a browser tool call: Zod validation, permission evaluation,
- * confirmation flow, execution, output sanitization, and audit logging.
+ * Run the 'ask' confirmation flow for a tool call.
+ * Sends a confirmation request to the extension, waits for the user's decision,
+ * and persists the permission change if alwaysAllow is selected.
+ *
+ * @returns 'allow' if the user approved, or a ToolCallResult error if denied/failed.
+ */
+const runAskFlow = async (
+  state: ServerState,
+  pluginName: string,
+  toolName: string,
+  params: Record<string, unknown>,
+  extra: RequestHandlerExtra,
+  callbacks: DispatchCallbacks,
+): Promise<'allow' | ToolCallResult> => {
+  // Send MCP progress notification to let the agent know we're waiting for approval
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken !== undefined) {
+    extra
+      .sendNotification({
+        method: 'notifications/progress',
+        params: {
+          progressToken,
+          progress: 0,
+          total: 1,
+          message: 'Waiting for user approval in the OpenTabs side panel',
+        },
+      })
+      .catch(() => {
+        // Fire-and-forget
+      });
+  }
+
+  let decision: { action: 'allow' | 'deny'; alwaysAllow: boolean };
+  try {
+    decision = await sendConfirmationRequest(state, toolName, pluginName, params);
+  } catch {
+    return {
+      content: [
+        { type: 'text' as const, text: `Tool ${toolName} requires approval but the extension is not connected.` },
+      ],
+      isError: true,
+    };
+  }
+
+  if (decision.action === 'deny') {
+    return {
+      content: [{ type: 'text' as const, text: `Tool ${toolName} was denied by the user.` }],
+      isError: true,
+    };
+  }
+
+  // User approved — persist to 'auto' if alwaysAllow was selected
+  if (decision.alwaysAllow) {
+    const existing = state.pluginPermissions[pluginName];
+    const toolOverrides = { ...(existing?.tools ?? {}), [toolName]: 'auto' as const };
+    const updatedConfig: PluginPermissionConfig = { ...existing, tools: toolOverrides };
+    state.pluginPermissions[pluginName] = updatedConfig;
+    void savePluginPermissions(state, state.pluginPermissions);
+    callbacks.onToolConfigChanged();
+  }
+
+  return 'allow';
+};
+
+/**
+ * Handle a browser tool call: permission check, Zod validation,
+ * confirmation flow (for 'ask'), execution, output sanitization, and audit logging.
  */
 const handleBrowserToolCall = async (
   state: ServerState,
   toolName: string,
   args: Record<string, unknown>,
   cachedBt: CachedBrowserTool,
-  _extra: RequestHandlerExtra,
+  extra: RequestHandlerExtra,
+  callbacks: DispatchCallbacks,
 ): Promise<ToolCallResult> => {
-  if (getToolPermission(state, 'browser', toolName) === 'off') {
+  const permission = getToolPermission(state, 'browser', toolName);
+
+  if (permission === 'off') {
     return {
-      content: [{ type: 'text' as const, text: `Tool ${toolName} is disabled via configuration` }],
+      content: [
+        {
+          type: 'text' as const,
+          text: `Tool ${toolName} is currently disabled. Ask the user to enable it in the OpenTabs side panel.`,
+        },
+      ],
       isError: true,
     };
+  }
+
+  if (permission === 'ask') {
+    const askResult = await runAskFlow(state, 'browser', toolName, args, extra, callbacks);
+    if (askResult !== 'allow') return askResult;
   }
 
   // Validate args through the tool's Zod input schema
@@ -153,7 +244,7 @@ const handleBrowserToolCall = async (
 };
 
 /**
- * Handle a plugin tool call: Ajv validation, concurrency limiting,
+ * Handle a plugin tool call: permission check, Ajv validation, concurrency limiting,
  * dispatch to extension, error formatting, and audit logging.
  *
  * The caller must have already verified the tool is callable via checkToolCallable.
@@ -166,7 +257,28 @@ const handlePluginToolCall = async (
   toolBaseName: string,
   lookup: ToolLookupEntry,
   extra: RequestHandlerExtra,
+  callbacks: DispatchCallbacks,
 ): Promise<ToolCallResult> => {
+  // Permission check — applies to all plugin tools
+  const permission = getToolPermission(state, pluginName, toolBaseName);
+
+  if (permission === 'off') {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Tool ${toolName} is currently disabled. Ask the user to enable it in the OpenTabs side panel.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (permission === 'ask') {
+    const askResult = await runAskFlow(state, pluginName, toolBaseName, args, extra, callbacks);
+    if (askResult !== 'allow') return askResult;
+  }
+
   // Extract platform-injected tabId before validation — the plugin's own
   // schema doesn't know about tabId, so it must be stripped before Ajv runs
   // (otherwise plugins with additionalProperties: false would reject it).
@@ -342,5 +454,5 @@ const handlePluginToolCall = async (
   }
 };
 
-export type { ToolCallResult, RequestHandlerExtra };
+export type { ToolCallResult, RequestHandlerExtra, DispatchCallbacks };
 export { sanitizeOutput, formatStructuredError, formatZodError, handleBrowserToolCall, handlePluginToolCall };

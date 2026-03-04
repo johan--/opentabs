@@ -192,9 +192,15 @@ export interface PluginRegistry {
   readonly failures: readonly FailedPlugin[];
 }
 
+/** Result of a user's confirmation decision */
+export interface ConfirmationDecision {
+  action: 'allow' | 'deny';
+  alwaysAllow: boolean;
+}
+
 /** Pending confirmation awaiting human approval */
 export interface PendingConfirmation {
-  resolve: (decision: 'allow' | 'deny') => void;
+  resolve: (decision: ConfirmationDecision) => void;
   reject: (error: Error) => void;
   tool: string;
   plugin: string;

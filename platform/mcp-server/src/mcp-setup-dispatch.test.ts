@@ -235,7 +235,7 @@ describe('tools/call handler — browser tool disabled via pluginPermissions', (
     };
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toBe('Tool browser_execute_script is disabled via configuration');
+    expect(result.content[0]?.text).toContain('currently disabled');
   });
 
   test('enabled browser tool dispatches normally', async () => {
