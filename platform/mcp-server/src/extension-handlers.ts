@@ -429,6 +429,7 @@ const handleConfigSetPluginPermission = (
   const allToolsPermissionParams = params as Partial<ConfigSetPluginPermissionParams>;
   const pluginName = allToolsPermissionParams.plugin;
   const permission = allToolsPermissionParams.permission;
+  const reviewedVersion = allToolsPermissionParams.reviewedVersion;
 
   if (typeof pluginName !== 'string' || typeof permission !== 'string') {
     sendJsonRpcError(state, id, -32602, 'Invalid params: expected plugin (string), permission (string)');
@@ -450,7 +451,11 @@ const handleConfigSetPluginPermission = (
   }
 
   const pConfig = state.pluginPermissions[pluginName] ?? {};
-  state.pluginPermissions[pluginName] = { ...pConfig, permission: permission as ToolPermission };
+  state.pluginPermissions[pluginName] = {
+    ...pConfig,
+    permission: permission as ToolPermission,
+    ...(typeof reviewedVersion === 'string' ? { reviewedVersion } : {}),
+  };
   callbacks.onToolConfigChanged();
   callbacks.onPluginPermissionsPersist();
 

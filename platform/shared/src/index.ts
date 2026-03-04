@@ -361,6 +361,8 @@ export interface ConfigSetToolPermissionParams {
 export interface ConfigSetPluginPermissionParams {
   plugin: string;
   permission: ToolPermission;
+  /** When provided, sets the plugin's reviewedVersion (used by "Enable Anyway" in the side panel) */
+  reviewedVersion?: string;
 }
 
 /** extension.reload request: server → extension (no params needed) */
