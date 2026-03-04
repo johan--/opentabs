@@ -89,6 +89,33 @@ const WithConfirmDialog: Story = {
   ),
 };
 
+const UpdateBadge: Story = {
+  render: () => (
+    <div className="space-y-4">
+      <div>
+        <p className="mb-1 text-muted-foreground text-xs">No update — no badge on trigger</p>
+        <PluginMenu
+          plugin={mockNpmPlugin()}
+          onUpdate={() => undefined}
+          onRemove={() => undefined}
+          updating={false}
+          removing={false}
+        />
+      </div>
+      <div>
+        <p className="mb-1 text-muted-foreground text-xs">Update available — yellow dot on trigger</p>
+        <PluginMenu
+          plugin={mockNpmPlugin({ update: { latestVersion: '0.2.0', updateCommand: 'npm update slack' } })}
+          onUpdate={() => undefined}
+          onRemove={() => undefined}
+          updating={false}
+          removing={false}
+        />
+      </div>
+    </div>
+  ),
+};
+
 const AllStates: Story = {
   render: () => (
     <div className="space-y-4">
@@ -103,7 +130,7 @@ const AllStates: Story = {
         />
       </div>
       <div>
-        <p className="mb-1 text-muted-foreground text-xs">With update available</p>
+        <p className="mb-1 text-muted-foreground text-xs">With update available (badge + menu item)</p>
         <PluginMenu
           plugin={mockNpmPlugin({ update: { latestVersion: '0.2.0', updateCommand: 'npm update slack' } })}
           onUpdate={() => undefined}
@@ -147,4 +174,4 @@ const AllStates: Story = {
 };
 
 export default meta;
-export { Default, WithUpdate, LocalPlugin, WithConfirmDialog, AllStates };
+export { Default, WithUpdate, LocalPlugin, WithConfirmDialog, UpdateBadge, AllStates };

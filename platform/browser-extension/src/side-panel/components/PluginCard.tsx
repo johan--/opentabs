@@ -155,10 +155,7 @@ const PluginCard = ({
                 />
               </div>
             </Tooltip.Trigger>
-            <Tooltip.Content>
-              v{plugin.version}
-              {plugin.update && <> &middot; Update: {plugin.update.latestVersion}</>}
-            </Tooltip.Content>
+            <Tooltip.Content>v{plugin.version}</Tooltip.Content>
           </Tooltip>
           <div className="flex min-w-0 flex-1 items-center gap-1.5 truncate font-head text-foreground text-sm">
             {plugin.displayName}
