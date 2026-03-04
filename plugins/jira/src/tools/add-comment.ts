@@ -7,6 +7,7 @@ export const addComment = defineTool({
   name: 'add_comment',
   displayName: 'Add Comment',
   description: 'Add a comment to a Jira issue.',
+  summary: 'Add a comment to an issue',
   icon: 'message-square',
   group: 'Comments',
   input: z.object({

@@ -8,6 +8,7 @@ export const searchIssues = defineTool({
   displayName: 'Search Issues',
   description:
     'Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.',
+  summary: 'Search issues using JQL',
   icon: 'search',
   group: 'Issues',
   input: z.object({

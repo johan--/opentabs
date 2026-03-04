@@ -7,6 +7,7 @@ export const listProjects = defineTool({
   name: 'list_projects',
   displayName: 'List Projects',
   description: 'List Jira projects accessible to the current user with optional search.',
+  summary: 'List accessible projects',
   icon: 'folder',
   group: 'Projects',
   input: z.object({

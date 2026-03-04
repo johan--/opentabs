@@ -8,6 +8,7 @@ export const searchUsers = defineTool({
   displayName: 'Search Users',
   description:
     'Search for Jira users by name or email. Useful for finding account IDs to use with assign_issue or create_issue.',
+  summary: 'Search for users by name or email',
   icon: 'users',
   group: 'Users',
   input: z.object({

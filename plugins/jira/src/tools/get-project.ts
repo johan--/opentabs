@@ -7,6 +7,7 @@ export const getProject = defineTool({
   name: 'get_project',
   displayName: 'Get Project',
   description: 'Get detailed information about a Jira project by its key or ID.',
+  summary: 'Get details of a project',
   icon: 'folder-open',
   group: 'Projects',
   input: z.object({

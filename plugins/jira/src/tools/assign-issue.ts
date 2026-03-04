@@ -6,6 +6,7 @@ export const assignIssue = defineTool({
   name: 'assign_issue',
   displayName: 'Assign Issue',
   description: 'Assign a Jira issue to a user, or unassign it by passing null. Use search_users to find account IDs.',
+  summary: 'Assign or unassign an issue',
   icon: 'user-plus',
   group: 'Issues',
   input: z.object({

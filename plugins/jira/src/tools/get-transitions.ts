@@ -8,6 +8,7 @@ export const getTransitions = defineTool({
   displayName: 'Get Transitions',
   description:
     'Get available status transitions for a Jira issue. Use this to find transition IDs before calling transition_issue.',
+  summary: 'Get available status transitions',
   icon: 'git-branch',
   group: 'Issues',
   input: z.object({

@@ -7,6 +7,7 @@ export const transitionIssue = defineTool({
   displayName: 'Transition Issue',
   description:
     'Transition a Jira issue to a new status. Use get_transitions to find available transition IDs for an issue.',
+  summary: "Change an issue's status",
   icon: 'arrow-right-circle',
   group: 'Issues',
   input: z.object({

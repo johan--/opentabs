@@ -7,6 +7,7 @@ export const getIssue = defineTool({
   name: 'get_issue',
   displayName: 'Get Issue',
   description: 'Get detailed information about a specific Jira issue by its key (e.g. KAN-1) or ID.',
+  summary: 'Get details of an issue',
   icon: 'file-text',
   group: 'Issues',
   input: z.object({

@@ -6,6 +6,7 @@ export const deleteIssue = defineTool({
   name: 'delete_issue',
   displayName: 'Delete Issue',
   description: 'Delete a Jira issue. Optionally delete all subtasks as well.',
+  summary: 'Delete an issue',
   icon: 'trash-2',
   group: 'Issues',
   input: z.object({

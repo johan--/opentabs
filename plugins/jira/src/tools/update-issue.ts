@@ -8,6 +8,7 @@ export const updateIssue = defineTool({
   displayName: 'Update Issue',
   description:
     'Update fields on an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.',
+  summary: 'Update an existing issue',
   icon: 'pencil',
   group: 'Issues',
   input: z.object({

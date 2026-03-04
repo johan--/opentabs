@@ -7,6 +7,7 @@ export const listComments = defineTool({
   name: 'list_comments',
   displayName: 'List Comments',
   description: 'List comments on a Jira issue with pagination support.',
+  summary: 'List comments on an issue',
   icon: 'message-circle',
   group: 'Comments',
   input: z.object({
