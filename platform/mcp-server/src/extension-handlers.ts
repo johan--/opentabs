@@ -328,6 +328,7 @@ const buildConfigStatePayload = (state: ServerState): ConfigStateResult => {
     browserTools,
     browserPermission,
     serverVersion: version,
+    skipPermissions: state.skipPermissions,
   };
 };
 

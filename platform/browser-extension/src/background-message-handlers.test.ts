@@ -9,7 +9,9 @@ interface FullStateResponse {
   plugins: ConfigStatePlugin[];
   failedPlugins: ConfigStateFailedPlugin[];
   browserTools: ConfigStateBrowserTool[];
+  browserPermission?: string;
   serverVersion?: string;
+  skipPermissions?: boolean;
   pendingConfirmations: unknown[];
 }
 
@@ -519,7 +521,9 @@ describe('handleBgGetFullState', () => {
       plugins: [],
       failedPlugins: [],
       browserTools: [],
+      browserPermission: undefined,
       serverVersion: undefined,
+      skipPermissions: undefined,
       pendingConfirmations: [],
     });
   });

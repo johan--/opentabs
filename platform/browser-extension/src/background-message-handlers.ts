@@ -227,6 +227,7 @@ const handleBgGetFullState: MessageHandler = (_message, sendResponse) => {
       browserTools: serverCache.browserTools,
       browserPermission: serverCache.browserPermission,
       serverVersion: serverCache.serverVersion,
+      skipPermissions: serverCache.skipPermissions,
       pendingConfirmations: getPendingConfirmations(),
     });
   })().catch(() => {

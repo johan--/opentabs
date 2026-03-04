@@ -41,6 +41,7 @@ const App = () => {
     BROWSER_TOOLS_CATALOG.map(t => ({ ...t, permission: 'auto' as const })),
   );
   const [browserPermission, setBrowserPermission] = useState<ToolPermission>('off');
+  const [skipPermissions, setSkipPermissions] = useState(false);
   const [serverVersion, setServerVersion] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [activeTools, setActiveTools] = useState<Set<string>>(new Set());
@@ -213,6 +214,7 @@ const App = () => {
         return merged;
       });
       setBrowserPermission(result.browserPermission ?? 'off');
+      setSkipPermissions(result.skipPermissions ?? false);
       setServerVersion(result.serverVersion);
       setActiveTools(prev => {
         const next = new Set<string>();
@@ -285,6 +287,7 @@ const App = () => {
           setFailedPlugins([]);
           setBrowserTools(BROWSER_TOOLS_CATALOG.map(t => ({ ...t, permission: 'auto' as const })));
           setBrowserPermission('off');
+          setSkipPermissions(false);
           setServerVersion(undefined);
           setActiveTools(new Set());
           setPendingConfirmations([]);
@@ -398,6 +401,7 @@ const App = () => {
                 removingPlugins={removingPlugins}
                 pluginErrors={pluginErrors}
                 serverVersion={serverVersion}
+                skipPermissions={skipPermissions}
               />
             ) : hasContent ? (
               <>
@@ -410,6 +414,7 @@ const App = () => {
                       serverVersion={serverVersion}
                       browserPermission={browserPermission}
                       onBrowserPermissionChange={setBrowserPermission}
+                      skipPermissions={skipPermissions}
                     />
                   </Accordion>
                 )}
@@ -423,6 +428,7 @@ const App = () => {
                   onRemove={handleRemove}
                   removingPlugins={removingPlugins}
                   pluginErrors={pluginErrors}
+                  skipPermissions={skipPermissions}
                 />
               </>
             ) : null}

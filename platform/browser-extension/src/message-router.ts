@@ -388,6 +388,7 @@ const handleSyncFull = async (params: Record<string, unknown>): Promise<void> =>
     rawBrowserPermission === 'off' || rawBrowserPermission === 'ask' || rawBrowserPermission === 'auto'
       ? rawBrowserPermission
       : undefined;
+  const rawSkipPermissions = typeof params.skipPermissions === 'boolean' ? params.skipPermissions : undefined;
 
   updateServerStateCache({
     plugins: cachePlugins,
@@ -395,6 +396,7 @@ const handleSyncFull = async (params: Record<string, unknown>): Promise<void> =>
     ...(rawBrowserTools ? { browserTools: rawBrowserTools } : {}),
     ...(browserPermission !== undefined ? { browserPermission } : {}),
     ...(rawServerVersion !== undefined ? { serverVersion: rawServerVersion } : {}),
+    ...(rawSkipPermissions !== undefined ? { skipPermissions: rawSkipPermissions } : {}),
   });
 
   // Mark caches as initialized so the bg:getFullState wake detection
@@ -646,6 +648,7 @@ const handleServerMessage = (message: Record<string, unknown>): void => {
       ...(payload.browserTools ? { browserTools: payload.browserTools } : {}),
       ...(payload.browserPermission !== undefined ? { browserPermission: payload.browserPermission } : {}),
       ...(payload.serverVersion !== undefined ? { serverVersion: payload.serverVersion } : {}),
+      ...(payload.skipPermissions !== undefined ? { skipPermissions: payload.skipPermissions } : {}),
     });
   }
 

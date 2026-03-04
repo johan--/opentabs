@@ -340,6 +340,8 @@ export interface ConfigStateResult {
   /** Plugin-level default permission for the browser pseudo-plugin */
   browserPermission?: ToolPermission;
   serverVersion?: string;
+  /** When true, all permission checks are bypassed (all tools run as auto) */
+  skipPermissions?: boolean;
 }
 
 /** config.setToolPermission request params */
