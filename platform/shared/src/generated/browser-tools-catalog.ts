@@ -8,6 +8,8 @@
 export interface BrowserToolMeta {
   readonly name: string;
   readonly description: string;
+  /** Short human-readable summary for the UI. Falls back to description if omitted. */
+  readonly summary?: string;
   readonly icon: string;
   readonly group?: string;
 }
