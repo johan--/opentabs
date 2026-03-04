@@ -347,27 +347,9 @@ export interface ConfigSetToolPermissionParams {
   permission: ToolPermission;
 }
 
-/** config.setToolsPermission request params */
-export interface ConfigSetToolsPermissionParams {
+/** config.setPluginPermission request params (sets plugin-level default) */
+export interface ConfigSetPluginPermissionParams {
   plugin: string;
-  tools: string[];
-  permission: ToolPermission;
-}
-
-/** config.setAllToolsPermission request params */
-export interface ConfigSetAllToolsPermissionParams {
-  plugin: string;
-  permission: ToolPermission;
-}
-
-/** config.setBrowserToolPermission request params */
-export interface ConfigSetBrowserToolPermissionParams {
-  tool: string;
-  permission: ToolPermission;
-}
-
-/** config.setAllBrowserToolsPermission request params */
-export interface ConfigSetAllBrowserToolsPermissionParams {
   permission: ToolPermission;
 }
 

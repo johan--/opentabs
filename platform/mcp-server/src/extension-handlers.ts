@@ -6,11 +6,8 @@
  */
 
 import type {
-  ConfigSetAllBrowserToolsPermissionParams,
-  ConfigSetAllToolsPermissionParams,
-  ConfigSetBrowserToolPermissionParams,
+  ConfigSetPluginPermissionParams,
   ConfigSetToolPermissionParams,
-  ConfigSetToolsPermissionParams,
   ConfigStateResult,
   JsonRpcError,
   JsonRpcNotification,
@@ -31,14 +28,16 @@ import {
   updatePlugin,
 } from './plugin-management.js';
 import type { RegisteredPlugin, ServerState, TabMapping } from './state.js';
-import { DISPATCH_TIMEOUT_MS, MAX_DISPATCH_TIMEOUT_MS } from './state.js';
+import { DISPATCH_TIMEOUT_MS, getToolPermission, MAX_DISPATCH_TIMEOUT_MS } from './state.js';
 import { version } from './version.js';
+
+/** Valid ToolPermission values for parameter validation */
+const VALID_PERMISSIONS = new Set<string>(['off', 'ask', 'auto']);
 
 /** Callbacks the extension protocol can invoke on the MCP side */
 interface McpCallbacks {
   onToolConfigChanged: () => void;
-  onToolConfigPersist: () => void;
-  onBrowserToolPolicyPersist: () => void;
+  onPluginPermissionsPersist: () => void;
   onPluginLog: (entry: PluginLogEntry) => void;
   onReload: () => Promise<{ plugins: number; durationMs: number }>;
   /** Send a JSON-RPC request to the extension and return the response (with timeout). */
@@ -102,8 +101,12 @@ const sendPluginManagementError = (state: ServerState, id: string | number, err:
  * Returns the common core shape shared by sync.full, plugin.update, and config.getState.
  * Callers can spread additional fields on top (e.g., sourcePath, adapterHash for sync messages,
  * or tabState, source, sdkVersion for config.getState).
+ *
+ * The plugin-level permission comes from pluginPermissions[plugin.name]?.permission ?? 'off'.
+ * Each tool's permission is resolved via getToolPermission() (per-tool override → plugin default → 'off').
  */
 const serializePluginForExtension = (
+  state: ServerState,
   plugin: RegisteredPlugin,
 ): {
   name: string;
@@ -125,27 +128,32 @@ const serializePluginForExtension = (
     group?: string;
     permission: ToolPermission;
   }[];
-} => ({
-  name: plugin.name,
-  version: plugin.version,
-  displayName: plugin.displayName,
-  urlPatterns: plugin.urlPatterns,
-  permission: 'off' as ToolPermission,
-  ...(plugin.iconSvg ? { iconSvg: plugin.iconSvg } : {}),
-  ...(plugin.iconInactiveSvg ? { iconInactiveSvg: plugin.iconInactiveSvg } : {}),
-  ...(plugin.iconDarkSvg ? { iconDarkSvg: plugin.iconDarkSvg } : {}),
-  ...(plugin.iconDarkInactiveSvg ? { iconDarkInactiveSvg: plugin.iconDarkInactiveSvg } : {}),
-  tools: plugin.tools.map(t => ({
-    name: t.name,
-    displayName: t.displayName,
-    description: t.description,
-    icon: t.icon,
-    ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
-    ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
-    ...(t.group ? { group: t.group } : {}),
-    permission: 'off' as ToolPermission,
-  })),
-});
+} => {
+  const pluginConfig = state.pluginPermissions[plugin.name];
+  const pluginPermission: ToolPermission = pluginConfig?.permission ?? 'off';
+
+  return {
+    name: plugin.name,
+    version: plugin.version,
+    displayName: plugin.displayName,
+    urlPatterns: plugin.urlPatterns,
+    permission: pluginPermission,
+    ...(plugin.iconSvg ? { iconSvg: plugin.iconSvg } : {}),
+    ...(plugin.iconInactiveSvg ? { iconInactiveSvg: plugin.iconInactiveSvg } : {}),
+    ...(plugin.iconDarkSvg ? { iconDarkSvg: plugin.iconDarkSvg } : {}),
+    ...(plugin.iconDarkInactiveSvg ? { iconDarkInactiveSvg: plugin.iconDarkInactiveSvg } : {}),
+    tools: plugin.tools.map(t => ({
+      name: t.name,
+      displayName: t.displayName,
+      description: t.description,
+      icon: t.icon,
+      ...(t.iconSvg ? { iconSvg: t.iconSvg } : {}),
+      ...(t.iconInactiveSvg ? { iconInactiveSvg: t.iconInactiveSvg } : {}),
+      ...(t.group ? { group: t.group } : {}),
+      permission: getToolPermission(state, plugin.name, t.name),
+    })),
+  };
+};
 
 // --- Tab handlers ---
 
@@ -291,7 +299,7 @@ const buildConfigStatePayload = (state: ServerState): ConfigStateResult => {
       const tabInfo = state.tabMapping.get(p.name);
       const update = p.npmPackageName ? outdatedByPkg.get(p.npmPackageName) : undefined;
       return {
-        ...serializePluginForExtension(p),
+        ...serializePluginForExtension(state, p),
         source: p.source,
         tabState: tabInfo?.state ?? 'closed',
         ...(p.sdkVersion ? { sdkVersion: p.sdkVersion } : {}),
@@ -305,7 +313,7 @@ const buildConfigStatePayload = (state: ServerState): ConfigStateResult => {
     .map(ct => ({
       name: ct.name,
       description: ct.description,
-      permission: 'off' as ToolPermission,
+      permission: getToolPermission(state, 'browser', ct.name),
       ...(ct.icon ? { icon: ct.icon } : {}),
     }));
 
@@ -328,7 +336,11 @@ const handleConfigGetState = (state: ServerState, id: string | number): void => 
   });
 };
 
-const handleConfigSetToolEnabled = (
+/**
+ * Handle config.setToolPermission: set a per-tool permission override.
+ * Works for both plugin tools (plugin=pluginName) and browser tools (plugin='browser').
+ */
+const handleConfigSetToolPermission = (
   state: ServerState,
   params: Record<string, unknown> | undefined,
   id: string | number,
@@ -349,23 +361,35 @@ const handleConfigSetToolEnabled = (
     return;
   }
 
-  const plugin = state.registry.plugins.get(pluginName);
-  if (!plugin) {
-    sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
+  if (!VALID_PERMISSIONS.has(permission)) {
+    sendJsonRpcError(state, id, -32602, `Invalid permission: ${permission} (expected off, ask, or auto)`);
     return;
   }
 
-  if (!plugin.tools.some(t => t.name === tool)) {
-    sendJsonRpcError(state, id, -32602, `Tool not found: ${tool} in plugin ${pluginName}`);
-    return;
+  // Validate tool exists in the appropriate context
+  if (pluginName === 'browser') {
+    if (!state.cachedBrowserTools.some(c => c.name === tool)) {
+      sendJsonRpcError(state, id, -32602, `Browser tool not found: ${tool}`);
+      return;
+    }
+  } else {
+    const plugin = state.registry.plugins.get(pluginName);
+    if (!plugin) {
+      sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
+      return;
+    }
+    if (!plugin.tools.some(t => t.name === tool)) {
+      sendJsonRpcError(state, id, -32602, `Tool not found: ${tool} in plugin ${pluginName}`);
+      return;
+    }
   }
 
   const pConfig = state.pluginPermissions[pluginName] ?? {};
-  const tools = pConfig.tools ?? {};
+  const tools = { ...(pConfig.tools ?? {}) };
   tools[tool] = permission as ToolPermission;
   state.pluginPermissions[pluginName] = { ...pConfig, tools };
   callbacks.onToolConfigChanged();
-  callbacks.onToolConfigPersist();
+  callbacks.onPluginPermissionsPersist();
 
   sendToExtension(state, {
     jsonrpc: '2.0',
@@ -380,7 +404,11 @@ const handleConfigSetToolEnabled = (
   });
 };
 
-const handleConfigSetAllToolsEnabled = (
+/**
+ * Handle config.setPluginPermission: set the plugin-level default permission.
+ * Works for both plugins (plugin=pluginName) and browser tools (plugin='browser').
+ */
+const handleConfigSetPluginPermission = (
   state: ServerState,
   params: Record<string, unknown> | undefined,
   id: string | number,
@@ -391,7 +419,7 @@ const handleConfigSetAllToolsEnabled = (
     return;
   }
 
-  const allToolsPermissionParams = params as Partial<ConfigSetAllToolsPermissionParams>;
+  const allToolsPermissionParams = params as Partial<ConfigSetPluginPermissionParams>;
   const pluginName = allToolsPermissionParams.plugin;
   const permission = allToolsPermissionParams.permission;
 
@@ -400,159 +428,24 @@ const handleConfigSetAllToolsEnabled = (
     return;
   }
 
-  const plugin = state.registry.plugins.get(pluginName);
-  if (!plugin) {
-    sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
+  if (!VALID_PERMISSIONS.has(permission)) {
+    sendJsonRpcError(state, id, -32602, `Invalid permission: ${permission} (expected off, ask, or auto)`);
     return;
   }
 
-  const pConfig = state.pluginPermissions[pluginName] ?? {};
-  state.pluginPermissions[pluginName] = { ...pConfig, permission: permission as ToolPermission };
-  callbacks.onToolConfigChanged();
-  callbacks.onToolConfigPersist();
-
-  sendToExtension(state, {
-    jsonrpc: '2.0',
-    method: 'plugins.changed',
-    params: { ...buildConfigStatePayload(state) },
-  });
-
-  sendToExtension(state, {
-    jsonrpc: '2.0',
-    result: { ok: true },
-    id,
-  });
-};
-
-const handleConfigSetToolsEnabled = (
-  state: ServerState,
-  params: Record<string, unknown> | undefined,
-  id: string | number,
-  callbacks: McpCallbacks,
-): void => {
-  if (!params) {
-    sendJsonRpcError(state, id, -32602, 'Missing params');
-    return;
-  }
-
-  const toolsPermissionParams = params as Partial<ConfigSetToolsPermissionParams>;
-  const pluginName = toolsPermissionParams.plugin;
-  const tools = toolsPermissionParams.tools;
-  const permission = toolsPermissionParams.permission;
-
-  if (typeof pluginName !== 'string' || !Array.isArray(tools) || typeof permission !== 'string') {
-    sendJsonRpcError(
-      state,
-      id,
-      -32602,
-      'Invalid params: expected plugin (string), tools (string[]), permission (string)',
-    );
-    return;
-  }
-
-  const plugin = state.registry.plugins.get(pluginName);
-  if (!plugin) {
-    sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
-    return;
-  }
-
-  const pluginToolNames = new Set(plugin.tools.map(t => t.name));
-  for (const tool of tools) {
-    if (typeof tool !== 'string' || !pluginToolNames.has(tool)) {
-      sendJsonRpcError(state, id, -32602, `Tool not found: ${tool} in plugin ${pluginName}`);
+  // Validate plugin exists (browser is always valid)
+  if (pluginName !== 'browser') {
+    const plugin = state.registry.plugins.get(pluginName);
+    if (!plugin) {
+      sendJsonRpcError(state, id, -32602, `Plugin not found: ${pluginName}`);
       return;
     }
   }
 
   const pConfig = state.pluginPermissions[pluginName] ?? {};
-  const toolOverrides = { ...(pConfig.tools ?? {}) };
-  for (const tool of tools) {
-    toolOverrides[tool] = permission as ToolPermission;
-  }
-  state.pluginPermissions[pluginName] = { ...pConfig, tools: toolOverrides };
+  state.pluginPermissions[pluginName] = { ...pConfig, permission: permission as ToolPermission };
   callbacks.onToolConfigChanged();
-  callbacks.onToolConfigPersist();
-
-  sendToExtension(state, {
-    jsonrpc: '2.0',
-    method: 'plugins.changed',
-    params: { ...buildConfigStatePayload(state) },
-  });
-
-  sendToExtension(state, {
-    jsonrpc: '2.0',
-    result: { ok: true },
-    id,
-  });
-};
-
-const handleConfigSetBrowserToolEnabled = (
-  state: ServerState,
-  params: Record<string, unknown> | undefined,
-  id: string | number,
-  callbacks: McpCallbacks,
-): void => {
-  if (!params) {
-    sendJsonRpcError(state, id, -32602, 'Missing params');
-    return;
-  }
-
-  const browserToolParams = params as Partial<ConfigSetBrowserToolPermissionParams>;
-  const tool = browserToolParams.tool;
-  const permission = browserToolParams.permission;
-
-  if (typeof tool !== 'string' || typeof permission !== 'string') {
-    sendJsonRpcError(state, id, -32602, 'Invalid params: expected tool (string), permission (string)');
-    return;
-  }
-
-  if (!state.cachedBrowserTools.some(c => c.name === tool)) {
-    sendJsonRpcError(state, id, -32602, `Browser tool not found: ${tool}`);
-    return;
-  }
-
-  const browserConfig = state.pluginPermissions.browser ?? {};
-  const browserTools = { ...(browserConfig.tools ?? {}) };
-  browserTools[tool] = permission as ToolPermission;
-  state.pluginPermissions.browser = { ...browserConfig, tools: browserTools };
-  callbacks.onToolConfigChanged();
-  callbacks.onBrowserToolPolicyPersist();
-
-  sendToExtension(state, {
-    jsonrpc: '2.0',
-    method: 'plugins.changed',
-    params: { ...buildConfigStatePayload(state) },
-  });
-
-  sendToExtension(state, {
-    jsonrpc: '2.0',
-    result: { ok: true },
-    id,
-  });
-};
-
-const handleConfigSetAllBrowserToolsEnabled = (
-  state: ServerState,
-  params: Record<string, unknown> | undefined,
-  id: string | number,
-  callbacks: McpCallbacks,
-): void => {
-  if (!params) {
-    sendJsonRpcError(state, id, -32602, 'Missing params');
-    return;
-  }
-
-  const allBrowserToolsParams = params as Partial<ConfigSetAllBrowserToolsPermissionParams>;
-  const permission = allBrowserToolsParams.permission;
-
-  if (typeof permission !== 'string') {
-    sendJsonRpcError(state, id, -32602, 'Invalid params: expected permission (string)');
-    return;
-  }
-
-  state.pluginPermissions.browser = { permission: permission as ToolPermission };
-  callbacks.onToolConfigChanged();
-  callbacks.onBrowserToolPolicyPersist();
+  callbacks.onPluginPermissionsPersist();
 
   sendToExtension(state, {
     jsonrpc: '2.0',
@@ -841,11 +734,8 @@ export {
   handleTabSyncAll,
   handleTabStateChanged,
   handleConfigGetState,
-  handleConfigSetToolEnabled,
-  handleConfigSetAllToolsEnabled,
-  handleConfigSetToolsEnabled,
-  handleConfigSetBrowserToolEnabled,
-  handleConfigSetAllBrowserToolsEnabled,
+  handleConfigSetToolPermission,
+  handleConfigSetPluginPermission,
   handlePluginSearch,
   handlePluginInstall,
   handlePluginUpdateFromRegistry,

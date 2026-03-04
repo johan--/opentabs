@@ -24,8 +24,7 @@ import { createState } from './state.js';
 /** No-op callbacks for handleExtensionMessage */
 const noopCallbacks = {
   onToolConfigChanged: () => {},
-  onToolConfigPersist: () => {},
-  onBrowserToolPolicyPersist: () => {},
+  onPluginPermissionsPersist: () => {},
   onPluginLog: () => {},
   onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
   queryExtension: () => Promise.resolve(undefined),

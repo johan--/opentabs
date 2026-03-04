@@ -21,11 +21,8 @@ import type { McpCallbacks } from './extension-handlers.js';
 import {
   buildConfigStatePayload,
   handleConfigGetState,
-  handleConfigSetAllBrowserToolsEnabled,
-  handleConfigSetAllToolsEnabled,
-  handleConfigSetBrowserToolEnabled,
-  handleConfigSetToolEnabled,
-  handleConfigSetToolsEnabled,
+  handleConfigSetPluginPermission,
+  handleConfigSetToolPermission,
   handleConfirmationResponse,
   handlePluginCheckUpdates,
   handlePluginInstall,
@@ -95,7 +92,7 @@ const sendSyncFull = async (state: ServerState): Promise<void> => {
   const plugins = pluginList.map(p => {
     const configPlugin = configPluginMap.get(p.name);
     return {
-      ...serializePluginForExtension(p),
+      ...serializePluginForExtension(state, p),
       sourcePath: p.sourcePath,
       adapterHash: p.adapterHash,
       adapterFile: adapterFileMap.get(p.name),
@@ -287,7 +284,7 @@ const sendPluginUpdate = async (
     jsonrpc: '2.0',
     method: 'plugin.update',
     params: {
-      ...serializePluginForExtension(plugin),
+      ...serializePluginForExtension(state, plugin),
       sourcePath: plugin.sourcePath,
       adapterHash: plugin.adapterHash,
       adapterFile,
@@ -395,28 +392,13 @@ const handleExtensionMessage = (
     return;
   }
 
-  if (method === 'config.setToolEnabled' && id !== undefined) {
-    handleConfigSetToolEnabled(state, params, id, callbacks);
+  if (method === 'config.setToolPermission' && id !== undefined) {
+    handleConfigSetToolPermission(state, params, id, callbacks);
     return;
   }
 
-  if (method === 'config.setAllToolsEnabled' && id !== undefined) {
-    handleConfigSetAllToolsEnabled(state, params, id, callbacks);
-    return;
-  }
-
-  if (method === 'config.setToolsEnabled' && id !== undefined) {
-    handleConfigSetToolsEnabled(state, params, id, callbacks);
-    return;
-  }
-
-  if (method === 'config.setBrowserToolEnabled' && id !== undefined) {
-    handleConfigSetBrowserToolEnabled(state, params, id, callbacks);
-    return;
-  }
-
-  if (method === 'config.setAllBrowserToolsEnabled' && id !== undefined) {
-    handleConfigSetAllBrowserToolsEnabled(state, params, id, callbacks);
+  if (method === 'config.setPluginPermission' && id !== undefined) {
+    handleConfigSetPluginPermission(state, params, id, callbacks);
     return;
   }
 

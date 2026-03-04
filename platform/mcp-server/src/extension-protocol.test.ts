@@ -30,8 +30,7 @@ const createMockWs = (): WsHandle & { sent: string[] } => ({
 /** No-op MCP callbacks for tests that don't exercise config changes */
 const noopCallbacks = {
   onToolConfigChanged: () => {},
-  onToolConfigPersist: () => {},
-  onBrowserToolPolicyPersist: () => {},
+  onPluginPermissionsPersist: () => {},
   onPluginLog: () => {},
   onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
   queryExtension: () => Promise.resolve(undefined),
@@ -1403,7 +1402,7 @@ describe('handleExtensionMessage — config.getState', () => {
   });
 });
 
-describe('handleExtensionMessage — config.setToolEnabled', () => {
+describe('handleExtensionMessage — config.setToolPermission', () => {
   const makePlugin = (overrides: Partial<RegisteredPlugin> & Pick<RegisteredPlugin, 'name'>): RegisteredPlugin => ({
     version: '1.0.0',
     displayName: overrides.name,
@@ -1444,10 +1443,9 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       onToolConfigChanged: () => {
         configChangedCalled = true;
       },
-      onToolConfigPersist: () => {
+      onPluginPermissionsPersist: () => {
         configPersistCalled = true;
       },
-      onBrowserToolPolicyPersist: () => {},
       onPluginLog: () => {},
       onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
       queryExtension: () => Promise.resolve(undefined),
@@ -1457,7 +1455,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'my-plugin', tool: 'send', permission: 'off' },
         id: 1,
       }),
@@ -1507,7 +1505,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'my-plugin', tool: 'send', permission: 'auto' },
         id: 2,
       }),
@@ -1530,7 +1528,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
 
     handleExtensionMessage(
       state,
-      JSON.stringify({ jsonrpc: '2.0', method: 'config.setToolEnabled', id: 3 }),
+      JSON.stringify({ jsonrpc: '2.0', method: 'config.setToolPermission', id: 3 }),
       noopCallbacks,
     );
 
@@ -1557,7 +1555,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'my-plugin', tool: 'send', permission: 123 },
         id: 4,
       }),
@@ -1581,7 +1579,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'my-plugin', tool: 'send' },
         id: 5,
       }),
@@ -1607,10 +1605,9 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       onToolConfigChanged: () => {
         configChangedCalled = true;
       },
-      onToolConfigPersist: () => {
+      onPluginPermissionsPersist: () => {
         configPersistCalled = true;
       },
-      onBrowserToolPolicyPersist: () => {},
       onPluginLog: () => {},
       onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
       queryExtension: () => Promise.resolve(undefined),
@@ -1620,7 +1617,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 123, tool: 'send', permission: 'auto' },
         id: 6,
       }),
@@ -1640,7 +1637,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'nonexistent', tool: 'send', permission: 'auto' },
         id: 7,
       }),
@@ -1690,7 +1687,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'my-plugin', tool: 'nonexistent-tool', permission: 'auto' },
         id: 8,
       }),
@@ -1723,10 +1720,9 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       onToolConfigChanged: () => {
         configChangedCalled = true;
       },
-      onToolConfigPersist: () => {
+      onPluginPermissionsPersist: () => {
         configPersistCalled = true;
       },
-      onBrowserToolPolicyPersist: () => {},
       onPluginLog: () => {},
       onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
       queryExtension: () => Promise.resolve(undefined),
@@ -1736,7 +1732,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'nonexistent', tool: 'send', permission: 'auto' },
         id: 9,
       }),
@@ -1775,7 +1771,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setToolEnabled',
+        method: 'config.setToolPermission',
         params: { plugin: 'my-plugin', tool: 'nonexistent-tool', permission: 'auto' },
         id: 10,
       }),
@@ -1786,7 +1782,7 @@ describe('handleExtensionMessage — config.setToolEnabled', () => {
   });
 });
 
-describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
+describe('handleExtensionMessage — config.setPluginPermission', () => {
   const makePlugin = (overrides: Partial<RegisteredPlugin> & Pick<RegisteredPlugin, 'name'>): RegisteredPlugin => ({
     version: '1.0.0',
     displayName: overrides.name,
@@ -1842,7 +1838,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setAllToolsEnabled',
+        method: 'config.setPluginPermission',
         params: { plugin: 'my-plugin', permission: 'auto' },
         id: 1,
       }),
@@ -1897,7 +1893,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setAllToolsEnabled',
+        method: 'config.setPluginPermission',
         params: { plugin: 'my-plugin', permission: 'off' },
         id: 2,
       }),
@@ -1937,10 +1933,9 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       onToolConfigChanged: () => {
         configChangedCalled = true;
       },
-      onToolConfigPersist: () => {
+      onPluginPermissionsPersist: () => {
         configPersistCalled = true;
       },
-      onBrowserToolPolicyPersist: () => {},
       onPluginLog: () => {},
       onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
       queryExtension: () => Promise.resolve(undefined),
@@ -1950,7 +1945,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setAllToolsEnabled',
+        method: 'config.setPluginPermission',
         params: { plugin: 'my-plugin', permission: 'auto' },
         id: 3,
       }),
@@ -1972,10 +1967,9 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       onToolConfigChanged: () => {
         configChangedCalled = true;
       },
-      onToolConfigPersist: () => {
+      onPluginPermissionsPersist: () => {
         configPersistCalled = true;
       },
-      onBrowserToolPolicyPersist: () => {},
       onPluginLog: () => {},
       onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
       queryExtension: () => Promise.resolve(undefined),
@@ -1985,7 +1979,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setAllToolsEnabled',
+        method: 'config.setPluginPermission',
         params: { plugin: 'nonexistent', permission: 'auto' },
         id: 4,
       }),
@@ -2017,7 +2011,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
 
     handleExtensionMessage(
       state,
-      JSON.stringify({ jsonrpc: '2.0', method: 'config.setAllToolsEnabled', id: 5 }),
+      JSON.stringify({ jsonrpc: '2.0', method: 'config.setPluginPermission', id: 5 }),
       noopCallbacks,
     );
 
@@ -2044,7 +2038,7 @@ describe('handleExtensionMessage — config.setAllToolsEnabled', () => {
       state,
       JSON.stringify({
         jsonrpc: '2.0',
-        method: 'config.setAllToolsEnabled',
+        method: 'config.setPluginPermission',
         params: { plugin: 'my-plugin', permission: 123 },
         id: 6,
       }),

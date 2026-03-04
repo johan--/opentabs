@@ -60,12 +60,7 @@ const createMcpCallbacks = (
       notifyToolListChanged(srv);
     }
   },
-  onToolConfigPersist: () => {
-    savePluginPermissions(state, { ...state.pluginPermissions }).catch(() => {
-      // Best-effort persistence — errors are non-fatal for in-memory state
-    });
-  },
-  onBrowserToolPolicyPersist: () => {
+  onPluginPermissionsPersist: () => {
     savePluginPermissions(state, { ...state.pluginPermissions }).catch(() => {
       // Best-effort persistence — errors are non-fatal for in-memory state
     });
