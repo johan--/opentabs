@@ -9,11 +9,13 @@ import {
   handleExtensionMessage,
   isDispatchError,
   queryExtension,
+  rejectAllPendingConfirmations,
+  sendConfirmationRequest,
   sendSyncFull,
   writeAdapterFile,
 } from './extension-protocol.js';
 import { buildRegistry } from './registry.js';
-import type { PendingDispatch, RegisteredPlugin } from './state.js';
+import type { ConfirmationDecision, PendingDispatch, RegisteredPlugin } from './state.js';
 import { createState, DISPATCH_TIMEOUT_MS, MAX_DISPATCH_TIMEOUT_MS } from './state.js';
 
 /** Create a mock WsHandle that records sent messages */
@@ -2466,5 +2468,275 @@ describe('queryExtension', () => {
     state.extensionWs = null;
 
     await expect(queryExtension(state, 'extension.getTabState')).rejects.toThrow();
+  });
+});
+
+describe('sendConfirmationRequest', () => {
+  test('sends confirmation.request with new payload shape and stores pending confirmation', () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    const promise = sendConfirmationRequest(state, 'send_message', 'slack', { channel: '#general', text: 'hi' });
+
+    expect(ws.sent).toHaveLength(1);
+    const msg = JSON.parse(ws.sent[0] as string) as {
+      jsonrpc: string;
+      method: string;
+      params: { id: string; tool: string; plugin: string; params: Record<string, unknown> };
+    };
+
+    expect(msg.jsonrpc).toBe('2.0');
+    expect(msg.method).toBe('confirmation.request');
+    expect(typeof msg.params.id).toBe('string');
+    expect(msg.params.tool).toBe('send_message');
+    expect(msg.params.plugin).toBe('slack');
+    expect(msg.params.params).toEqual({ channel: '#general', text: 'hi' });
+
+    // No domain, tabId, paramsPreview, or timeoutMs fields
+    const rawParams = msg.params as Record<string, unknown>;
+    expect('domain' in rawParams).toBe(false);
+    expect('tabId' in rawParams).toBe(false);
+    expect('paramsPreview' in rawParams).toBe(false);
+    expect('timeoutMs' in rawParams).toBe(false);
+
+    // Pending confirmation stored
+    expect(state.pendingConfirmations.size).toBe(1);
+    const pendingId = msg.params.id;
+    const pending = state.pendingConfirmations.get(pendingId);
+    expect(pending).toBeDefined();
+    expect(pending?.tool).toBe('send_message');
+    expect(pending?.plugin).toBe('slack');
+
+    // Clean up by resolving the promise
+    pending?.resolve({ action: 'allow', alwaysAllow: false });
+    return promise;
+  });
+
+  test('resolves with ConfirmationDecision when user responds via confirmation.response', async () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    const promise = sendConfirmationRequest(state, 'browser_click', 'browser', { selector: '#btn' });
+
+    // Extract the confirmation id from the sent message
+    const msg = JSON.parse(ws.sent[0] as string) as { params: { id: string } };
+    const id = msg.params.id;
+
+    // Simulate the extension sending a confirmation response
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'confirmation.response',
+        params: { id, decision: 'allow', alwaysAllow: true },
+      }),
+      noopCallbacks,
+    );
+
+    const decision: ConfirmationDecision = await promise;
+    expect(decision.action).toBe('allow');
+    expect(decision.alwaysAllow).toBe(true);
+    expect(state.pendingConfirmations.size).toBe(0);
+  });
+
+  test('resolves with deny when user denies', async () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    const promise = sendConfirmationRequest(state, 'delete_message', 'slack', {});
+
+    const msg = JSON.parse(ws.sent[0] as string) as { params: { id: string } };
+    const id = msg.params.id;
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'confirmation.response',
+        params: { id, decision: 'deny' },
+      }),
+      noopCallbacks,
+    );
+
+    const decision: ConfirmationDecision = await promise;
+    expect(decision.action).toBe('deny');
+    expect(decision.alwaysAllow).toBe(false);
+  });
+
+  test('rejects when extension is not connected', async () => {
+    const state = createState();
+    state.extensionWs = null;
+
+    await expect(sendConfirmationRequest(state, 'test_tool', 'test', {})).rejects.toThrow('Extension not connected');
+    expect(state.pendingConfirmations.size).toBe(0);
+  });
+
+  test('hangs indefinitely until resolved (no timeout)', async () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    const promise = sendConfirmationRequest(state, 'slow_tool', 'plugin', {});
+
+    // The promise is pending with no timeout — the pending confirmation stays in the map
+    expect(state.pendingConfirmations.size).toBe(1);
+
+    // Verify no timerId on the pending confirmation (simplified PendingConfirmation has no timerId)
+    const pendingEntry = [...state.pendingConfirmations.values()][0];
+    expect(pendingEntry).toBeDefined();
+    expect('timerId' in (pendingEntry as unknown as Record<string, unknown>)).toBe(false);
+
+    // Clean up by resolving
+    pendingEntry?.resolve({ action: 'allow', alwaysAllow: false });
+    await promise;
+  });
+});
+
+describe('rejectAllPendingConfirmations', () => {
+  test('rejects all pending confirmations and clears the map', async () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    const promise1 = sendConfirmationRequest(state, 'tool_a', 'plugin_a', {});
+    const promise2 = sendConfirmationRequest(state, 'tool_b', 'plugin_b', {});
+
+    expect(state.pendingConfirmations.size).toBe(2);
+
+    rejectAllPendingConfirmations(state);
+
+    expect(state.pendingConfirmations.size).toBe(0);
+
+    await expect(promise1).rejects.toThrow('Extension disconnected');
+    await expect(promise2).rejects.toThrow('Extension disconnected');
+  });
+
+  test('handles empty pendingConfirmations gracefully', () => {
+    const state = createState();
+
+    rejectAllPendingConfirmations(state);
+
+    expect(state.pendingConfirmations.size).toBe(0);
+  });
+});
+
+describe('handleExtensionMessage — confirmation.response routing', () => {
+  test('routes confirmation.response to handleConfirmationResponse', () => {
+    const state = createState();
+    const ws = createMockWs();
+    state.extensionWs = ws;
+
+    let resolved: ConfirmationDecision | undefined;
+    state.pendingConfirmations.set('test-id', {
+      resolve: (decision: ConfirmationDecision) => {
+        resolved = decision;
+      },
+      reject: () => {},
+      tool: 'test_tool',
+      plugin: 'test_plugin',
+      params: {},
+    });
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'confirmation.response',
+        params: { id: 'test-id', decision: 'allow', alwaysAllow: true },
+      }),
+      noopCallbacks,
+    );
+
+    expect(resolved).toEqual({ action: 'allow', alwaysAllow: true });
+    expect(state.pendingConfirmations.size).toBe(0);
+  });
+
+  test('ignores confirmation.response with unknown id', () => {
+    const state = createState();
+    state.extensionWs = createMockWs();
+
+    let resolved = false;
+    state.pendingConfirmations.set('known-id', {
+      resolve: () => {
+        resolved = true;
+      },
+      reject: () => {},
+      tool: 'tool',
+      plugin: 'plugin',
+      params: {},
+    });
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'confirmation.response',
+        params: { id: 'unknown-id', decision: 'allow' },
+      }),
+      noopCallbacks,
+    );
+
+    expect(resolved).toBe(false);
+    expect(state.pendingConfirmations.size).toBe(1);
+  });
+
+  test('ignores confirmation.response with invalid decision', () => {
+    const state = createState();
+    state.extensionWs = createMockWs();
+
+    let resolved = false;
+    state.pendingConfirmations.set('conf-id', {
+      resolve: () => {
+        resolved = true;
+      },
+      reject: () => {},
+      tool: 'tool',
+      plugin: 'plugin',
+      params: {},
+    });
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'confirmation.response',
+        params: { id: 'conf-id', decision: 'invalid' },
+      }),
+      noopCallbacks,
+    );
+
+    expect(resolved).toBe(false);
+    expect(state.pendingConfirmations.size).toBe(1);
+  });
+
+  test('defaults alwaysAllow to false when not provided', () => {
+    const state = createState();
+    state.extensionWs = createMockWs();
+
+    let resolved: ConfirmationDecision | undefined;
+    state.pendingConfirmations.set('conf-no-always', {
+      resolve: (decision: ConfirmationDecision) => {
+        resolved = decision;
+      },
+      reject: () => {},
+      tool: 'tool',
+      plugin: 'plugin',
+      params: {},
+    });
+
+    handleExtensionMessage(
+      state,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'confirmation.response',
+        params: { id: 'conf-no-always', decision: 'allow' },
+      }),
+      noopCallbacks,
+    );
+
+    expect(resolved).toEqual({ action: 'allow', alwaysAllow: false });
   });
 });
