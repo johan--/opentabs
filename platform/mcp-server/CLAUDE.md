@@ -32,7 +32,7 @@ The MCP server discovers plugins from two sources: (1) **npm auto-discovery** sc
 
 ### Tool Dispatch
 
-**Tab targeting**: `getEnabledToolsList` (in `mcp-setup.ts`) injects an optional `tabId` integer property into every plugin tool's input schema via `structuredClone` — the original `ManifestTool.input_schema` is never mutated. `handlePluginToolCall` (in `mcp-tool-dispatch.ts`) extracts `tabId` from args before Ajv validation and threads it as a top-level field in `ToolDispatchParams` sent to the extension. Plugin tool handlers never see `tabId` in their input — it is a platform concern. Use `plugin_list_tabs` to discover valid tab IDs.
+**Tab targeting**: `getAllToolsList` (in `mcp-setup.ts`) injects an optional `tabId` integer property into every plugin tool's input schema via `structuredClone` — the original `ManifestTool.input_schema` is never mutated. `handlePluginToolCall` (in `mcp-tool-dispatch.ts`) extracts `tabId` from args before Ajv validation and threads it as a top-level field in `ToolDispatchParams` sent to the extension. Plugin tool handlers never see `tabId` in their input — it is a platform concern. Use `plugin_list_tabs` to discover valid tab IDs.
 
 Tool dispatch uses a 30s timeout (`DISPATCH_TIMEOUT_MS`) by default. When a tool reports progress, the timeout resets to 30s from the last progress notification — so a tool that reports progress at least once every 30s will never time out. An absolute ceiling of 5 minutes (`MAX_DISPATCH_TIMEOUT_MS = 300_000`) applies regardless of progress, preventing indefinitely running tools. The extension has a matching `MAX_SCRIPT_TIMEOUT_MS` (295s, 5s less than the server max) to ensure the extension always responds before the server times out.
 

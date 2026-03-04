@@ -5,7 +5,7 @@ import type { BrowserToolDefinition } from './browser-tools/definition.js';
 import type { McpServerInstance, RequestHandlerExtra } from './mcp-setup.js';
 import {
   checkToolCallable,
-  getEnabledToolsList,
+  getAllToolsList,
   rebuildCachedBrowserTools,
   registerMcpHandlers,
   sanitizeOutput,
@@ -233,9 +233,6 @@ const mockExtra: RequestHandlerExtra = {
 
 /** Retrieve the tools/list handler by finding the handler that returns a { tools } shape */
 const getListToolsHandler = (handlers: Map<unknown, RequestHandler>): RequestHandler => {
-  // registerMcpHandlers registers exactly 2 handlers (tools/list and tools/call).
-  // The tools/list handler is registered first. Iterate and return the one whose
-  // result has a `tools` array property.
   for (const handler of handlers.values()) {
     const result = handler({ params: { name: '' } }, mockExtra) as Record<string, unknown>;
     if ('tools' in result) return handler;
@@ -243,12 +240,20 @@ const getListToolsHandler = (handlers: Map<unknown, RequestHandler>): RequestHan
   throw new Error('tools/list handler not found');
 };
 
-describe('registerMcpHandlers — disabled tool filtering', () => {
-  test('disabled tools are excluded from tools/list response', () => {
+/** Helper to create a browser tool definition for testing */
+const createBrowserTool = (name: string, description: string): BrowserToolDefinition => ({
+  name,
+  description,
+  input: z.object({}),
+  handler: () => Promise.resolve([]),
+});
+
+describe('registerMcpHandlers — tools/list includes all tools regardless of permission', () => {
+  test('all tools are listed even when some have permission off', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages', 'list_channels'])], []);
 
-    // Enable plugin but disable one tool via pluginPermissions
+    // Plugin enabled with one tool off
     state.pluginPermissions = { slack: { permission: 'auto', tools: { read_messages: 'off' } } };
 
     const { server, handlers } = createMockServer();
@@ -259,16 +264,15 @@ describe('registerMcpHandlers — disabled tool filtering', () => {
 
     const toolNames = result.tools.map(t => t.name);
     expect(toolNames).toContain('slack_send_message');
-    expect(toolNames).not.toContain('slack_read_messages');
+    expect(toolNames).toContain('slack_read_messages');
     expect(toolNames).toContain('slack_list_channels');
-    expect(toolNames).toHaveLength(2);
+    expect(toolNames).toHaveLength(3);
   });
 
-  test('re-enabling a disabled tool makes it reappear in tools/list', () => {
+  test('tools/list reflects permission changes dynamically', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
 
-    // Enable plugin but disable one tool
     state.pluginPermissions = { slack: { permission: 'auto', tools: { send_message: 'off' } } };
 
     const { server, handlers } = createMockServer();
@@ -276,44 +280,35 @@ describe('registerMcpHandlers — disabled tool filtering', () => {
 
     const listTools = getListToolsHandler(handlers);
 
-    // Verify tool is absent when disabled
-    const resultBefore = listTools({ params: { name: '' } }, mockExtra) as { tools: Array<{ name: string }> };
-    const namesBefore = resultBefore.tools.map(t => t.name);
-    expect(namesBefore).not.toContain('slack_send_message');
-    expect(namesBefore).toContain('slack_read_messages');
+    // Tool has [Disabled] prefix when off
+    const resultBefore = listTools({ params: { name: '' } }, mockExtra) as {
+      tools: Array<{ name: string; description: string }>;
+    };
+    const sendBefore = resultBefore.tools.find(t => t.name === 'slack_send_message');
+    expect(sendBefore?.description).toMatch(/^\[Disabled\] /);
 
-    // Re-enable the tool by removing the per-tool override
+    // Change permission to auto — prefix goes away
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    // Same handler, same state reference — tool should reappear
-    const resultAfter = listTools({ params: { name: '' } }, mockExtra) as { tools: Array<{ name: string }> };
-    const namesAfter = resultAfter.tools.map(t => t.name);
-    expect(namesAfter).toContain('slack_send_message');
-    expect(namesAfter).toContain('slack_read_messages');
-    expect(namesAfter).toHaveLength(2);
+    const resultAfter = listTools({ params: { name: '' } }, mockExtra) as {
+      tools: Array<{ name: string; description: string }>;
+    };
+    const sendAfter = resultAfter.tools.find(t => t.name === 'slack_send_message');
+    expect(sendAfter?.description).not.toMatch(/^\[Disabled\]/);
+    expect(sendAfter?.description).toBe('send_message description');
   });
 });
 
-/** Helper to create a browser tool definition for testing */
-const createBrowserTool = (name: string, description: string): BrowserToolDefinition => ({
-  name,
-  description,
-  input: z.object({}),
-  handler: () => Promise.resolve([]),
-});
-
-describe('getEnabledToolsList — all tools enabled', () => {
-  test('returns all plugin tools and browser tools when all permissions are auto', () => {
+describe('getAllToolsList — all tools always listed', () => {
+  test('returns all plugin tools and browser tools regardless of permission', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
     rebuildCachedBrowserTools(state);
-    state.pluginPermissions = {
-      slack: { permission: 'auto' },
-      browser: { permission: 'auto' },
-    };
+    // No permissions set — all default to 'off', but still listed
+    state.pluginPermissions = {};
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
     const names = tools.map(t => t.name);
 
     expect(names).toContain('slack_send_message');
@@ -321,67 +316,76 @@ describe('getEnabledToolsList — all tools enabled', () => {
     expect(names).toContain('browser_list_tabs');
     expect(tools).toHaveLength(3);
   });
-});
 
-describe('getEnabledToolsList — disabled tool filtering', () => {
-  test('one plugin tool disabled via pluginPermissions is excluded, others remain', () => {
-    const state = createState();
-    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
-    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = {
-      slack: { permission: 'auto', tools: { read_messages: 'off' } },
-      browser: { permission: 'auto' },
-    };
-
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
-
-    expect(names).toContain('slack_send_message');
-    expect(names).not.toContain('slack_read_messages');
-    expect(names).toContain('browser_list_tabs');
-    expect(tools).toHaveLength(2);
-  });
-
-  test('all plugin tools disabled — only browser tools appear', () => {
-    const state = createState();
-    state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
-    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = {
-      slack: { permission: 'off' },
-      browser: { permission: 'auto' },
-    };
-
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
-
-    expect(names).not.toContain('slack_send_message');
-    expect(names).not.toContain('slack_read_messages');
-    expect(names).toContain('browser_list_tabs');
-    expect(tools).toHaveLength(1);
-  });
-
-  test('browser tool permissions are independent of plugin permissions', () => {
+  test('tools with permission off are listed with [Disabled] prefix', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
-    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildCachedBrowserTools(state);
-    // Disabling the slack plugin does not affect browser tools
-    state.pluginPermissions = {
-      slack: { permission: 'off' },
-      browser: { permission: 'auto' },
-    };
+    // No permission config — defaults to 'off'
 
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
+    const tools = getAllToolsList(state);
 
-    expect(names).toContain('browser_list_tabs');
-    expect(names).not.toContain('slack_send_message');
     expect(tools).toHaveLength(1);
+    expect(tools[0]?.description).toBe('[Disabled] send_message description');
   });
 
-  test('multiple plugins with mixed enabled/disabled tools — correct filtering per plugin', () => {
+  test('tools with permission ask are listed with [Requires approval] prefix', () => {
+    const state = createState();
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    state.pluginPermissions = { slack: { permission: 'ask' } };
+
+    const tools = getAllToolsList(state);
+
+    expect(tools).toHaveLength(1);
+    expect(tools[0]?.description).toBe('[Requires approval] send_message description');
+  });
+
+  test('tools with permission auto have no description prefix', () => {
+    const state = createState();
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    state.pluginPermissions = { slack: { permission: 'auto' } };
+
+    const tools = getAllToolsList(state);
+
+    expect(tools).toHaveLength(1);
+    expect(tools[0]?.description).toBe('send_message description');
+  });
+
+  test('browser tools get description prefixes based on their permission', () => {
+    const state = createState();
+    state.browserTools = [
+      createBrowserTool('browser_list_tabs', 'List tabs'),
+      createBrowserTool('browser_screenshot', 'Take screenshot'),
+    ];
+    rebuildCachedBrowserTools(state);
+    state.pluginPermissions = {
+      browser: { permission: 'ask', tools: { browser_screenshot: 'auto' } },
+    };
+
+    const tools = getAllToolsList(state);
+    const listTabs = tools.find(t => t.name === 'browser_list_tabs');
+    const screenshot = tools.find(t => t.name === 'browser_screenshot');
+
+    expect(listTabs?.description).toBe('[Requires approval] List tabs');
+    expect(screenshot?.description).toBe('Take screenshot');
+  });
+
+  test('all browser tools off still appear with [Disabled] prefix', () => {
+    const state = createState();
+    state.browserTools = [
+      createBrowserTool('browser_list_tabs', 'List tabs'),
+      createBrowserTool('browser_open_tab', 'Open tab'),
+    ];
+    rebuildCachedBrowserTools(state);
+    state.pluginPermissions = { browser: { permission: 'off' } };
+
+    const tools = getAllToolsList(state);
+    expect(tools).toHaveLength(2);
+    for (const tool of tools) {
+      expect(tool.description).toMatch(/^\[Disabled\] /);
+    }
+  });
+
+  test('multiple plugins with mixed permissions show correct prefixes', () => {
     const state = createState();
     state.registry = buildRegistry(
       [createPlugin('slack', ['send_message', 'read_messages']), createPlugin('github', ['create_issue', 'list_prs'])],
@@ -390,20 +394,37 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
     rebuildCachedBrowserTools(state);
     state.pluginPermissions = {
-      slack: { permission: 'auto', tools: { read_messages: 'off' } },
-      github: { permission: 'auto', tools: { create_issue: 'off' } },
+      slack: { permission: 'auto', tools: { read_messages: 'ask' } },
+      github: { permission: 'off', tools: { list_prs: 'auto' } },
       browser: { permission: 'auto' },
     };
 
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
+    const tools = getAllToolsList(state);
+    const byName = Object.fromEntries(tools.map(t => [t.name, t.description]));
 
-    expect(names).toContain('slack_send_message');
-    expect(names).not.toContain('slack_read_messages');
-    expect(names).not.toContain('github_create_issue');
-    expect(names).toContain('github_list_prs');
-    expect(names).toContain('browser_list_tabs');
-    expect(tools).toHaveLength(3);
+    expect(byName.slack_send_message).toBe('send_message description');
+    expect(byName.slack_read_messages).toBe('[Requires approval] read_messages description');
+    expect(byName.github_create_issue).toBe('[Disabled] create_issue description');
+    expect(byName.github_list_prs).toBe('list_prs description');
+    expect(byName.browser_list_tabs).toBe('List tabs');
+    expect(tools).toHaveLength(5);
+  });
+
+  test('skipPermissions=true makes all tools auto (no prefixes)', () => {
+    const state = createState();
+    state.skipPermissions = true;
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
+    rebuildCachedBrowserTools(state);
+    // Even with off permissions, skipPermissions overrides to auto
+    state.pluginPermissions = { slack: { permission: 'off' }, browser: { permission: 'off' } };
+
+    const tools = getAllToolsList(state);
+
+    expect(tools).toHaveLength(2);
+    for (const tool of tools) {
+      expect(tool.description).not.toMatch(/^\[/);
+    }
   });
 
   test('empty plugins map returns only browser tools', () => {
@@ -415,7 +436,7 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
     rebuildCachedBrowserTools(state);
     state.pluginPermissions = { browser: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
     const names = tools.map(t => t.name);
 
     expect(names).toContain('browser_list_tabs');
@@ -424,90 +445,13 @@ describe('getEnabledToolsList — disabled tool filtering', () => {
   });
 });
 
-describe('getEnabledToolsList — browser tool permission filtering', () => {
-  test('disabled browser tool is excluded from tools list', () => {
-    const state = createState();
-    state.browserTools = [
-      createBrowserTool('browser_list_tabs', 'List tabs'),
-      createBrowserTool('browser_execute_script', 'Execute script'),
-    ];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = { browser: { permission: 'auto', tools: { browser_execute_script: 'off' } } };
-
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
-
-    expect(names).toContain('browser_list_tabs');
-    expect(names).not.toContain('browser_execute_script');
-    expect(tools).toHaveLength(1);
-  });
-
-  test('all browser tools disabled — none appear in list', () => {
-    const state = createState();
-    state.browserTools = [
-      createBrowserTool('browser_list_tabs', 'List tabs'),
-      createBrowserTool('browser_open_tab', 'Open tab'),
-    ];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = { browser: { permission: 'off' } };
-
-    const tools = getEnabledToolsList(state);
-    expect(tools).toHaveLength(0);
-  });
-
-  test('browser permission auto means all browser tools enabled', () => {
-    const state = createState();
-    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = { browser: { permission: 'auto' } };
-
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
-
-    expect(names).toContain('browser_list_tabs');
-    expect(tools).toHaveLength(1);
-  });
-
-  test('re-enabling a disabled browser tool makes it reappear', () => {
-    const state = createState();
-    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = { browser: { tools: { browser_list_tabs: 'off' } } };
-
-    expect(getEnabledToolsList(state)).toHaveLength(0);
-
-    state.pluginPermissions = { browser: { permission: 'auto' } };
-    const tools = getEnabledToolsList(state);
-    expect(tools).toHaveLength(1);
-    expect(tools[0]?.name).toBe('browser_list_tabs');
-  });
-
-  test('browser tool permissions do not affect plugin tools', () => {
-    const state = createState();
-    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
-    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
-    rebuildCachedBrowserTools(state);
-    state.pluginPermissions = {
-      slack: { permission: 'auto' },
-      browser: { tools: { browser_list_tabs: 'off' } },
-    };
-
-    const tools = getEnabledToolsList(state);
-    const names = tools.map(t => t.name);
-
-    expect(names).toContain('slack_send_message');
-    expect(names).not.toContain('browser_list_tabs');
-    expect(tools).toHaveLength(1);
-  });
-});
-
-describe('getEnabledToolsList — tool entry shape', () => {
+describe('getAllToolsList — tool entry shape', () => {
   test('plugin tools have correct name, description, and inputSchema', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     expect(tools).toHaveLength(1);
     expect(tools[0]).toMatchObject({
@@ -523,7 +467,7 @@ describe('getEnabledToolsList — tool entry shape', () => {
     rebuildCachedBrowserTools(state);
     state.pluginPermissions = { browser: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     expect(tools).toHaveLength(1);
     expect(tools[0]).toMatchObject({
@@ -534,13 +478,13 @@ describe('getEnabledToolsList — tool entry shape', () => {
   });
 });
 
-describe('getEnabledToolsList — tabId schema injection', () => {
+describe('getAllToolsList — tabId schema injection', () => {
   test('plugin tools have tabId injected into inputSchema properties', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     expect(tools).toHaveLength(1);
     const schema = tools[0]?.inputSchema as Record<string, unknown>;
@@ -556,7 +500,7 @@ describe('getEnabledToolsList — tabId schema injection', () => {
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     const schema = tools[0]?.inputSchema as Record<string, unknown>;
     const properties = schema.properties as Record<string, unknown>;
@@ -571,14 +515,14 @@ describe('getEnabledToolsList — tabId schema injection', () => {
     state.registry = buildRegistry([plugin], []);
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    // Capture the original schema BEFORE calling getEnabledToolsList
+    // Capture the original schema BEFORE calling getAllToolsList
     const originalTool = plugin.tools[0];
     if (!originalTool) throw new Error('Expected at least one tool');
     const originalSchema = originalTool.input_schema;
     const originalProperties = originalSchema.properties as Record<string, unknown> | undefined;
 
-    // Call getEnabledToolsList which injects tabId into a clone
-    getEnabledToolsList(state);
+    // Call getAllToolsList which injects tabId into a clone
+    getAllToolsList(state);
 
     // Original schema must NOT have tabId
     if (originalProperties) {
@@ -610,7 +554,7 @@ describe('getEnabledToolsList — tabId schema injection', () => {
     state.registry = buildRegistry([plugin], []);
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     const schema = tools[0]?.inputSchema as Record<string, unknown>;
     const required = schema.required as string[] | undefined;
@@ -626,7 +570,7 @@ describe('getEnabledToolsList — tabId schema injection', () => {
     rebuildCachedBrowserTools(state);
     state.pluginPermissions = { browser: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     expect(tools).toHaveLength(1);
     const schema = tools[0]?.inputSchema as Record<string, unknown>;
@@ -641,7 +585,7 @@ describe('getEnabledToolsList — tabId schema injection', () => {
     state.registry = buildRegistry([createPlugin('slack', ['send_message', 'read_messages'])], []);
     state.pluginPermissions = { slack: { permission: 'auto' } };
 
-    const tools = getEnabledToolsList(state);
+    const tools = getAllToolsList(state);
 
     expect(tools).toHaveLength(2);
     for (const tool of tools) {
@@ -655,10 +599,9 @@ describe('getEnabledToolsList — tabId schema injection', () => {
 });
 
 describe('checkToolCallable', () => {
-  test('returns ok with correct pluginName and toolName when tool exists and is enabled', () => {
+  test('returns ok with correct pluginName and toolName when tool exists', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
-    state.pluginPermissions = { slack: { permission: 'auto' } };
 
     const result = checkToolCallable(state, 'slack_send_message');
 
@@ -669,16 +612,17 @@ describe('checkToolCallable', () => {
     }
   });
 
-  test('returns error containing "disabled" when tool exists but is disabled', () => {
+  test('returns ok even when tool permission is off (permission checks at dispatch time)', () => {
     const state = createState();
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
-    // Default permission is 'off' — no explicit config needed to disable
+    // Default permission is 'off' — but checkToolCallable no longer checks this
 
     const result = checkToolCallable(state, 'slack_send_message');
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('disabled');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.pluginName).toBe('slack');
+      expect(result.toolName).toBe('send_message');
     }
   });
 
