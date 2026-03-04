@@ -43,6 +43,24 @@ const PluginList = ({
     );
   }
 
+  const readyPlugins = filterLower ? [] : visiblePlugins.filter(p => p.tabState === 'ready');
+  const notReadyPlugins = filterLower ? [] : visiblePlugins.filter(p => p.tabState !== 'ready');
+
+  const renderCard = (plugin: PluginState) => (
+    <PluginCard
+      key={plugin.name}
+      plugin={plugin}
+      activeTools={activeTools}
+      setPlugins={setPlugins}
+      toolFilter={toolFilter}
+      onUpdate={onUpdate ? () => onUpdate(plugin.name) : undefined}
+      onRemove={onRemove ? () => onRemove(plugin.name) : undefined}
+      removingPlugin={removingPlugins?.has(plugin.name)}
+      actionError={pluginErrors?.get(plugin.name) ?? null}
+      skipPermissions={skipPermissions}
+    />
+  );
+
   return (
     <>
       {visibleFailed.length > 0 && (
@@ -52,22 +70,29 @@ const PluginList = ({
           ))}
         </div>
       )}
-      <Accordion type="multiple" className="space-y-2">
-        {visiblePlugins.map(plugin => (
-          <PluginCard
-            key={plugin.name}
-            plugin={plugin}
-            activeTools={activeTools}
-            setPlugins={setPlugins}
-            toolFilter={toolFilter}
-            onUpdate={onUpdate ? () => onUpdate(plugin.name) : undefined}
-            onRemove={onRemove ? () => onRemove(plugin.name) : undefined}
-            removingPlugin={removingPlugins?.has(plugin.name)}
-            actionError={pluginErrors?.get(plugin.name) ?? null}
-            skipPermissions={skipPermissions}
-          />
-        ))}
-      </Accordion>
+      {filterLower ? (
+        <Accordion type="multiple" className="space-y-2">
+          {visiblePlugins.map(renderCard)}
+        </Accordion>
+      ) : (
+        <>
+          {readyPlugins.length > 0 && (
+            <Accordion type="multiple" className="space-y-2">
+              {readyPlugins.map(renderCard)}
+            </Accordion>
+          )}
+          {notReadyPlugins.length > 0 && (
+            <div>
+              <div className="px-3 pt-3 pb-1 font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+                NOT CONNECTED
+              </div>
+              <Accordion type="multiple" className="space-y-2">
+                {notReadyPlugins.map(renderCard)}
+              </Accordion>
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 };

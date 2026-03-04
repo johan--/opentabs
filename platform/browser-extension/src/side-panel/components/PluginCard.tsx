@@ -119,7 +119,13 @@ const PluginCard = ({
   return (
     <Accordion.Item
       value={plugin.name}
-      className={removingPlugin ? 'pointer-events-none opacity-60 transition-opacity' : undefined}>
+      className={
+        removingPlugin
+          ? 'pointer-events-none opacity-60 transition-opacity'
+          : plugin.tabState !== 'ready'
+            ? 'opacity-70 transition-opacity'
+            : undefined
+      }>
       <AccordionPrimitive.Header className="flex">
         <AccordionPrimitive.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 focus:outline-hidden [&[data-state=open]>svg]:rotate-180">
           <Tooltip>
