@@ -221,7 +221,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     const newPluginPermissions = { ...config.permissions };
     const newPluginPaths = [...config.localPlugins];
     const newDiscoveryErrors = errors;
-    const newSkipPermissions = isCliSkipPermissions() || config.skipPermissions === true;
+    const newSkipPermissions = isCliSkipPermissions();
 
     // Build the new cached browser tools on a staging object so a throw here
     // does not partially update state. rebuildCachedBrowserTools only reads

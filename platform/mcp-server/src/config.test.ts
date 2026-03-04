@@ -122,32 +122,6 @@ describe('loadConfig / saveConfig round-trip', () => {
     const config = await loadConfig();
     expect(config.permissions).toEqual({});
   });
-
-  test('preserves skipPermissions flag', async () => {
-    const custom: OpentabsConfig = {
-      localPlugins: [],
-      permissions: {},
-      skipPermissions: true,
-    };
-    await saveConfigWrapped(custom);
-
-    const loaded = await loadConfig();
-    expect(loaded.skipPermissions).toBe(true);
-  });
-
-  test('migrates skipConfirmation to skipPermissions', async () => {
-    await writeFile(
-      configPath,
-      JSON.stringify({
-        localPlugins: [],
-        permissions: {},
-        skipConfirmation: true,
-      }),
-    );
-
-    const config = await loadConfig();
-    expect(config.skipPermissions).toBe(true);
-  });
 });
 
 describe('savePluginPermissions round-trip', () => {

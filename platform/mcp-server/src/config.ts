@@ -44,8 +44,6 @@ interface OpentabsConfig {
   localPlugins: string[];
   /** Per-plugin permission configuration: plugin name → { permission?, tools? } */
   permissions: Record<string, PluginPermissionConfig>;
-  /** Whether to skip all permission prompts (dangerous — disables human-in-the-loop) */
-  skipPermissions?: boolean;
 }
 
 /** Version marker file for the managed extension install */
@@ -158,15 +156,7 @@ const parseConfigRecord = (record: Record<string, unknown>): OpentabsConfig => {
 
   const permissions = parsePluginsConfig(record.permissions);
 
-  // Read skipPermissions (new name); fall back to skipConfirmation (old name) for backward compatibility.
-  const skipPermissions =
-    typeof record.skipPermissions === 'boolean'
-      ? record.skipPermissions
-      : typeof record.skipConfirmation === 'boolean'
-        ? record.skipConfirmation
-        : undefined;
-
-  return { localPlugins, permissions, skipPermissions };
+  return { localPlugins, permissions };
 };
 
 /**
@@ -260,7 +250,6 @@ const savePluginPermissions = async (
     const updated: OpentabsConfig = {
       localPlugins: current.localPlugins,
       permissions: plugins,
-      skipPermissions: current.skipPermissions,
     };
     await atomicWriteConfig(configPath, `${JSON.stringify(updated, null, 2)}\n`);
   })();
