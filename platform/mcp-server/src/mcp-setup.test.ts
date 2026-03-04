@@ -410,14 +410,29 @@ describe('getAllToolsList — all tools always listed', () => {
     expect(tools).toHaveLength(5);
   });
 
-  test('skipPermissions=true makes all tools auto (no prefixes)', () => {
+  test('skipPermissions=true with off permissions still shows [Disabled] prefix', () => {
     const state = createState();
     state.skipPermissions = true;
     state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
     state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
     rebuildCachedBrowserTools(state);
-    // Even with off permissions, skipPermissions overrides to auto
     state.pluginPermissions = { slack: { permission: 'off' }, browser: { permission: 'off' } };
+
+    const tools = getAllToolsList(state);
+
+    expect(tools).toHaveLength(2);
+    for (const tool of tools) {
+      expect(tool.description).toMatch(/^\[Disabled\]/);
+    }
+  });
+
+  test('skipPermissions=true with ask permissions shows no prefixes (auto)', () => {
+    const state = createState();
+    state.skipPermissions = true;
+    state.registry = buildRegistry([createPlugin('slack', ['send_message'])], []);
+    state.browserTools = [createBrowserTool('browser_list_tabs', 'List tabs')];
+    rebuildCachedBrowserTools(state);
+    state.pluginPermissions = { slack: { permission: 'ask' }, browser: { permission: 'ask' } };
 
     const tools = getAllToolsList(state);
 
