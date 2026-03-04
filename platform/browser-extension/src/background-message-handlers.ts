@@ -321,16 +321,6 @@ const handleSpConfirmationResponse: MessageHandler = (message, sendResponse) => 
   sendResponse({ ok: true });
 };
 
-/** Handle sp:confirmationTimeout — confirmation timed out without user response */
-const handleSpConfirmationTimeout: MessageHandler = (message, sendResponse) => {
-  const id = typeof message.id === 'string' ? message.id : undefined;
-  if (id !== undefined) {
-    clearConfirmationBackgroundTimeout(id);
-  }
-  clearConfirmationBadge(id);
-  sendResponse({ ok: true });
-};
-
 /** Handle bg:setToolPermission — set a single tool's permission via the MCP server */
 const handleBgSetToolPermission: MessageHandler = (message, sendResponse) => {
   const plugin = message.plugin as string;
@@ -635,7 +625,6 @@ const backgroundHandlers = new Map<InternalMessage['type'], MessageHandler>([
   ['plugin:logs', handlePluginLogs],
   ['tool:progress', handleToolProgress],
   ['sp:confirmationResponse', handleSpConfirmationResponse],
-  ['sp:confirmationTimeout', handleSpConfirmationTimeout],
   ['port-changed', handlePortChanged],
 ]);
 
@@ -657,7 +646,6 @@ const EXTENSION_ONLY_TYPES: ReadonlySet<InternalMessage['type']> = new Set([
   'bg:updatePlugin',
   'offscreen:getLogs',
   'sp:confirmationResponse',
-  'sp:confirmationTimeout',
   'port-changed',
 ]);
 
@@ -706,7 +694,6 @@ export {
   handlePluginLogs,
   handlePortChanged,
   handleSpConfirmationResponse,
-  handleSpConfirmationTimeout,
   handleToolProgress,
   handleWsMessage,
   handleWsState,

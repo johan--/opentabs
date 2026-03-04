@@ -111,15 +111,9 @@ export interface SpConfirmationResponseMessage {
   type: 'sp:confirmationResponse';
   data: {
     id: string;
-    decision: 'allow_once' | 'allow_always' | 'deny';
-    scope?: 'tool_domain' | 'tool_all' | 'domain_all';
+    decision: 'allow' | 'deny';
+    alwaysAllow?: boolean;
   };
-}
-
-/** Side panel → Background: confirmation timed out without user response */
-export interface SpConfirmationTimeoutMessage {
-  type: 'sp:confirmationTimeout';
-  id: string;
 }
 
 /** Side panel → Background: set a single tool's permission */
@@ -214,7 +208,6 @@ export type InternalMessage =
   | SpConnectionStateMessage
   | SpRelayMessage
   | SpConfirmationResponseMessage
-  | SpConfirmationTimeoutMessage
   | PortChangedMessage;
 
 /** Tab state info for a single plugin — shared shape used by tab.stateChanged payloads */

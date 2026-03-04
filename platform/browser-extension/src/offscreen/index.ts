@@ -514,7 +514,6 @@ chrome.runtime.onMessage.addListener((message: InternalMessage, sender, sendResp
     case 'sp:connectionState':
     case 'sp:serverMessage':
     case 'sp:confirmationResponse':
-    case 'sp:confirmationTimeout':
       break;
   }
 

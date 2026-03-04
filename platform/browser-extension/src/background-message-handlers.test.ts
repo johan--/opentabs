@@ -175,7 +175,6 @@ const {
   handlePluginLogs,
   handleToolProgress,
   handleSpConfirmationResponse,
-  handleSpConfirmationTimeout,
   handleBgGetFullState,
   handleBgSetToolPermission,
   handleBgSetAllToolsPermission,
@@ -532,36 +531,6 @@ describe('handleSpConfirmationResponse', () => {
   test('sendResponse is always called with { ok: true }', () => {
     const sendResponse = vi.fn();
     handleSpConfirmationResponse({ data: {} }, sendResponse);
-    expect(sendResponse).toHaveBeenCalledWith({ ok: true });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// handleSpConfirmationTimeout
-// ---------------------------------------------------------------------------
-
-describe('handleSpConfirmationTimeout', () => {
-  test('clears background timeout when message.id is a string', () => {
-    handleSpConfirmationTimeout({ id: 'conf-1' }, () => {});
-
-    expect(mockClearConfirmationBackgroundTimeout).toHaveBeenCalledWith('conf-1');
-  });
-
-  test('does NOT call clearConfirmationBackgroundTimeout when id is not a string', () => {
-    handleSpConfirmationTimeout({ id: 123 }, () => {});
-
-    expect(mockClearConfirmationBackgroundTimeout).not.toHaveBeenCalled();
-  });
-
-  test('always calls clearConfirmationBadge', () => {
-    handleSpConfirmationTimeout({}, () => {});
-
-    expect(mockClearConfirmationBadge).toHaveBeenCalledOnce();
-  });
-
-  test('sendResponse is called with { ok: true }', () => {
-    const sendResponse = vi.fn();
-    handleSpConfirmationTimeout({}, sendResponse);
     expect(sendResponse).toHaveBeenCalledWith({ ok: true });
   });
 });
