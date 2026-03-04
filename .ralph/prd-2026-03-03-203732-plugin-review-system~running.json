@@ -196,7 +196,7 @@
         "npm run test passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "e2eCheckpoint": false,
       "model": "opus",
       "notes": "Files to modify:\n- platform/mcp-server/src/mcp-setup.ts — Register plugin_inspect and plugin_mark_reviewed in the platform tools section. They should bypass getToolPermission checks entirely (same as plugin_list_tabs). They should not be included in the list sent to the extension for side panel display.\n- platform/mcp-server/src/extension-handlers.ts — Ensure these tools are excluded from the browserTools array in the sync.full payload. Check how extension_get_state, extension_get_logs, plugin_list_tabs are already excluded and follow the same pattern.\n\nPlatform tools are a distinct category from browser tools and plugin tools. They are always available, always executable, and never shown in the side panel permission UI."
