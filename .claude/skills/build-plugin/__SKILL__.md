@@ -36,7 +36,7 @@ Before writing any code, study the existing plugin infrastructure. Use the Task 
    - `OpenTabsPlugin` abstract base class (name, displayName, description, urlPatterns, tools, isReady)
    - `defineTool({ name, displayName, description, icon, input, output, handle })` factory
    - `ToolError` static factories: `.auth()`, `.notFound()`, `.rateLimited()`, `.timeout()`, `.validation()`, `.internal()`
-   - SDK utilities: `fetchJSON`, `postJSON`, `getLocalStorage`, `waitForSelector`, `retry`, `sleep`, `log`
+   - SDK utilities: `fetchJSON`, `postJSON`, `getLocalStorage`, `waitForSelector`, `retry`, `sleep`, `log`, `parseRetryAfterMs`, `getCookie`
    - All plugin code runs in the **browser page context** (not server-side)
 
 2. **Study the Slack plugin** (`plugins/slack/`) — this is the canonical reference:
@@ -277,7 +277,7 @@ src/
 This is the most critical file. Follow this pattern:
 
 ```typescript
-import { ToolError } from "@opentabs-dev/plugin-sdk";
+import { ToolError, parseRetryAfterMs } from "@opentabs-dev/plugin-sdk";
 
 interface AppAuth {
   token: string;
@@ -377,7 +377,8 @@ export const api = async <T extends Record<string, unknown>>(
     const errorBody = (await response.text().catch(() => "")).substring(0, 512);
     if (response.status === 429) {
       const retryAfter = response.headers.get("Retry-After");
-      const retryMs = retryAfter ? Number(retryAfter) * 1000 : undefined;
+      const retryMs =
+        retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
       throw ToolError.rateLimited(
         `Rate limited: ${endpoint} — ${errorBody}`,
         retryMs,
@@ -535,11 +536,13 @@ This phase is **mandatory**. Every plugin build surfaces friction in the platfor
 While building and testing, track anything that slowed you down or required a workaround. After the plugin is working, classify each friction point:
 
 **Platform bugs** — things that were broken:
+
 - Scaffolder generated wrong versions, missing fields, or unhelpful defaults
 - A browser tool returned wrong results or failed silently
 - A build/lint/type-check failure caused by a platform issue (not a plugin bug)
 
 **Missing SDK capabilities** — things you had to hand-roll that every plugin needs:
+
 - The test is **universality**: would virtually every plugin developer hit this same need?
 - Things that clear the bar: retry logic, cookie parsing, request timeout wiring, token persistence boilerplate
 - Things that do NOT: app-specific API normalization, app-specific auth extraction
@@ -555,6 +558,7 @@ While building and testing, track anything that slowed you down or required a wo
 ```
 
 Group related fixes into one PRD when they touch the same files. Each story must:
+
 - Target exactly one file or closely related set of files
 - Have a concrete acceptance criterion
 - Be completable by a fresh AI agent in one iteration
@@ -567,12 +571,14 @@ The codebase and tooling should be perfect before the next plugin is built. If s
 After filing PRDs, update this file (`__SKILL__.md`) with **universal knowledge about building plugins for diverse web services**. This skill teaches how to efficiently tackle different auth layers, API patterns, and browser environments.
 
 **What belongs here:**
+
 - Auth patterns for new classes of web apps (cookie-based, token-based, OAuth, CORS, etc.)
 - Browser environment constraints that apply to all plugins (SPA hydration, HttpOnly cookies, CSP, globalThis lifecycle)
 - API exploration patterns that work across different web services
 - Defensive coding patterns for untrusted API responses
 
 **What does NOT belong here:**
+
 - Platform bugs or tooling limitations — these get PRDs, not gotchas
 - App-specific details (e.g., "Jira uses ADF format for descriptions")
 - Things the scaffolder/SDK/CLI should handle — fix the tool instead
@@ -735,7 +741,7 @@ These are inherent constraints of the browser environment and web APIs — not p
 
 ### Auth and Cookies
 
-6. **HttpOnly cookies are invisible to plugin code** — `document.cookie` cannot read HttpOnly cookies (most session cookies). Detect auth indirectly: `<meta>` tags (e.g., `<meta name="user-login">`), non-HttpOnly indicator cookies, page globals (`window.__APP_STATE__`), or localStorage. API calls still work with `credentials: 'include'` — the browser sends HttpOnly cookies automatically. Persist the *user context* (user ID, workspace ID) on globalThis even when the token itself is HttpOnly. See the "Cookie-Based Auth Pattern" section below.
+6. **HttpOnly cookies are invisible to plugin code** — `document.cookie` cannot read HttpOnly cookies (most session cookies). Detect auth indirectly: `<meta>` tags (e.g., `<meta name="user-login">`), non-HttpOnly indicator cookies, page globals (`window.__APP_STATE__`), or localStorage. API calls still work with `credentials: 'include'` — the browser sends HttpOnly cookies automatically. Persist the _user context_ (user ID, workspace ID) on globalThis even when the token itself is HttpOnly. See the "Cookie-Based Auth Pattern" section below.
 7. **Cross-origin API + cookies: check CORS first** — When the API is on a different subdomain, verify CORS. Three outcomes: (a) `allow-origin` + `allow-credentials: true` — direct `fetch()` with `credentials: 'include'` works; (b) `allow-origin: *` — credentials rejected, use token-based auth; (c) no CORS headers — blocked, find same-origin endpoints. The adapter runs in the page's MAIN world, so `credentials: 'include'` sends cookies like the app's own code.
 
 ### API Patterns
@@ -762,29 +768,32 @@ const getAuth = (): Auth | null => {
   if (persisted) return persisted;
 
   // Check non-HttpOnly cookies for user context
-  const userId = getCookie('user_id');
+  const userId = getCookie("user_id");
   if (!userId) return null;
 
   // Resolve workspace/space/org context from localStorage or API
   const contextId = getContextFromLocalStorage();
-  const auth: Auth = { userId, contextId: contextId ?? '' };
+  const auth: Auth = { userId, contextId: contextId ?? "" };
   setPersistedAuth(auth);
   return auth;
 };
 
 // API calls use credentials: 'include' — the browser sends HttpOnly cookies automatically
-const api = async <T>(endpoint: string, body: Record<string, unknown>): Promise<T> => {
+const api = async <T>(
+  endpoint: string,
+  body: Record<string, unknown>,
+): Promise<T> => {
   const auth = getAuth();
-  if (!auth) throw ToolError.auth('Not authenticated');
+  if (!auth) throw ToolError.auth("Not authenticated");
 
   const response = await fetch(`https://app.example.com/api/${endpoint}`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'x-active-user': auth.userId,  // Some apps need explicit user headers
+      "Content-Type": "application/json",
+      "x-active-user": auth.userId, // Some apps need explicit user headers
     },
     body: JSON.stringify(body),
-    credentials: 'include',  // HttpOnly cookies sent automatically
+    credentials: "include", // HttpOnly cookies sent automatically
     signal: AbortSignal.timeout(30_000),
   });
   // ... error handling ...
