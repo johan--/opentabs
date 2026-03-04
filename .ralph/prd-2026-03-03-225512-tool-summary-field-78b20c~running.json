@@ -86,7 +86,7 @@
         "npm run test passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "e2eCheckpoint": false,
       "model": "opus",
       "notes": "Files to edit:\n\n1. `platform/browser-extension/src/side-panel/components/ToolRow.tsx` — Add optional `summary?: string` to the props. Use `summary ?? description` for both the inline text and the tooltip:\n   ```tsx\n   const displayDescription = summary ?? description;\n   // ...\n   <div className=\"truncate text-muted-foreground text-xs\">{displayDescription}</div>\n   // ...\n   <Tooltip.Content>{displayDescription}</Tooltip.Content>\n   ```\n\n2. `platform/browser-extension/src/side-panel/components/PluginCard.tsx` — In the ToolRow rendering (lines 241-250 and 255-264), pass `summary={tool.summary}`.\n\n3. `platform/browser-extension/src/side-panel/components/BrowserToolsCard.tsx` — In the ToolRow rendering (lines 213-224 and 228-237), the BrowserToolState type needs to carry summary. Check the bridge.ts types to ensure BrowserToolState includes summary. Pass `summary={tool.summary}` to ToolRow.\n\n4. Check `platform/browser-extension/src/side-panel/bridge.ts` — The `BrowserToolState` type likely mirrors `ConfigStateBrowserTool`. Ensure it includes `summary?: string`. Also check `WireToolDef` usage in the bridge.\n\n5. `platform/browser-extension/src/side-panel/components/ToolRow.stories.tsx` — Add stories: `WithSummary` (showing a short summary), `WithoutSummary` (showing fallback to description), and a comparison story showing both side by side."
