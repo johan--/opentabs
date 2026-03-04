@@ -35,7 +35,7 @@
         "cd plugins/confluence && npm run format:check passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "e2eCheckpoint": false,
       "model": "opus",
       "notes": "Edit all 14 files in `plugins/confluence/src/tools/`. Examples:\n\n- `create-page.ts`: `summary: 'Create a new Confluence page'`\n- `get-page.ts`: `summary: 'Get a page by ID'`\n- `search.ts`: `summary: 'Search content using CQL'`\n- `list-spaces.ts`: `summary: 'List Confluence spaces'`\n- `update-page.ts`: `summary: 'Update an existing page'`\n- `add-label.ts`: `summary: 'Add a label to a page'`"
