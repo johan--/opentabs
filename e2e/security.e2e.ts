@@ -130,3 +130,64 @@ test.describe('DNS rebinding protection — Host header validation', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// US-002: CORS protection rejects browser Origin headers
+// ---------------------------------------------------------------------------
+
+test.describe('CORS protection — Origin header validation', () => {
+  let configDir = '';
+
+  test.beforeEach(() => {
+    configDir = createTestConfigDir();
+  });
+
+  test.afterEach(() => {
+    if (configDir) cleanupTestConfigDir(configDir);
+  });
+
+  test('rejects requests with non-chrome-extension Origin headers (403)', async () => {
+    const server = await startMcpServer(configDir, true);
+    try {
+      await server.waitForHealth(h => h.status === 'ok');
+
+      const evilOrigins = ['https://evil.com', 'http://localhost:3000', 'https://attacker.io', 'http://127.0.0.1:8080'];
+
+      for (const origin of evilOrigins) {
+        const res = await fetch(`http://localhost:${server.port}/health`, {
+          headers: { Origin: origin },
+        });
+        expect(res.status, `Origin: ${origin} should be rejected`).toBe(403);
+        expect(await res.text()).toContain('browser requests are not allowed');
+      }
+    } finally {
+      await server.kill();
+    }
+  });
+
+  test('accepts requests with chrome-extension:// Origin', async () => {
+    const server = await startMcpServer(configDir, true);
+    try {
+      await server.waitForHealth(h => h.status === 'ok');
+
+      const res = await fetch(`http://localhost:${server.port}/health`, {
+        headers: { Origin: 'chrome-extension://abcdefghijklmnop' },
+      });
+      expect(res.status).toBe(200);
+    } finally {
+      await server.kill();
+    }
+  });
+
+  test('accepts requests with no Origin header (MCP clients)', async () => {
+    const server = await startMcpServer(configDir, true);
+    try {
+      await server.waitForHealth(h => h.status === 'ok');
+
+      const res = await fetch(`http://localhost:${server.port}/health`);
+      expect(res.status).toBe(200);
+    } finally {
+      await server.kill();
+    }
+  });
+});
