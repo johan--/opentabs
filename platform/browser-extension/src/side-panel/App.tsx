@@ -12,6 +12,7 @@ import type {
   PluginState,
 } from './bridge.js';
 import {
+  setSkipPermissions as bridgeSetSkipPermissions,
   getFullState,
   installPlugin,
   removePlugin,
@@ -355,6 +356,12 @@ const App = () => {
               AI runs tools without asking. Off tools stay off. Set by{' '}
               <code className="font-mono">OPENTABS_DANGEROUSLY_SKIP_PERMISSIONS</code>.
             </p>
+            <button
+              type="button"
+              onClick={() => void bridgeSetSkipPermissions(false)}
+              className="mt-0.5 cursor-pointer font-head text-[11px] text-destructive underline hover:text-destructive/80">
+              Restore approvals
+            </button>
           </div>
         )}
         {showSearchBar && (

@@ -452,6 +452,28 @@ const handleBgSetPluginPermission: MessageHandler = (message, sendResponse) => {
     });
 };
 
+/** Handle bg:setSkipPermissions — set skipPermissions runtime toggle via the MCP server */
+const handleBgSetSkipPermissions: MessageHandler = (message, sendResponse) => {
+  const skipPermissions = message.skipPermissions as boolean;
+
+  // Capture original for rollback
+  const cache = getServerStateCache();
+  const originalSkipPermissions = cache.skipPermissions ?? false;
+
+  // Optimistically update local cache
+  updateServerStateCache({ skipPermissions });
+
+  sendServerRequest('config.setSkipPermissions', { skipPermissions })
+    .then((result: unknown) => {
+      sendResponse(result);
+    })
+    .catch((err: unknown) => {
+      // Rollback
+      updateServerStateCache({ skipPermissions: originalSkipPermissions });
+      sendResponse({ error: err instanceof Error ? err.message : String(err) });
+    });
+};
+
 /** Handle bg:searchPlugins — search npm registry for plugins */
 const handleBgSearchPlugins: MessageHandler = (message, sendResponse) => {
   const query = message.query as string;
@@ -520,6 +542,7 @@ const backgroundHandlers = new Map<InternalMessage['type'], MessageHandler>([
   ['bg:setToolPermission', handleBgSetToolPermission],
   ['bg:setAllToolsPermission', handleBgSetAllToolsPermission],
   ['bg:setPluginPermission', handleBgSetPluginPermission],
+  ['bg:setSkipPermissions', handleBgSetSkipPermissions],
   ['bg:searchPlugins', handleBgSearchPlugins],
   ['bg:installPlugin', handleBgInstallPlugin],
   ['bg:removePlugin', handleBgRemovePlugin],
@@ -540,6 +563,7 @@ const EXTENSION_ONLY_TYPES: ReadonlySet<InternalMessage['type']> = new Set([
   'bg:setToolPermission',
   'bg:setAllToolsPermission',
   'bg:setPluginPermission',
+  'bg:setSkipPermissions',
   'bg:searchPlugins',
   'bg:installPlugin',
   'bg:removePlugin',
@@ -586,6 +610,7 @@ export {
   handleBgSearchPlugins,
   handleBgSetAllToolsPermission,
   handleBgSetPluginPermission,
+  handleBgSetSkipPermissions,
   handleBgSetToolPermission,
   handleBgUpdatePlugin,
   handleOffscreenGetUrl,

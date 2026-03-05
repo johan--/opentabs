@@ -402,10 +402,12 @@ test.describe('Side panel — plugin-level permission select', () => {
   test('plugin permission select changes the default for all tools', async () => {
     const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
     const prefixedToolNames = readPluginToolNames();
+    const pluginVersion = (
+      JSON.parse(fs.readFileSync(path.join(E2E_TEST_PLUGIN_DIR, 'package.json'), 'utf-8')) as { version: string }
+    ).version;
 
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-toggle-all-'));
     // Start with e2e-test plugin at 'auto' and mark as reviewed so the unreviewed dialog doesn't interfere
-    const pluginVersion = getPluginVersion();
     writeTestConfig(configDir, {
       localPlugins: [absPluginPath],
       permissions: { 'e2e-test': { permission: 'auto', reviewedVersion: pluginVersion } },
