@@ -39,6 +39,10 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 const pending: Array<() => void> = [];
 let workerStartCount = 0;
 
+/** Runtime override for skipPermissions, set via IPC when the user clicks
+ *  'Restore approvals'. null = no override (pass through from parent env). */
+let skipPermissionsOverride: boolean | null = null;
+
 // --- MCP Session State ---
 
 /** Tracked state for each MCP client session that the proxy manages. */
@@ -207,18 +211,23 @@ const startWorker = (): void => {
   workerStartCount++;
   const isRestart = workerStartCount > 1;
 
-  const child = fork(WORKER_JS, ['--dev'], {
-    env: { ...process.env, PORT: '0', OPENTABS_PROXY: '1' },
-  });
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    PORT: '0',
+    OPENTABS_PROXY: '1',
+  };
+  if (skipPermissionsOverride !== null) {
+    env.OPENTABS_DANGEROUSLY_SKIP_PERMISSIONS = skipPermissionsOverride ? '1' : '';
+  }
+  const child = fork(WORKER_JS, ['--dev'], { env });
   worker = child;
 
   child.on('message', (msg: unknown) => {
-    if (
-      typeof msg === 'object' &&
-      msg !== null &&
-      (msg as { type?: unknown }).type === 'ready' &&
-      typeof (msg as { port?: unknown }).port === 'number'
-    ) {
+    if (typeof msg !== 'object' || msg === null) return;
+
+    const type = (msg as { type?: unknown }).type;
+
+    if (type === 'ready' && typeof (msg as { port?: unknown }).port === 'number') {
       workerPort = (msg as { type: string; port: number }).port;
       console.log(`[proxy] Worker ready on port ${workerPort}`);
 
@@ -232,6 +241,8 @@ const startWorker = (): void => {
       } else {
         drainPending();
       }
+    } else if (type === 'skipPermissions' && typeof (msg as { value?: unknown }).value === 'boolean') {
+      skipPermissionsOverride = (msg as { value: boolean }).value;
     }
   });
 
