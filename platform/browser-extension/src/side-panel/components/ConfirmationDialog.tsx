@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from './retro/Button.js';
 import { Dialog } from './retro/Dialog.js';
+import { Switch } from './retro/Switch.js';
 
 type ConfirmationData = {
   id: string;
@@ -76,11 +77,13 @@ const ConfirmationDialog = ({ confirmations, onRespond }: ConfirmationDialogProp
                   </pre>
                 </details>
               )}
-              <label className="mt-3 flex items-center gap-2">
-                <input type="checkbox" checked={alwaysAllow} onChange={e => setAlwaysAllow(e.target.checked)} />
-                <span className="text-sm">Always allow this tool</span>
-              </label>
-              <span className="text-muted-foreground text-xs">Sets permission to Auto</span>
+              <div className="mt-3 flex items-center gap-2">
+                <Switch checked={alwaysAllow} onCheckedChange={setAlwaysAllow} aria-label="Always allow this tool" />
+                <div>
+                  <span className="text-sm">Always allow this tool</span>
+                  <p className="text-muted-foreground text-xs">Sets permission to Auto</p>
+                </div>
+              </div>
             </>
           )}
         </Dialog.Body>
