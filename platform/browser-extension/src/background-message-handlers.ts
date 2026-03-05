@@ -7,6 +7,8 @@ import { forwardToSidePanel, sendToServer } from './messaging.js';
 import { getAllPluginMeta } from './plugin-storage.js';
 import { rejectAllPendingServerRequests, sendServerRequest } from './server-request.js';
 import {
+  addPendingAllBrowserToolsUpdate,
+  addPendingBrowserToolUpdate,
   addPendingPluginAllToolsUpdate,
   addPendingPluginPermissionUpdate,
   addPendingPluginToolUpdate,
@@ -14,6 +16,8 @@ import {
   getCachesInitialized,
   getServerStateCache,
   loadServerStateCacheFromSession,
+  removePendingAllBrowserToolsUpdate,
+  removePendingBrowserToolUpdate,
   removePendingPluginAllToolsUpdate,
   removePendingPluginPermissionUpdate,
   removePendingPluginToolUpdate,
@@ -322,6 +326,31 @@ const handleBgSetToolPermission: MessageHandler = (message, sendResponse) => {
   const tool = message.tool as string;
   const permission = message.permission as ToolPermission;
 
+  if (plugin === 'browser') {
+    const cache = getServerStateCache();
+    const originalPermission = cache.browserTools.find(t => t.name === tool)?.permission ?? 'auto';
+
+    const updatedBrowserTools = cache.browserTools.map(t => (t.name === tool ? { ...t, permission } : t));
+    addPendingBrowserToolUpdate(tool, permission);
+    updateServerStateCache({ browserTools: updatedBrowserTools });
+
+    sendServerRequest('config.setToolPermission', { plugin, tool, permission })
+      .then((result: unknown) => {
+        removePendingBrowserToolUpdate(tool);
+        sendResponse(result);
+      })
+      .catch((err: unknown) => {
+        removePendingBrowserToolUpdate(tool);
+        const currentCache = getServerStateCache();
+        const revertedBrowserTools = currentCache.browserTools.map(t =>
+          t.name === tool ? { ...t, permission: originalPermission } : t,
+        );
+        updateServerStateCache({ browserTools: revertedBrowserTools });
+        sendResponse({ error: err instanceof Error ? err.message : String(err) });
+      });
+    return;
+  }
+
   // Capture the original permission value for surgical rollback
   const cache = getServerStateCache();
   const pluginEntry = cache.plugins.find(p => p.name === plugin);
@@ -364,6 +393,36 @@ const handleBgSetToolPermission: MessageHandler = (message, sendResponse) => {
 const handleBgSetAllToolsPermission: MessageHandler = (message, sendResponse) => {
   const plugin = message.plugin as string;
   const permission = message.permission as ToolPermission;
+
+  if (plugin === 'browser') {
+    const cache = getServerStateCache();
+    const toolNames = cache.browserTools.map(t => t.name);
+    const originalToolStates = new Map<string, ToolPermission>();
+    for (const t of cache.browserTools) {
+      originalToolStates.set(t.name, t.permission);
+    }
+
+    const updatedBrowserTools = cache.browserTools.map(t => ({ ...t, permission }));
+    addPendingAllBrowserToolsUpdate(toolNames, permission);
+    updateServerStateCache({ browserTools: updatedBrowserTools });
+
+    sendServerRequest('config.setAllToolsPermission', { plugin, permission })
+      .then((result: unknown) => {
+        removePendingAllBrowserToolsUpdate(toolNames);
+        sendResponse(result);
+      })
+      .catch((err: unknown) => {
+        removePendingAllBrowserToolsUpdate(toolNames);
+        const currentCache = getServerStateCache();
+        const revertedBrowserTools = currentCache.browserTools.map(t => ({
+          ...t,
+          permission: originalToolStates.get(t.name) ?? t.permission,
+        }));
+        updateServerStateCache({ browserTools: revertedBrowserTools });
+        sendResponse({ error: err instanceof Error ? err.message : String(err) });
+      });
+    return;
+  }
 
   // Capture original permission values for surgical rollback
   const cache = getServerStateCache();
