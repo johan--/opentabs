@@ -140,6 +140,12 @@ export interface BgSetPluginPermissionMessage {
   reviewedVersion?: string;
 }
 
+/** Side panel → Background: set skipPermissions runtime toggle */
+export interface BgSetSkipPermissionsMessage {
+  type: 'bg:setSkipPermissions';
+  skipPermissions: boolean;
+}
+
 /** Side panel → Background: search npm registry for plugins */
 export interface BgSearchPluginsMessage {
   type: 'bg:searchPlugins';
@@ -182,6 +188,7 @@ export type InternalMessage =
   | BgSetToolPermissionMessage
   | BgSetAllToolsPermissionMessage
   | BgSetPluginPermissionMessage
+  | BgSetSkipPermissionsMessage
   | BgSearchPluginsMessage
   | BgInstallPluginMessage
   | BgRemovePluginMessage
