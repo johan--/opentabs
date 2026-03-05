@@ -27,6 +27,7 @@ import {
   parseToolResult,
   setupAdapterSymlink,
   setupToolTest,
+  waitFor,
   waitForExtensionConnected,
   waitForExtensionDisconnected,
   waitForLog,
@@ -500,6 +501,77 @@ test.describe('/health endpoint: authenticated vs unauthenticated response', () 
     } finally {
       await server.kill();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US-007: Network capture cleanup when tab closes
+// ---------------------------------------------------------------------------
+
+test.describe('Network capture cleanup when tab closes', () => {
+  test('closing a tab with active capture cleans up capture state', async ({
+    mcpServer,
+    testServer,
+    extensionContext: _extensionContext,
+    mcpClient,
+  }) => {
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+    await mcpClient.listTools();
+
+    // 1. Open a tab
+    const openResult = await mcpClient.callTool('browser_open_tab', { url: testServer.url });
+    expect(openResult.isError).toBe(false);
+    const tabInfo = parseToolResult(openResult.content);
+    const tabId = tabInfo.id as number;
+
+    // 2. Enable network capture on the tab
+    const enableResult = await mcpClient.callTool('browser_enable_network_capture', { tabId });
+    expect(enableResult.isError).toBe(false);
+    const enableData = parseToolResult(enableResult.content);
+    expect(enableData.enabled).toBe(true);
+
+    // 3. Verify capture is active via extension_get_state
+    const stateResult1 = await mcpClient.callTool('extension_get_state');
+    expect(stateResult1.isError).toBe(false);
+    const state1 = parseToolResult(stateResult1.content);
+    const captures1 = state1.networkCaptures as Array<{ tabId: number; isCapturing: boolean }>;
+    const activeCapture = captures1.find(c => c.tabId === tabId);
+    expect(activeCapture).toBeDefined();
+    expect(activeCapture?.isCapturing).toBe(true);
+
+    // 4. Close the tab
+    const closeResult = await mcpClient.callTool('browser_close_tab', { tabId });
+    expect(closeResult.isError).toBe(false);
+
+    // 5. Wait for capture state to be cleaned up (chrome.tabs.onRemoved fires async)
+    await waitFor(
+      async () => {
+        const stateResult = await mcpClient.callTool('extension_get_state');
+        if (stateResult.isError) return false;
+        const state = parseToolResult(stateResult.content);
+        const captures = state.networkCaptures as Array<{ tabId: number }>;
+        return !captures.some(c => c.tabId === tabId);
+      },
+      10_000,
+      500,
+      'capture cleaned up after tab close',
+    );
+
+    // 6. Open a new tab and enable capture — should succeed (not blocked by stale state)
+    const openResult2 = await mcpClient.callTool('browser_open_tab', { url: testServer.url });
+    expect(openResult2.isError).toBe(false);
+    const tabInfo2 = parseToolResult(openResult2.content);
+    const tabId2 = tabInfo2.id as number;
+
+    const enableResult2 = await mcpClient.callTool('browser_enable_network_capture', { tabId: tabId2 });
+    expect(enableResult2.isError).toBe(false);
+    const enableData2 = parseToolResult(enableResult2.content);
+    expect(enableData2.enabled).toBe(true);
+
+    // Cleanup
+    await mcpClient.callTool('browser_disable_network_capture', { tabId: tabId2 });
+    await mcpClient.callTool('browser_close_tab', { tabId: tabId2 });
   });
 });
 
