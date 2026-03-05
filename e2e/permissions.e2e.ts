@@ -945,6 +945,69 @@ test.describe('Confirmation dialog — plugin tools', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Tests — Confirmation dialog — Always Allow switch reset
+// ---------------------------------------------------------------------------
+
+test.describe('Confirmation dialog — Always Allow switch reset', () => {
+  test('Always Allow switch resets to unchecked after each Allow/Deny decision', async ({
+    mcpServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    const config = readTestConfig(mcpServer.configDir);
+    config.permissions = { browser: { permission: 'ask' } };
+    writeTestConfig(mcpServer.configDir, config);
+
+    mcpServer.logs.length = 0;
+    mcpServer.triggerHotReload();
+    await waitForLog(mcpServer, 'Hot reload complete', 20_000);
+
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+
+    const sw = await getBackgroundWorker(extensionContext);
+    const sidePanel = await openSidePanel(extensionContext);
+
+    // Send two concurrent 'ask' tool calls
+    const [result1, result2] = await Promise.all([
+      mcpClient.callTool('browser_list_tabs', {}, { timeout: 60_000 }),
+      mcpClient.callTool('browser_list_tabs', {}, { timeout: 60_000 }),
+      (async () => {
+        // Wait for both confirmations to arrive
+        await waitFor(async () => (await getBadgeText(sw)) === '2', 15_000, 200, 'badge text === "2"');
+
+        await waitForConfirmationDialog(sidePanel);
+        const dialog = sidePanel.locator('[role="dialog"]');
+        const alwaysAllowSwitch = dialog.getByRole('switch', { name: 'Always allow this tool' });
+
+        // Switch should start unchecked
+        await expect(alwaysAllowSwitch).toHaveAttribute('data-state', 'unchecked');
+
+        // Toggle the Always Allow switch ON
+        await alwaysAllowSwitch.click();
+        await expect(alwaysAllowSwitch).toHaveAttribute('data-state', 'checked');
+
+        // Allow the first confirmation (with Always Allow toggled on)
+        await sidePanel.getByRole('button', { name: 'Allow' }).click();
+
+        // The switch should reset to unchecked for the second confirmation
+        await waitForConfirmationDialog(sidePanel);
+        const dialog2 = sidePanel.locator('[role="dialog"]');
+        const alwaysAllowSwitch2 = dialog2.getByRole('switch', { name: 'Always allow this tool' });
+        await expect(alwaysAllowSwitch2).toHaveAttribute('data-state', 'unchecked', { timeout: 5_000 });
+
+        // Deny the second confirmation
+        await sidePanel.getByRole('button', { name: 'Deny' }).click();
+      })(),
+    ]);
+
+    expect(result1.isError).toBe(false);
+    expect(result2.isError).toBe(true);
+    expect(result2.content).toContain('denied by the user');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Tests — Tool description prefixes in tools/list
 // ---------------------------------------------------------------------------
 
