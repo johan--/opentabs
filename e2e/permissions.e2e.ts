@@ -32,11 +32,13 @@ import {
 } from './fixtures.js';
 import {
   openSidePanel,
+  openTestAppTab,
   setupAdapterSymlink,
   waitFor,
   waitForExtensionConnected,
   waitForLog,
   waitForToolList,
+  waitForToolResult,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -840,6 +842,105 @@ test.describe('Confirmation dialog — parameters display', () => {
     ]);
 
     expect(result.isError).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — Confirmation dialog — plugin tools (not just browser tools)
+// ---------------------------------------------------------------------------
+
+test.describe('Confirmation dialog — plugin tools', () => {
+  test('Allow completes plugin tool and returns correct result', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    // Start with e2e-test at 'auto' so the plugin can become ready
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+    await testServer.reset();
+
+    await openTestAppTab(extensionContext, testServer.url, mcpServer, testServer);
+    await waitForToolResult(mcpClient, 'e2e-test_get_status', {}, { isError: false }, 15_000);
+
+    // Switch e2e-test permission to 'ask'
+    const config = readTestConfig(mcpServer.configDir);
+    config.permissions = {
+      ...config.permissions,
+      'e2e-test': { permission: 'ask' },
+      browser: { permission: 'auto' },
+    };
+    writeTestConfig(mcpServer.configDir, config);
+
+    mcpServer.logs.length = 0;
+    mcpServer.triggerHotReload();
+    await waitForLog(mcpServer, 'Hot reload complete', 20_000);
+
+    const sidePanel = await openSidePanel(extensionContext);
+
+    const [result] = await Promise.all([
+      mcpClient.callTool('e2e-test_echo', { message: 'hello from plugin' }, { timeout: 35_000 }),
+      (async () => {
+        await waitForConfirmationDialog(sidePanel);
+        const dialog = sidePanel.locator('[role="dialog"]');
+
+        // Dialog shows the base tool name and plugin slug
+        await expect(dialog.getByText('echo')).toBeVisible();
+        await expect(dialog.getByText('e2e-test')).toBeVisible();
+        await expect(dialog.getByText('Approve Tool')).toBeVisible();
+
+        // Parameters should be visible (echo takes { message })
+        const summary = dialog.getByText('Parameters');
+        await expect(summary).toBeVisible();
+
+        await sidePanel.getByRole('button', { name: 'Allow' }).click();
+      })(),
+    ]);
+
+    expect(result.isError).toBe(false);
+    expect(result.content).toContain('hello from plugin');
+  });
+
+  test('Deny returns PERMISSION_DENIED error for plugin tool', async ({
+    mcpServer,
+    testServer,
+    extensionContext,
+    mcpClient,
+  }) => {
+    // Start with e2e-test at 'auto' so the plugin can become ready
+    await waitForExtensionConnected(mcpServer);
+    await waitForLog(mcpServer, 'tab.syncAll received');
+    await testServer.reset();
+
+    await openTestAppTab(extensionContext, testServer.url, mcpServer, testServer);
+    await waitForToolResult(mcpClient, 'e2e-test_get_status', {}, { isError: false }, 15_000);
+
+    // Switch e2e-test permission to 'ask'
+    const config = readTestConfig(mcpServer.configDir);
+    config.permissions = {
+      ...config.permissions,
+      'e2e-test': { permission: 'ask' },
+      browser: { permission: 'auto' },
+    };
+    writeTestConfig(mcpServer.configDir, config);
+
+    mcpServer.logs.length = 0;
+    mcpServer.triggerHotReload();
+    await waitForLog(mcpServer, 'Hot reload complete', 20_000);
+
+    const sidePanel = await openSidePanel(extensionContext);
+
+    const [result] = await Promise.all([
+      mcpClient.callTool('e2e-test_echo', { message: 'will be denied' }, { timeout: 35_000 }),
+      (async () => {
+        await waitForConfirmationDialog(sidePanel);
+        await sidePanel.getByRole('button', { name: 'Deny' }).click();
+      })(),
+    ]);
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('denied by the user');
   });
 });
 
