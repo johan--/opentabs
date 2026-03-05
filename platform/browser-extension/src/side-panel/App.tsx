@@ -56,6 +56,7 @@ const App = () => {
   const [installErrors, setInstallErrors] = useState<Map<string, string>>(new Map());
   const [pluginErrors, setPluginErrors] = useState<Map<string, string>>(new Map());
   const [browserToolsOpen, setBrowserToolsOpen] = useState(false);
+  const [browserToolsHydrated, setBrowserToolsHydrated] = useState(false);
 
   const pluginErrorTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const npmSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -89,9 +90,10 @@ const App = () => {
       result => {
         const stored = result.browserToolsOpen as boolean | undefined;
         if (stored === true) setBrowserToolsOpen(true);
+        setBrowserToolsHydrated(true);
       },
       () => {
-        // Storage unavailable — keep default (collapsed)
+        setBrowserToolsHydrated(true);
       },
     );
   }, []);
@@ -445,7 +447,7 @@ const App = () => {
               />
             ) : hasContent ? (
               <>
-                {browserTools.length > 0 && (
+                {browserTools.length > 0 && browserToolsHydrated && (
                   <Accordion
                     type="multiple"
                     value={browserToolsOpen ? ['browser-tools'] : []}

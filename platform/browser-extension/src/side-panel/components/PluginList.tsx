@@ -110,11 +110,13 @@ const PluginList = ({
 
   const { animating, resolveTransitionClass } = useGroupTransitions(plugins, !!filterLower);
 
-  // Controlled accordion state — collapse cards when they change groups
+  // Controlled accordion state — collapse cards when they change groups.
+  // Hydrated from chrome.storage.session before first render to prevent
+  // a collapsed→expanded flash (the accordion animates height changes).
+  const [accordionHydrated, setAccordionHydrated] = useState(false);
   const [openReady, setOpenReady] = useState<string[]>([]);
   const [openNotReady, setOpenNotReady] = useState<string[]>([]);
 
-  // Hydrate accordion state from chrome.storage.session on mount
   useEffect(() => {
     chrome.storage.session.get(ACCORDION_STORAGE_KEY).then(
       result => {
@@ -123,9 +125,10 @@ const PluginList = ({
           if (Array.isArray(stored.openReady)) setOpenReady(stored.openReady);
           if (Array.isArray(stored.openNotReady)) setOpenNotReady(stored.openNotReady);
         }
+        setAccordionHydrated(true);
       },
       () => {
-        // Storage unavailable — keep defaults
+        setAccordionHydrated(true);
       },
     );
   }, []);
@@ -184,6 +187,12 @@ const PluginList = ({
 
     return () => clearTimeout(unmountTimer);
   }, [hasNotReady, filterLower]);
+
+  // Defer rendering until accordion state is hydrated from storage.
+  // Without this gate, the first render uses empty arrays (all collapsed),
+  // then the storage read triggers a re-render with the saved state,
+  // causing a visible expand animation.
+  if (!accordionHydrated) return null;
 
   if (filterLower && visiblePlugins.length === 0) {
     return (
