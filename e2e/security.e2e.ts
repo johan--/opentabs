@@ -132,14 +132,16 @@ test.describe('DNS rebinding protection — Host header validation', () => {
     try {
       await server.waitForHealth(h => h.status === 'ok');
 
-      // Malformed IPv6 and non-localhost IPv6 addresses
-      const maliciousHosts = ['[::2]:8080', '[evil'];
+      // Non-localhost IPv6 address — server handler rejects with 403
+      const res1 = await requestWithHost(server.port, '/health', '[::2]:8080');
+      expect(res1.status, 'Host: [::2]:8080 should be rejected').toBe(403);
+      expect(res1.body).toContain('invalid Host header');
 
-      for (const host of maliciousHosts) {
-        const res = await requestWithHost(server.port, '/health', host);
-        expect(res.status, `Host: ${host} should be rejected`).toBe(403);
-        expect(res.body).toContain('invalid Host header');
-      }
+      // Malformed IPv6 bracket notation — may cause 403 from our handler or
+      // 500 from the HTTP framework (Bun's parser rejects the malformed header
+      // before the application handler runs). Either is a valid rejection.
+      const res2 = await requestWithHost(server.port, '/health', '[evil');
+      expect(res2.status, 'Host: [evil should be rejected (non-2xx)').toBeGreaterThanOrEqual(400);
     } finally {
       await server.kill();
     }
@@ -572,6 +574,138 @@ test.describe('Network capture cleanup when tab closes', () => {
     // Cleanup
     await mcpClient.callTool('browser_disable_network_capture', { tabId: tabId2 });
     await mcpClient.callTool('browser_close_tab', { tabId: tabId2 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US-008: Config mutex serializes concurrent permission writes
+// ---------------------------------------------------------------------------
+
+test.describe('Config mutex serializes concurrent permission writes', () => {
+  test('5 concurrent setToolPermission calls all persist without data loss', async () => {
+    const configDir = createTestConfigDir();
+    const config = readTestConfig(configDir);
+    config.permissions = { 'e2e-test': { permission: 'off' } };
+    writeTestConfig(configDir, config);
+
+    const server = await startMcpServer(configDir, true, undefined, {
+      OPENTABS_DANGEROUSLY_SKIP_PERMISSIONS: '',
+    });
+
+    try {
+      await server.waitForHealth(h => h.status === 'ok');
+
+      // Connect a WebSocket client (same pattern as plugin-management.e2e.ts)
+      const { wsUrl, wsSecret } = await fetchWsInfo(server.port, server.secret);
+      const protocols = ['opentabs'];
+      if (wsSecret) protocols.push(wsSecret);
+      const ws = protocols.length > 1 ? new WebSocket(wsUrl, protocols) : new WebSocket(wsUrl);
+
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('WebSocket connect timeout')), 5_000);
+        ws.onopen = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        ws.onerror = () => {
+          clearTimeout(timer);
+          reject(new Error('WebSocket connect failed'));
+        };
+      });
+
+      // Pending response resolvers keyed by request id
+      const pending = new Map<string, (resp: Record<string, unknown>) => void>();
+      ws.onmessage = event => {
+        try {
+          const msg = JSON.parse(typeof event.data === 'string' ? event.data : '') as Record<string, unknown>;
+          const id = msg.id;
+          if (id !== undefined && typeof id === 'string') {
+            const resolver = pending.get(id);
+            if (resolver) {
+              pending.delete(id);
+              resolver(msg);
+            }
+          }
+        } catch {
+          // ignore non-JSON messages
+        }
+      };
+
+      const sendRequest = (method: string, params: Record<string, unknown>): Promise<Record<string, unknown>> => {
+        const id = crypto.randomUUID();
+        return new Promise<Record<string, unknown>>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            pending.delete(id);
+            reject(new Error(`JSON-RPC request timed out: ${method}`));
+          }, 10_000);
+          pending.set(id, resp => {
+            clearTimeout(timeout);
+            resolve(resp);
+          });
+          ws.send(JSON.stringify({ jsonrpc: '2.0', method, params, id }));
+        });
+      };
+
+      // 5 different e2e-test tools with 5 different permission values
+      const toolPermissions: Array<{ tool: string; permission: string }> = [
+        { tool: 'echo', permission: 'auto' },
+        { tool: 'greet', permission: 'ask' },
+        { tool: 'list_items', permission: 'auto' },
+        { tool: 'create_item', permission: 'ask' },
+        { tool: 'slow_with_progress', permission: 'auto' },
+      ];
+
+      // Fire all 5 concurrently
+      const results = await Promise.all(
+        toolPermissions.map(({ tool, permission }) =>
+          sendRequest('config.setToolPermission', { plugin: 'e2e-test', tool, permission }),
+        ),
+      );
+
+      // All should succeed
+      for (const r of results) {
+        expect(r.error).toBeUndefined();
+        expect((r.result as { ok: boolean }).ok).toBe(true);
+      }
+
+      // Persistence is async (fire-and-forget via configWriteMutex).
+      // Poll config.json until all 5 tool overrides appear.
+      await waitFor(
+        () => {
+          const savedConfig = readTestConfig(configDir);
+          const tools = savedConfig.permissions?.['e2e-test']?.tools;
+          if (!tools) return false;
+          return (
+            tools.echo === 'auto' &&
+            tools.greet === 'ask' &&
+            tools.list_items === 'auto' &&
+            tools.create_item === 'ask' &&
+            tools.slow_with_progress === 'auto'
+          );
+        },
+        10_000,
+        200,
+        'all 5 tool permissions persisted to config.json',
+      );
+
+      // Final verification: read once more and assert each value explicitly
+      const finalConfig = readTestConfig(configDir);
+      const finalTools = finalConfig.permissions?.['e2e-test']?.tools;
+      expect(finalTools).toBeDefined();
+      expect(finalTools?.echo).toBe('auto');
+      expect(finalTools?.greet).toBe('ask');
+      expect(finalTools?.list_items).toBe('auto');
+      expect(finalTools?.create_item).toBe('ask');
+      expect(finalTools?.slow_with_progress).toBe('auto');
+
+      // Base plugin permission should still be 'off'
+      expect(finalConfig.permissions?.['e2e-test']?.permission).toBe('off');
+
+      ws.close();
+    } finally {
+      await server.kill();
+      cleanupTestConfigDir(configDir);
+    }
   });
 });
 
