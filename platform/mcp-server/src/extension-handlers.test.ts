@@ -1016,6 +1016,66 @@ describe('handleConfigSetPluginPermission', () => {
     expect(response.result).toEqual({ ok: true });
   });
 
+  test('clears per-tool overrides when plugin-level permission changes', () => {
+    const state = createState();
+    const { ws } = createMockWs();
+    state.extensionWs = ws;
+    const plugin = makePlugin('test-plugin', ['tool_a', 'tool_b']);
+    state.registry = {
+      ...state.registry,
+      plugins: new Map([['test-plugin', plugin]]) as ReadonlyMap<string, RegisteredPlugin>,
+    };
+    // Set up existing per-tool overrides
+    state.pluginPermissions = {
+      'test-plugin': { permission: 'auto', tools: { tool_a: 'off', tool_b: 'ask' } },
+    };
+
+    handleConfigSetPluginPermission(state, { plugin: 'test-plugin', permission: 'off' }, 'req-clear', noopCallbacks);
+
+    expect(state.pluginPermissions['test-plugin']?.permission).toBe('off');
+    // Per-tool overrides should be cleared
+    expect(state.pluginPermissions['test-plugin']?.tools).toBeUndefined();
+  });
+
+  test('clears browser per-tool overrides when browser plugin-level permission changes', () => {
+    const state = createState();
+    const { ws } = createMockWs();
+    state.extensionWs = ws;
+    state.pluginPermissions = {
+      browser: { permission: 'ask', tools: { browser_screenshot_tab: 'off' } },
+    };
+
+    handleConfigSetPluginPermission(
+      state,
+      { plugin: 'browser', permission: 'auto' },
+      'req-browser-clear',
+      noopCallbacks,
+    );
+
+    expect(state.pluginPermissions.browser?.permission).toBe('auto');
+    expect(state.pluginPermissions.browser?.tools).toBeUndefined();
+  });
+
+  test('preserves reviewedVersion when clearing per-tool overrides', () => {
+    const state = createState();
+    const { ws } = createMockWs();
+    state.extensionWs = ws;
+    const plugin = makePlugin('test-plugin', ['tool_a']);
+    state.registry = {
+      ...state.registry,
+      plugins: new Map([['test-plugin', plugin]]) as ReadonlyMap<string, RegisteredPlugin>,
+    };
+    state.pluginPermissions = {
+      'test-plugin': { permission: 'auto', tools: { tool_a: 'off' }, reviewedVersion: '1.0.0' },
+    };
+
+    handleConfigSetPluginPermission(state, { plugin: 'test-plugin', permission: 'ask' }, 'req-preserve', noopCallbacks);
+
+    expect(state.pluginPermissions['test-plugin']?.permission).toBe('ask');
+    expect(state.pluginPermissions['test-plugin']?.tools).toBeUndefined();
+    expect(state.pluginPermissions['test-plugin']?.reviewedVersion).toBe('1.0.0');
+  });
+
   test('calls onToolConfigChanged and onPluginPermissionsPersist', () => {
     const state = createState();
     const { ws } = createMockWs();

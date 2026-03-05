@@ -467,8 +467,11 @@ const handleConfigSetPluginPermission = (
   }
 
   const pConfig = state.pluginPermissions[pluginName] ?? {};
+  // Clear per-tool overrides: changing the plugin-level permission sets all tools to
+  // the new default. Stale overrides would otherwise take precedence in resolution.
+  const { tools: _cleared, ...rest } = pConfig;
   state.pluginPermissions[pluginName] = {
-    ...pConfig,
+    ...rest,
     permission: permission as ToolPermission,
     ...(typeof reviewedVersion === 'string' ? { reviewedVersion } : {}),
   };
