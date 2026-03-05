@@ -98,4 +98,54 @@ test.describe('Side panel group transitions', () => {
       cleanupTestConfigDir(configDir);
     }
   });
+
+  test('plugin moves from ready to NOT CONNECTED group when tab closes', async () => {
+    const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
+
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-group-close-'));
+    writeTestConfig(configDir, {
+      localPlugins: [absPluginPath],
+      permissions: { 'e2e-test': { permission: 'auto' }, browser: { permission: 'auto' } },
+    });
+
+    const server = await startMcpServer(configDir, true);
+    const testServer = await startTestServer();
+    const { context, cleanupDir, extensionDir } = await launchExtensionContext(server.port, server.secret);
+    setupAdapterSymlink(configDir, extensionDir);
+
+    try {
+      // Open a matching tab first so the plugin starts in the ready group
+      const appTab = await context.newPage();
+      await appTab.goto(testServer.url, { waitUntil: 'load' });
+
+      await waitForExtensionConnected(server);
+      await waitForLog(server, 'tab.stateChanged: e2e-test → ready', 15_000);
+
+      // Open side panel — plugin should be in the ready group
+      const sidePanel = await openSidePanel(context);
+      await expect(sidePanel.getByText('E2E Test')).toBeVisible({ timeout: 30_000 });
+
+      // Verify the plugin card is in the ready group (no reduced opacity)
+      const accordionItem = pluginAccordionItem(sidePanel, 'E2E Test');
+      await expect(accordionItem).not.toHaveClass(/opacity-70/, { timeout: 10_000 });
+
+      // Close the matching tab — plugin should move to not-connected group
+      await appTab.close();
+      await waitForLog(server, 'tab.stateChanged: e2e-test → closed', 15_000);
+
+      // Verify "NOT CONNECTED" label is visible
+      await expect(sidePanel.getByText('NOT CONNECTED')).toBeVisible({ timeout: 10_000 });
+
+      // Verify the plugin card now has reduced opacity (not-ready state)
+      await expect(accordionItem).toHaveClass(/opacity-70/, { timeout: 10_000 });
+
+      await sidePanel.close();
+    } finally {
+      await context.close().catch(() => {});
+      await server.kill();
+      await testServer.kill();
+      fs.rmSync(cleanupDir, { recursive: true, force: true });
+      cleanupTestConfigDir(configDir);
+    }
+  });
 });
