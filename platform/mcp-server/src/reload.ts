@@ -25,7 +25,6 @@ import { log } from './logger.js';
 import type { McpServerInstance } from './mcp-setup.js';
 import { notifyToolListChanged, rebuildCachedBrowserTools, registerMcpHandlers } from './mcp-setup.js';
 import { buildRegistry } from './registry.js';
-import { isCliSkipPermissions } from './skip-permissions.js';
 import type { CachedBrowserTool, ServerState } from './state.js';
 import { checkForUpdates } from './version-check.js';
 
@@ -253,7 +252,10 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     const newPluginPermissions = { ...config.permissions };
     const newPluginPaths = [...config.localPlugins];
     const newDiscoveryErrors = errors;
-    const newSkipPermissions = isCliSkipPermissions();
+    // Preserve the runtime skipPermissions value — it may have been toggled
+    // via "Restore approvals" in the side panel. Only read the env var on
+    // initial startup (when state.skipPermissions is still the default).
+    const newSkipPermissions = state.skipPermissions;
 
     // Build the new cached browser tools on a staging object so a throw here
     // does not partially update state. rebuildCachedBrowserTools only reads

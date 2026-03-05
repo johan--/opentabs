@@ -356,7 +356,7 @@ export const createState = (): ServerState => ({
   startedAt: Date.now(),
   discoveryErrors: [],
   auditLog: [],
-  skipPermissions: false,
+  skipPermissions: process.env.OPENTABS_DANGEROUSLY_SKIP_PERMISSIONS === '1',
 
   pluginPermissions: {},
   pendingConfirmations: new Map(),
