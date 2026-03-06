@@ -226,7 +226,9 @@ Make test calls to discover the key API endpoints. For a typical web app, look f
 
 ## Phase 4: Design the Tool Set
 
-Model the tool set after the Slack plugin. A typical production plugin has 15-25 tools across these categories:
+**Maximize API coverage.** Add as many tools as the web service's API supports. The goal is a comprehensive, production-ready plugin that exposes the full power of the service to MCP clients. Do not stop at a minimal set — if the API has an endpoint, the plugin should have a tool for it.
+
+Model the tool set after the Slack plugin. A typical production plugin has 15-25+ tools across these categories:
 
 **Messaging/Content:**
 
@@ -255,6 +257,8 @@ Model the tool set after the Slack plugin. A typical production plugin has 15-25
 **Platform-specific:**
 
 - Add tools unique to the platform (threads, DMs, file uploads, etc.)
+
+**Coverage checklist** — for each API resource the service exposes, ask: can the user list it, get one, create one, update one, delete one, and search/filter it? If yes and the API supports it, add the tool. Every endpoint that an MCP client might reasonably want to call should be covered.
 
 ---
 
@@ -477,6 +481,20 @@ class MyPlugin extends OpenTabsPlugin {
   }
 }
 
+// IMPORTANT: isReady() must be robust. It determines whether the plugin
+// shows as "ready" or "unavailable" in the side panel. A fragile isReady()
+// that returns false on valid authenticated pages makes the entire plugin
+// unusable. Use multiple detection strategies with fallbacks:
+//
+// 1. Primary: check page globals (window.__initialData.isAuthenticated)
+// 2. Secondary: check non-HttpOnly indicator cookies (document.cookie)
+// 3. Tertiary: check DOM signals (sidebar elements, user menus)
+// 4. Fallback: if on the app's domain and NOT on a login page, assume authed
+//
+// The polling pattern (500ms interval, 5s max) handles SPA hydration delays.
+// Always test isReady() by reloading the page and verifying the plugin
+// transitions to "ready" within a few seconds.
+
 export default new MyPlugin();
 ```
 
@@ -597,9 +615,11 @@ After building the plugin, update this file (`__SKILL__.md`) with any new patter
 ## Key Conventions
 
 - **One file per tool** in `src/tools/`
-- **Every Zod field gets `.describe()`** — this is what AI agents see in the tool schema
+- **Every Zod field gets `.describe()`** — this is what AI agents see in the tool schema. Descriptions must be specific and informative (e.g., `"Channel ID to send the message to (e.g., C01234567)"` not just `"The channel"`). The MCP client relies entirely on these descriptions to understand how to call the tool correctly.
 - **`description` is for MCP AI clients** — write a detailed, informative description that helps Claude (or other AI agents) understand when and how to use the tool. Include parameter semantics, supported formats, and behavioral notes. This is what appears in the MCP `tools/list` response.
 - **`summary` is for humans in the side panel** — write a short (under 80 chars), plain-English sentence. The side panel tooltip and inline description show `summary` when available, falling back to `description`. Every tool must have both fields.
+- **Every tool must be production-ready** — proper input validation via Zod schemas, correct output typing, comprehensive error handling, and tested against the live API. No stubs, no placeholder implementations, no "TODO" tools.
+- **Every tool must work** — every tool must be verified against the live browser before the plugin is considered complete. A tool that returns wrong data or errors on valid input is worse than no tool at all.
 - **Defensive mapping** with fallback defaults (`data.field ?? ''`) — never trust API response shapes
 - **`context` parameter is optional**: `handle: async (params, context?) => { ... }`
 - **Tools return objects**, never raw primitives
@@ -738,7 +758,7 @@ When using browser tools during testing (like `browser_navigate_tab`, `browser_e
 ## Common Gotchas
 
 1. **All plugin code runs in the browser** — no Node.js APIs, no filesystem, no server-side logic
-2. **SPAs hydrate asynchronously** — `isReady()` must poll, not just check once (500ms interval, 3-5s max wait)
+2. **SPAs hydrate asynchronously — `isReady()` must be robust** — `isReady()` must poll, not just check once (500ms interval, 5s max wait). Use multiple detection strategies with fallbacks (page globals → cookies → DOM → URL-based heuristic). A single fragile check (e.g., only looking for a specific CSS class) will break when the app updates its UI. Always test `isReady()` by reloading the Sentry/target page and verifying the plugin reaches "ready" state within seconds.
 3. **Some apps delete browser APIs** — Discord deletes `window.localStorage`; use iframe fallback when `typeof window.localStorage === 'undefined'`
 4. **Tokens must persist on globalThis** — module-level variables are reset when the extension reloads and re-injects the adapter. Use `globalThis.__openTabs.tokenCache.<pluginName>` instead.
 5. **API responses may return arrays** — when the generic type expects `Record<string, unknown>` but the endpoint returns an array, use `Array.isArray(data) ? (data as T[]).map(...) : []`
