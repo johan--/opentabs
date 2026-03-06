@@ -1,4 +1,8 @@
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import type { BrowserToolDefinition } from './browser-tools/definition.js';
@@ -222,6 +226,7 @@ const createMockServer = (): {
     },
     connect: () => Promise.resolve(),
     sendToolListChanged: () => Promise.resolve(),
+    sendPromptListChanged: () => Promise.resolve(),
     sendLoggingMessage: () => Promise.resolve(),
   };
   return { server, handlers };
@@ -947,6 +952,124 @@ describe('getAllToolsList — platform tools', () => {
 
     // browserPermission should also reflect configured value
     expect(payload.browserPermission).toBe('ask');
+  });
+});
+
+describe('registerMcpHandlers — prompts/list handler', () => {
+  test('returns the build_plugin prompt definition', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    const handler = getHandler(handlers, ListPromptsRequestSchema);
+    const result = handler({ params: { name: '' } }, mockExtra) as {
+      prompts: Array<{ name: string; description: string; arguments: unknown[] }>;
+    };
+
+    expect(result.prompts).toBeDefined();
+    expect(result.prompts.length).toBeGreaterThanOrEqual(1);
+
+    const buildPlugin = result.prompts.find(p => p.name === 'build_plugin');
+    expect(buildPlugin).toBeDefined();
+    expect(buildPlugin?.description).toContain('plugin');
+    expect(buildPlugin?.arguments.length).toBeGreaterThan(0);
+  });
+
+  test('prompt definitions include argument metadata', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    const handler = getHandler(handlers, ListPromptsRequestSchema);
+    const result = handler({ params: { name: '' } }, mockExtra) as {
+      prompts: Array<{
+        name: string;
+        arguments: Array<{ name: string; description: string; required?: boolean }>;
+      }>;
+    };
+
+    const buildPlugin = result.prompts.find(p => p.name === 'build_plugin');
+    const urlArg = buildPlugin?.arguments.find(a => a.name === 'url');
+    expect(urlArg).toBeDefined();
+    expect(urlArg?.required).toBe(true);
+    expect(urlArg?.description).toBeTruthy();
+  });
+});
+
+describe('registerMcpHandlers — prompts/get handler', () => {
+  test('resolves build_plugin prompt with url argument', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    const handler = getHandler(handlers, GetPromptRequestSchema);
+    const result = handler(
+      { params: { name: 'build_plugin', arguments: { url: 'https://slack.com' } } },
+      mockExtra,
+    ) as {
+      description: string;
+      messages: Array<{ role: string; content: { type: string; text: string } }>;
+    };
+
+    expect(result.description).toContain('https://slack.com');
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.role).toBe('user');
+    expect(result.messages[0]?.content.type).toBe('text');
+    expect(result.messages[0]?.content.text).toContain('https://slack.com');
+  });
+
+  test('throws for unknown prompt name', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    const handler = getHandler(handlers, GetPromptRequestSchema);
+    expect(() => handler({ params: { name: 'nonexistent', arguments: {} } }, mockExtra)).toThrow(
+      'Prompt not found: nonexistent',
+    );
+  });
+
+  test('resolves build_plugin with no arguments (uses defaults)', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    const handler = getHandler(handlers, GetPromptRequestSchema);
+    const result = handler({ params: { name: 'build_plugin' } }, mockExtra) as {
+      description: string;
+      messages: Array<{ role: string; content: { type: string; text: string } }>;
+    };
+
+    // Falls back to default url
+    expect(result.description).toContain('https://example.com');
+    expect(result.messages[0]?.content.text).toContain('https://example.com');
+  });
+
+  test('resolves build_plugin with both url and name arguments', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    const handler = getHandler(handlers, GetPromptRequestSchema);
+    const result = handler(
+      { params: { name: 'build_plugin', arguments: { url: 'https://linear.app', name: 'linear' } } },
+      mockExtra,
+    ) as {
+      messages: Array<{ content: { text: string } }>;
+    };
+
+    expect(result.messages[0]?.content.text).toContain('https://linear.app');
+    expect(result.messages[0]?.content.text).toContain('`linear`');
+  });
+});
+
+describe('registerMcpHandlers — handler count', () => {
+  test('registers exactly 4 handlers: tools/list, tools/call, prompts/list, prompts/get', () => {
+    const state = createState();
+    const { server, handlers } = createMockServer();
+    registerMcpHandlers(server, state);
+
+    expect(handlers.size).toBe(4);
   });
 });
 

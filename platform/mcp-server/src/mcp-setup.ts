@@ -21,9 +21,15 @@
  *   (dispatchToExtension, sendInvocationStart, etc.).
  */
 
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { log } from './logger.js';
+import { PROMPTS, resolvePrompt } from './mcp-prompts.js';
 import type { DispatchCallbacks, RequestHandlerExtra } from './mcp-tool-dispatch.js';
 import {
   handleBrowserToolCall,
@@ -50,6 +56,7 @@ interface ServerModuleShape {
       capabilities: {
         tools: { listChanged: boolean };
         logging: Record<string, never>;
+        prompts: { listChanged: boolean };
       };
       instructions?: string;
     },
@@ -67,6 +74,7 @@ interface McpServerInstance {
   ) => void;
   connect: (transport: unknown) => Promise<void>;
   sendToolListChanged: () => Promise<void>;
+  sendPromptListChanged: () => Promise<void>;
   sendLoggingMessage: (params: { level: string; logger?: string; data?: unknown }) => Promise<void>;
 }
 
@@ -178,6 +186,25 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
   server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: getAllToolsList(state),
   }));
+
+  // Handler: prompts/list — return all registered prompt definitions.
+  server.setRequestHandler(ListPromptsRequestSchema, () => ({
+    prompts: PROMPTS.map(p => ({
+      name: p.name,
+      description: p.description,
+      arguments: p.arguments,
+    })),
+  }));
+
+  // Handler: prompts/get — resolve a prompt by name with arguments.
+  server.setRequestHandler(GetPromptRequestSchema, request => {
+    const { name, arguments: args } = request.params as { name: string; arguments?: Record<string, string> };
+    const result = resolvePrompt(name, args ?? {});
+    if (!result) {
+      throw new Error(`Prompt not found: ${name}`);
+    }
+    return result;
+  });
 
   // Handler: tools/call — dispatch to extension or handle browser tool locally.
   // Delegates to handleBrowserToolCall or handlePluginToolCall for the actual logic.
@@ -310,6 +337,7 @@ const createMcpServer = async (state: ServerState): Promise<McpServerInstance> =
       capabilities: {
         tools: { listChanged: true },
         logging: {},
+        prompts: { listChanged: true },
       },
       instructions: SERVER_INSTRUCTIONS,
     },
