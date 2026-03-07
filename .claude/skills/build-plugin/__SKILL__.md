@@ -29,6 +29,31 @@ If the user declines, set browser tools to `'ask'` permission and plan for manua
 
 ---
 
+## Core Principle: Use the Real APIs, Never the DOM
+
+**Every tool must use the same APIs the web app's own frontend uses to communicate with its backend.** The adapter runs in the page's MAIN world — it is indistinguishable from the web app's own JavaScript. If the web app can fetch data from its backend, the plugin can too, using the exact same endpoints, headers, and auth mechanism.
+
+**DOM scraping is never acceptable as a tool implementation.** Reading from DOM elements, parsing rendered HTML, clicking UI buttons, or filling form fields are hacks — they are fragile (break on any UI change), limited (only see what's on screen), and slow (require rendering and waiting). A tool that reads data from the DOM instead of calling the API the web app uses to fetch that data is a failed implementation.
+
+**This applies to all operations:**
+- **Reading data** — call the same API endpoints the web app calls, not `document.querySelector`
+- **Writing data** — call the same mutation/action APIs, not `button.click()` or `input.value = ...`
+- **Navigation/state** — acceptable to use URL hash changes for SPA routing, but data must come from APIs
+
+**When the API is hard to discover or authenticate:**
+- **Do not give up and fall back to DOM.** Spend the time in Phase 3 to fully reverse-engineer the web app's API communication. Install XHR/fetch interceptors, capture request/response pairs, study headers and auth tokens.
+- **Monkey-patch `XMLHttpRequest` and `fetch`** at adapter load time to capture auth tokens (XSRF tokens, action tokens, session identifiers) from the web app's own requests as they happen.
+- **Study the web app's internal state** — page globals (`window.GLOBALS`, `window.__INITIAL_STATE__`), `gapi`, inline script data, etc. — to extract API endpoints, keys, and configuration.
+- **Replay the exact same requests** the web app makes, with the same headers, same body format, same auth. If the web app uses protobuf-like JSON, binary encoding, or custom RPC, replicate that format.
+- **If a public REST API exists but requires OAuth2** and the page doesn't expose an access token, look for internal/first-party API endpoints on the same origin that accept cookie auth. Most web apps have internal APIs that bypass OAuth — the public REST API is for third-party integrations.
+
+The only acceptable uses of the DOM in a plugin are:
+1. **`isReady()` authentication detection** — checking page globals, meta tags, or DOM signals to determine if the user is logged in
+2. **URL hash navigation** — using `window.location.hash` for SPA routing (which triggers the app's own data fetching)
+3. **Last-resort compose/send flows** — only if the web app genuinely has no API for the operation (extremely rare)
+
+---
+
 ## Phase 1: Research the Codebase
 
 Before writing any code, study the existing plugin infrastructure. Use the Task tool with `explore` agent for each of these:
@@ -210,7 +235,61 @@ const data = await resp.json();
 
 Verify the response shape and that auth works.
 
-### Step 5: Map the API Surface
+### Step 5: Intercept Internal API Traffic (for apps without clean REST APIs)
+
+Some web apps (e.g., Gmail, Google Docs) don't expose clean REST APIs from the page context. They communicate with their backend through internal RPC endpoints, protobuf-encoded JSON, or proprietary batch APIs. The public REST API may require OAuth2 tokens that the page doesn't expose.
+
+**When standard auth extraction fails, use XHR/fetch interception to capture the app's own API calls:**
+
+```javascript
+// Install XHR interceptor in browser_execute_script to capture all requests
+const requests = [];
+const origOpen = XMLHttpRequest.prototype.open;
+const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+const origSend = XMLHttpRequest.prototype.send;
+
+XMLHttpRequest.prototype.open = function(method, url) {
+  this.__url = url; this.__method = method; this.__headers = {};
+  return origOpen.apply(this, arguments);
+};
+XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+  if (this.__headers) this.__headers[name] = value;
+  return origSetHeader.apply(this, arguments);
+};
+XMLHttpRequest.prototype.send = function(body) {
+  requests.push({
+    method: this.__method, url: String(this.__url).substring(0, 300),
+    headers: this.__headers, bodyLen: body ? String(body).length : 0
+  });
+  return origSend.apply(this, arguments);
+};
+window.__capturedRequests = requests;
+```
+
+Then trigger actions in the web app (click emails, navigate, search) and examine `window.__capturedRequests` to discover:
+- The actual API endpoints the app uses (may be internal RPC, not the public REST API)
+- Auth headers (XSRF tokens, action tokens, SAPISIDHASH, session identifiers)
+- Request body format (JSON, protobuf-JSON, form-encoded)
+- Required custom headers
+
+**In the adapter IIFE, install the same XHR interception at load time** to capture auth tokens from the web app's own requests as they happen. The adapter runs before the page finishes loading, so it catches early boot requests that set up sessions and auth.
+
+Also install response interceptors to capture response formats:
+
+```javascript
+// Add to the send interceptor to capture responses
+xhr.addEventListener('load', function() {
+  if (String(xhr.__url).includes('/api/') || String(xhr.__url).includes('/sync/')) {
+    responses.push({
+      url: xhr.__url, status: xhr.status,
+      contentType: xhr.getResponseHeader('content-type'),
+      body: xhr.responseText?.substring(0, 2000)
+    });
+  }
+});
+```
+
+### Step 6: Map the API Surface
 
 Make test calls to discover the key API endpoints. For a typical web app, look for:
 
@@ -779,6 +858,8 @@ When using browser tools during testing (like `browser_navigate_tab`, `browser_e
 20. **Test every tool against the live browser** — The `opentabs_plugin_list_tabs` tool is the first thing to verify (no confirmation needed). Then systematically test read-only tools (search, list, get) before write tools (create, update, delete). This catches auth issues, API format mismatches, and schema mapping errors early.
 21. **Cookie-based auth APIs may require CSRF tokens for writes** — Many web apps (especially Django-based ones like Sentry) use HttpOnly session cookies for auth but require a CSRF token in a header for non-GET requests. The CSRF token is typically stored in a non-HttpOnly cookie (e.g., `sentry-sc`, `csrftoken`). Check `window.__initialData.csrfCookieName` or similar bootstrap globals to discover the cookie name. Read the token with `document.cookie` and pass it as `X-CSRFToken` (or `X-CSRF-Token`) on PUT/POST/DELETE requests. GET requests work without it. Always test a write operation during Phase 3 exploration to catch this early.
 22. **Check `window.__initialData` or similar bootstrap globals for auth signals** — Many SPAs embed authentication state, user info, and configuration in a global variable set by server-rendered HTML (e.g., `window.__initialData`, `window.__INITIAL_STATE__`, `window.boot_data`). These are far more reliable than DOM-based detection (which breaks when the UI changes). Use `browser_execute_script` to check `typeof window.__initialData` and inspect its keys early in Phase 3. Look for `isAuthenticated`, `user`, `csrfCookieName`, and organization/workspace context.
+23. **Never use DOM scraping as a tool implementation** — DOM-based data reading (`document.querySelector`, `element.textContent`, `element.getAttribute`) and DOM-based actions (`button.click()`, `input.value = ...`) are hacks that break on any UI update and only see what's rendered on screen. Every tool must call the same API endpoints the web app itself uses. If the API is hard to discover (internal RPC, protobuf, proprietary batch format), spend the time in Phase 3 to reverse-engineer it using XHR/fetch interception — do not take the shortcut of reading from the DOM. The only acceptable DOM use in tools is URL hash navigation for SPA routing. `isReady()` may use DOM signals for auth detection since that is a one-time readiness check, not a data-fetching operation.
+24. **Some apps use internal APIs instead of their public REST API** — Apps like Gmail expose a public REST API (e.g., `gmail.googleapis.com`) that requires OAuth2 tokens, but the web client communicates via internal same-origin endpoints (e.g., `/sync/u/N/i/s`, `?ui=2&act=...`) using cookie auth + XSRF tokens. When the public API rejects cookie/SAPISIDHASH auth, look for the internal endpoints the web app actually uses. Install XHR interceptors to capture them. These internal APIs accept cookie auth via `credentials: 'include'` and custom headers (XSRF tokens, action tokens) that can be captured by monkey-patching XHR at adapter load time.
 
 ---
 
