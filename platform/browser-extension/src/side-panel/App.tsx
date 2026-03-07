@@ -15,6 +15,7 @@ import {
   setSkipPermissions as bridgeSetSkipPermissions,
   getFullState,
   installPlugin,
+  removeFailedPlugin,
   removePlugin,
   searchPlugins,
   sendConfirmationResponse,
@@ -54,6 +55,7 @@ const App = () => {
   const [npmSearchError, setNpmSearchError] = useState(false);
   const [installingPlugins, setInstallingPlugins] = useState<Set<string>>(new Set());
   const [removingPlugins, setRemovingPlugins] = useState<Set<string>>(new Set());
+  const [removingFailedPlugins, setRemovingFailedPlugins] = useState<ReadonlySet<string>>(new Set());
   const [installErrors, setInstallErrors] = useState<Map<string, string>>(new Map());
   const [pluginErrors, setPluginErrors] = useState<Map<string, string>>(new Map());
   const [browserToolsOpen, setBrowserToolsOpen] = useState(false);
@@ -209,6 +211,25 @@ const App = () => {
       });
   };
 
+  const handleRemoveFailedPlugin = (specifier: string) => {
+    setRemovingFailedPlugins(prev => new Set([...prev, specifier]));
+    removeFailedPlugin(specifier)
+      .then(() => {
+        setRemovingFailedPlugins(prev => {
+          const next = new Set(prev);
+          next.delete(specifier);
+          return next;
+        });
+      })
+      .catch(() => {
+        setRemovingFailedPlugins(prev => {
+          const next = new Set(prev);
+          next.delete(specifier);
+          return next;
+        });
+      });
+  };
+
   const handleUpdate = (pluginName: string) => {
     clearPluginError(pluginName);
     updatePlugin(pluginName).catch((err: unknown) => {
@@ -319,6 +340,7 @@ const App = () => {
           setNpmSearchError(false);
           setInstallingPlugins(new Set());
           setRemovingPlugins(new Set());
+          setRemovingFailedPlugins(new Set());
           setInstallErrors(new Map());
           for (const timer of pluginErrorTimers.current.values()) clearTimeout(timer);
           pluginErrorTimers.current.clear();
@@ -478,6 +500,8 @@ const App = () => {
                   onRemove={handleRemove}
                   removingPlugins={removingPlugins}
                   pluginErrors={pluginErrors}
+                  onRemoveFailedPlugin={handleRemoveFailedPlugin}
+                  removingFailedPlugins={removingFailedPlugins}
                 />
                 {plugins.length === 0 && failedPlugins.length === 0 && (
                   <Empty className="border-muted" role="status">
