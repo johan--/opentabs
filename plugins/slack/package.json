@@ -15,7 +15,8 @@
     "description": "OpenTabs plugin for Slack",
     "urlPatterns": [
       "*://*.slack.com/*"
-    ]
+    ],
+    "homepage": "https://app.slack.com"
   },
   "exports": {
     ".": {

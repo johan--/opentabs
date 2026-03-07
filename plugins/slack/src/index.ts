@@ -29,6 +29,7 @@ class SlackPlugin extends OpenTabsPlugin {
   readonly description = 'OpenTabs plugin for Slack';
   override readonly displayName = 'Slack';
   readonly urlPatterns = ['*://*.slack.com/*'];
+  override readonly homepage = 'https://app.slack.com';
   readonly tools: ToolDefinition[] = [
     sendMessage,
     editMessage,
