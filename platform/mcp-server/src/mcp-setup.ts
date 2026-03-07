@@ -25,11 +25,14 @@ import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { PROMPTS, resolvePrompt } from './mcp-prompts.js';
+import { getAllResources, resolveResource } from './mcp-resources.js';
 import type { DispatchCallbacks, RequestHandlerExtra } from './mcp-tool-dispatch.js';
 import {
   handleBrowserToolCall,
@@ -57,6 +60,7 @@ interface ServerModuleShape {
         tools: { listChanged: boolean };
         logging: Record<string, never>;
         prompts: { listChanged: boolean };
+        resources: Record<string, never>;
       };
       instructions?: string;
     },
@@ -206,6 +210,21 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
     return result;
   });
 
+  // Handler: resources/list — return all registered resource definitions.
+  server.setRequestHandler(ListResourcesRequestSchema, () => ({
+    resources: getAllResources(state),
+  }));
+
+  // Handler: resources/read — resolve a resource by URI.
+  server.setRequestHandler(ReadResourceRequestSchema, request => {
+    const { uri } = request.params as { uri: string };
+    const resolved = resolveResource(state, uri);
+    if (!resolved) {
+      throw new Error(`Resource not found: ${uri}`);
+    }
+    return { contents: [{ uri: resolved.uri, mimeType: resolved.mimeType, text: resolved.text }] };
+  });
+
   // Handler: tools/call — dispatch to extension or handle browser tool locally.
   // Delegates to handleBrowserToolCall or handlePluginToolCall for the actual logic.
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
@@ -338,6 +357,7 @@ const createMcpServer = async (state: ServerState): Promise<McpServerInstance> =
         tools: { listChanged: true },
         logging: {},
         prompts: { listChanged: true },
+        resources: {},
       },
       instructions: SERVER_INSTRUCTIONS,
     },
