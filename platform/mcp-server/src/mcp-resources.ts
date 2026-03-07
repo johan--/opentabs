@@ -720,10 +720,693 @@ const result = await retry(
 \`\`\`
 `;
 
+const TROUBLESHOOTING_CONTENT = `# Troubleshooting Guide
+
+Common errors when using OpenTabs, their causes, and resolution steps.
+
+## Quick Diagnosis
+
+Before diving into specific errors, run these diagnostic commands:
+
+\`\`\`bash
+opentabs status      # Server, extension, and plugin state
+opentabs doctor      # Comprehensive setup diagnostics
+\`\`\`
+
+From your AI client:
+- Call \`extension_get_state\` — extension health and WebSocket status
+- Call \`plugin_list_tabs\` — per-plugin tab readiness
+- Fetch \`opentabs://status\` — full server state snapshot
+
+## Error Reference
+
+### Extension Not Connected
+
+**Error:** \`Extension not connected. Please ensure the OpenTabs Chrome extension is running.\`
+
+**Cause:** The Chrome extension WebSocket connection to the MCP server is not active.
+
+**Resolution:**
+1. Verify server is running: \`opentabs status\`
+2. Check extension is loaded: open \`chrome://extensions\`, verify OpenTabs is enabled
+3. Reload extension: click the refresh icon on the OpenTabs card in \`chrome://extensions\`
+4. Close and reopen the side panel
+5. If still failing, run \`opentabs doctor\` for full diagnostics
+6. Check for stale auth secret: \`opentabs config rotate-secret --confirm\`, then reload extension
+
+### Tab Closed
+
+**Error:** \`Tab closed: <message>\`
+
+**Cause:** No browser tab matches the plugin's URL patterns, or the matching tab was closed during dispatch.
+
+**Resolution:**
+1. Open the target web application in Chrome
+2. Verify the URL matches the plugin's \`urlPatterns\` (\`opentabs status\` shows patterns)
+3. Call \`plugin_list_tabs\` to verify the tab is detected
+4. Retry the tool call
+
+### Tab Unavailable
+
+**Error:** \`Tab unavailable: <message>\`
+
+**Cause:** A tab matches the plugin's URL patterns but \`isReady()\` returns false. The user is likely not logged in.
+
+**Resolution:**
+1. Log into the web application in the matching browser tab
+2. Refresh the tab (Ctrl+R / Cmd+R)
+3. Wait 5 seconds for the readiness probe to complete
+4. Call \`plugin_list_tabs\` to check the \`ready\` field
+5. Retry the tool call
+
+### Plugin Not Reviewed
+
+**Error:** \`Plugin "<name>" (v<version>) has not been reviewed yet.\`
+
+**Cause:** New plugins start with permission \`'off'\` and require a security review before use.
+
+**Resolution (AI client flow):**
+1. Call \`plugin_inspect({"plugin": "<name>"})\` — retrieves adapter source code + review token
+2. Review the code for security concerns (data exfiltration, credential access, suspicious network requests)
+3. Share findings with the user
+4. If approved, call \`plugin_mark_reviewed({"plugin": "<name>", "version": "<ver>", "reviewToken": "<token>", "permission": "auto"})\`
+
+**Resolution (side panel):** Open the side panel, click the shield icon on the plugin card, and confirm.
+
+### Plugin Updated — Re-Review Required
+
+**Error:** \`Plugin "<name>" has been updated from v<old> to v<new> and needs re-review.\`
+
+**Cause:** Plugin version changed since last review. Permission resets to \`'off'\` on version change.
+
+**Resolution:** Same as "Plugin Not Reviewed" above — call \`plugin_inspect\` and re-review.
+
+### Tool Disabled
+
+**Error:** \`Tool "<name>" is currently disabled. Ask the user to enable it in the OpenTabs side panel.\`
+
+**Cause:** The tool's permission is set to \`'off'\`.
+
+**Resolution:**
+- User enables in side panel, OR
+- \`opentabs config set tool-permission.<plugin>.<tool> ask\`
+- \`opentabs config set plugin-permission.<plugin> ask\`
+
+### Permission Denied by User
+
+**Error:** \`Tool "<name>" was denied by the user.\`
+
+**Cause:** Tool permission is \`'ask'\` and the user clicked "Deny" in the approval dialog.
+
+**Resolution:** Do NOT retry immediately. Ask the user if they want to approve the action. To skip future prompts: \`opentabs config set tool-permission.<plugin>.<tool> auto\`
+
+### Too Many Concurrent Dispatches
+
+**Error:** \`Too many concurrent dispatches for plugin "<name>" (limit: 5). Wait for in-flight requests to complete.\`
+
+**Cause:** More than 5 simultaneous tool calls to the same plugin.
+
+**Resolution:** Wait 100-500ms for in-flight dispatches to complete, then retry.
+
+### Dispatch Timeout
+
+**Error:** \`Dispatch <label> timed out after <ms>ms\`
+
+**Cause:** Tool handler did not respond within 30 seconds (or 5 minutes with progress reporting).
+
+**Resolution:**
+1. Check if the tab is responsive (take a screenshot, check console logs)
+2. Refresh the target tab if unresponsive
+3. For legitimately long operations, the plugin should use \`context.reportProgress()\` to extend the timeout
+4. Break long operations into multiple tool calls
+
+**Timeout rules:**
+- Default: 30s per dispatch
+- Progress resets the timer: each \`reportProgress()\` call extends by 30s
+- Absolute ceiling: 5 minutes regardless of progress
+
+### Schema Validation Error
+
+**Error:** \`Invalid arguments for tool "<name>": - <field>: <issue>\`
+
+**Cause:** Tool arguments don't match the JSON Schema defined by the plugin.
+
+**Resolution:** Check the tool's input schema via \`tools/list\` and ensure all required fields are provided with correct types.
+
+### Tool Not Found
+
+**Error:** \`Tool <name> not found\`
+
+**Cause:** The prefixed tool name doesn't exist in the registry. Plugin may not be installed.
+
+**Resolution:**
+1. Run \`opentabs status\` to verify the plugin is installed
+2. Check the tool name (format: \`<plugin>_<tool>\`, e.g., \`slack_send_message\`)
+3. Reinstall: \`opentabs plugin install <name>\`
+
+### Rate Limited
+
+**Error:** Tool response includes \`retryable: true\` and \`retryAfterMs\`.
+
+**Cause:** The target web application's API returned HTTP 429.
+
+**Resolution:** Wait the specified \`retryAfterMs\` before retrying. The \`ToolError.rateLimited\` metadata includes the exact delay.
+
+## Diagnostic Tools Reference
+
+| Tool | What it checks |
+|------|---------------|
+| \`extension_get_state\` | WebSocket status, registered plugins, active captures |
+| \`extension_get_logs\` | Extension background script logs, injection warnings |
+| \`extension_check_adapter({"plugin": "<name>"})\` | Adapter injection status, hash match, isReady() result |
+| \`plugin_list_tabs\` | Per-plugin tab matching and readiness |
+| \`browser_get_console_logs\` | Browser console errors (requires network capture) |
+| \`opentabs status\` | Server uptime, extension connection, plugin states |
+| \`opentabs doctor\` | Full setup diagnostics with fix suggestions |
+| \`opentabs logs --plugin <name>\` | Server-side plugin-specific logs |
+`;
+
+const SDK_API_CONTENT = `# SDK API Reference
+
+All exports from \`@opentabs-dev/plugin-sdk\`. Utilities run in the browser page context.
+
+## Core Classes
+
+### OpenTabsPlugin
+
+Abstract base class for all plugins. Extend and export a singleton instance.
+
+\`\`\`typescript
+abstract class OpenTabsPlugin {
+  abstract readonly name: string;
+  abstract readonly displayName: string;
+  abstract readonly description: string;
+  abstract readonly urlPatterns: string[];
+  abstract readonly tools: ToolDefinition[];
+  abstract isReady(): Promise<boolean>;
+
+  // Optional lifecycle hooks
+  teardown?(): void;
+  onActivate?(): void;
+  onDeactivate?(): void;
+  onNavigate?(url: string): void;
+  onToolInvocationStart?(toolName: string): void;
+  onToolInvocationEnd?(toolName: string, success: boolean, durationMs: number): void;
+}
+\`\`\`
+
+### defineTool
+
+Type-safe factory for tool definitions:
+
+\`\`\`typescript
+function defineTool<TInput, TOutput>(config: ToolDefinition<TInput, TOutput>): ToolDefinition<TInput, TOutput>
+\`\`\`
+
+### ToolDefinition
+
+\`\`\`typescript
+interface ToolDefinition<TInput, TOutput> {
+  name: string;
+  displayName?: string;
+  description: string;
+  summary?: string;
+  icon?: LucideIconName;   // Lucide icon in kebab-case (default: 'wrench')
+  group?: string;
+  input: TInput;           // Zod object schema
+  output: TOutput;         // Zod schema
+  handle(params: z.infer<TInput>, context?: ToolHandlerContext): Promise<z.infer<TOutput>>;
+}
+\`\`\`
+
+### ToolHandlerContext
+
+\`\`\`typescript
+interface ToolHandlerContext {
+  reportProgress(opts: { progress?: number; total?: number; message?: string }): void;
+}
+\`\`\`
+
+## DOM Utilities
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| \`waitForSelector\` | \`<T extends Element>(selector, opts?) => Promise<T>\` | Wait for element to appear (MutationObserver, default 10s) |
+| \`waitForSelectorRemoval\` | \`(selector, opts?) => Promise<void>\` | Wait for element to be removed (default 10s) |
+| \`querySelectorAll\` | \`<T extends Element>(selector) => T[]\` | Returns real array (not NodeList) |
+| \`getTextContent\` | \`(selector) => string \\| null\` | Trimmed textContent of first match |
+| \`observeDOM\` | \`(selector, callback, opts?) => () => void\` | MutationObserver, returns cleanup function |
+
+Options: \`{ timeout?: number; signal?: AbortSignal }\` for wait functions. \`{ childList?: boolean; attributes?: boolean; subtree?: boolean }\` for observeDOM.
+
+## Fetch Utilities
+
+All fetch utilities use \`credentials: 'include'\` to leverage the page's authenticated session. Default timeout: 30s.
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| \`fetchFromPage\` | \`(url, init?) => Promise<Response>\` | Fetch with session cookies, throws ToolError on non-ok |
+| \`fetchJSON\` | \`<T>(url, init?, schema?) => Promise<T>\` | GET + JSON parse. Optional Zod validation |
+| \`postJSON\` | \`<T>(url, body, init?, schema?) => Promise<T>\` | POST JSON body + parse response |
+| \`putJSON\` | \`<T>(url, body, init?, schema?) => Promise<T>\` | PUT JSON body + parse response |
+| \`patchJSON\` | \`<T>(url, body, init?, schema?) => Promise<T>\` | PATCH JSON body + parse response |
+| \`deleteJSON\` | \`<T>(url, init?, schema?) => Promise<T>\` | DELETE + parse response |
+| \`postForm\` | \`<T>(url, body, init?, schema?) => Promise<T>\` | POST URL-encoded form (Record<string,string>) |
+| \`postFormData\` | \`<T>(url, body, init?, schema?) => Promise<T>\` | POST multipart/form-data (FormData) |
+
+When a Zod schema is passed as the last argument, the response is validated against it.
+
+Helper functions:
+- \`httpStatusToToolError(response, message)\` — maps HTTP status to ToolError category
+- \`parseRetryAfterMs(value)\` — parses Retry-After header to milliseconds
+
+Options extend \`RequestInit\` with \`{ timeout?: number }\`.
+
+## Storage Utilities
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| \`getLocalStorage\` | \`(key) => string \\| null\` | Safe localStorage read (null on SecurityError) |
+| \`setLocalStorage\` | \`(key, value) => void\` | Safe localStorage write |
+| \`removeLocalStorage\` | \`(key) => void\` | Safe localStorage remove |
+| \`getSessionStorage\` | \`(key) => string \\| null\` | Safe sessionStorage read |
+| \`setSessionStorage\` | \`(key, value) => void\` | Safe sessionStorage write |
+| \`removeSessionStorage\` | \`(key) => void\` | Safe sessionStorage remove |
+| \`getCookie\` | \`(name) => string \\| null\` | Parse cookie by name from document.cookie |
+
+All storage functions catch SecurityError (sandboxed iframes) and return null / no-op silently.
+
+## Page State Utilities
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| \`getPageGlobal\` | \`(path) => unknown\` | Deep property access on globalThis via dot-notation (e.g., \`'app.auth.token'\`) |
+| \`getCurrentUrl\` | \`() => string\` | Returns window.location.href |
+| \`getPageTitle\` | \`() => string\` | Returns document.title |
+
+\`getPageGlobal\` blocks access to \`__proto__\`, \`constructor\`, \`prototype\`.
+
+## Timing Utilities
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| \`sleep\` | \`(ms, opts?) => Promise<void>\` | Promisified setTimeout. Options: \`{ signal?: AbortSignal }\` |
+| \`retry\` | \`<T>(fn, opts?) => Promise<T>\` | Retry with configurable attempts, delay, backoff |
+| \`waitUntil\` | \`(predicate, opts?) => Promise<void>\` | Poll predicate at interval until true |
+
+**retry options:** \`{ maxAttempts?: 3, delay?: 1000, backoff?: false, maxDelay?: 30000, signal?: AbortSignal }\`
+
+**waitUntil options:** \`{ interval?: 200, timeout?: 10000, signal?: AbortSignal }\`
+
+## Logging
+
+\`\`\`typescript
+import { log } from '@opentabs-dev/plugin-sdk';
+
+log.debug(message, ...args);
+log.info(message, ...args);
+log.warn(message, ...args);
+log.error(message, ...args);
+\`\`\`
+
+Log entries route through the extension to the MCP server and connected clients. Falls back to \`console\` methods outside the adapter runtime. Args are safely serialized (handles circular refs, DOM nodes, functions).
+
+## Error Handling
+
+### ToolError
+
+Structured error class with metadata for AI clients:
+
+\`\`\`typescript
+class ToolError extends Error {
+  readonly code: string;
+  readonly retryable: boolean;
+  readonly retryAfterMs: number | undefined;
+  readonly category: ErrorCategory | undefined;
+
+  static auth(message, code?): ToolError;           // category: 'auth', not retryable
+  static notFound(message, code?): ToolError;        // category: 'not_found', not retryable
+  static rateLimited(message, retryAfterMs?, code?): ToolError;  // category: 'rate_limit', retryable
+  static validation(message, code?): ToolError;      // category: 'validation', not retryable
+  static timeout(message, code?): ToolError;         // category: 'timeout', retryable
+  static internal(message, code?): ToolError;        // category: 'internal', not retryable
+}
+\`\`\`
+
+\`ErrorCategory\`: \`'auth' | 'rate_limit' | 'not_found' | 'validation' | 'internal' | 'timeout'\`
+
+## Lifecycle Hooks
+
+Optional methods on \`OpenTabsPlugin\`:
+
+| Hook | When Called |
+|------|------------|
+| \`onActivate()\` | After adapter registered on \`globalThis.__openTabs.adapters\` |
+| \`onDeactivate()\` | Before adapter removal |
+| \`teardown()\` | Before re-injection on plugin update |
+| \`onNavigate(url)\` | On in-page URL changes (pushState, replaceState, popstate, hashchange) |
+| \`onToolInvocationStart(toolName)\` | Before each tool handler call |
+| \`onToolInvocationEnd(toolName, success, durationMs)\` | After each tool handler call |
+
+Errors in hooks are caught and logged — they do not affect tool execution.
+
+## Re-exports from @opentabs-dev/shared
+
+| Export | Description |
+|--------|-------------|
+| \`ManifestTool\` | Tool metadata type for plugin manifests |
+| \`Manifest\` | Complete plugin manifest type (\`PluginManifest\`) |
+| \`validatePluginName(name)\` | Validates plugin name against \`NAME_REGEX\` and \`RESERVED_NAMES\` |
+| \`validateUrlPattern(pattern)\` | Validates Chrome match patterns |
+| \`NAME_REGEX\` | Regex for valid plugin names |
+| \`RESERVED_NAMES\` | Set of reserved plugin names |
+| \`LucideIconName\` | String literal union of valid Lucide icon names |
+| \`LUCIDE_ICON_NAMES\` | Array of all valid Lucide icon names |
+`;
+
+const CLI_CONTENT = `# CLI Reference
+
+## opentabs CLI
+
+User-facing CLI for managing the OpenTabs platform.
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| \`opentabs start [options]\` | Start the MCP server |
+| \`opentabs stop [options]\` | Stop the background MCP server |
+| \`opentabs status [options]\` | Show server status, extension connection, and plugin states |
+| \`opentabs logs [options]\` | Show recent MCP server log output |
+| \`opentabs audit [options]\` | Show recent tool invocation history |
+| \`opentabs doctor [options]\` | Diagnose your OpenTabs setup |
+| \`opentabs update\` | Update CLI to the latest version |
+
+### start
+
+\`\`\`bash
+opentabs start [--port <number>] [--background] [--show-config]
+\`\`\`
+
+- \`--port <number>\` — Server port (default: 9515)
+- \`--background\` — Run as a background process (PID written to \`~/.opentabs/server.pid\`)
+- \`--show-config\` — Print MCP client configuration blocks
+
+On first run, creates \`~/.opentabs/\`, generates auth secret, and prints configuration.
+
+### stop
+
+\`\`\`bash
+opentabs stop [--port <number>]
+\`\`\`
+
+Stops a background server started with \`opentabs start --background\`.
+
+### status
+
+\`\`\`bash
+opentabs status [--port <number>] [--json]
+\`\`\`
+
+- \`--json\` — Output raw JSON from the health endpoint
+
+Shows: server version, uptime, extension connection, plugin count, per-plugin details.
+
+### logs
+
+\`\`\`bash
+opentabs logs [--lines <n>] [-f|--follow] [--plugin <name>]
+\`\`\`
+
+- \`--lines <n>\` — Number of lines (default: 50)
+- \`-f, --follow\` — Tail the log (like \`tail -f\`)
+- \`--plugin <name>\` — Filter logs by plugin name
+
+### audit
+
+\`\`\`bash
+opentabs audit [--limit <n>] [--plugin <name>] [--tool <name>] [--since <duration>] [--json] [--file]
+\`\`\`
+
+- \`--limit <n>\` — Number of entries (default: 20)
+- \`--plugin <name>\` — Filter by plugin name
+- \`--tool <name>\` — Filter by tool name
+- \`--since <duration>\` — Time range (e.g., \`30m\`, \`1h\`, \`2d\`)
+- \`--file\` — Read from disk log (\`~/.opentabs/audit.log\`) instead of running server
+
+### doctor
+
+\`\`\`bash
+opentabs doctor [--port <number>]
+\`\`\`
+
+Checks: runtime, browser, config file, auth secret, server health, extension status, extension version, MCP client config, local plugins, npm plugins.
+
+### update
+
+\`\`\`bash
+opentabs update
+\`\`\`
+
+Checks npm for updates, warns if server is running, auto-restarts background servers after update.
+
+## Configuration Commands
+
+### config show (alias: config get)
+
+\`\`\`bash
+opentabs config show [--json] [--show-secret]
+\`\`\`
+
+- \`--json\` — Output as JSON
+- \`--show-secret\` — Display auth secret and MCP client configurations
+
+### config set
+
+\`\`\`bash
+opentabs config set <key> [value] [-f|--force]
+\`\`\`
+
+**Supported keys:**
+
+| Key Format | Value | Example |
+|------------|-------|---------|
+| \`tool-permission.<plugin>.<tool>\` | \`off\\|ask\\|auto\` | \`opentabs config set tool-permission.slack.send_message auto\` |
+| \`plugin-permission.<plugin>\` | \`off\\|ask\\|auto\` | \`opentabs config set plugin-permission.slack ask\` |
+| \`port\` | \`1-65535\` | \`opentabs config set port 9515\` |
+| \`localPlugins.add\` | path | \`opentabs config set localPlugins.add /path/to/plugin\` |
+| \`localPlugins.remove\` | path | \`opentabs config set localPlugins.remove /path/to/plugin\` |
+
+\`--force\` allows \`localPlugins.add\` even if the path doesn't exist yet.
+
+### config path
+
+\`\`\`bash
+opentabs config path
+\`\`\`
+
+Prints the absolute path to \`~/.opentabs/config.json\`.
+
+### config reset
+
+\`\`\`bash
+opentabs config reset [--confirm]
+\`\`\`
+
+Deletes the config file. Server regenerates defaults on next start.
+
+### config rotate-secret
+
+\`\`\`bash
+opentabs config rotate-secret [--confirm]
+\`\`\`
+
+Generates new 256-bit auth secret, notifies running server, requires MCP clients to update.
+
+## Plugin Management Commands
+
+### plugin search
+
+\`\`\`bash
+opentabs plugin search [query]
+\`\`\`
+
+Search npm registry for OpenTabs plugins. Omit query to list all available plugins.
+
+### plugin list (alias: plugin ls)
+
+\`\`\`bash
+opentabs plugin list [--port <number>] [--json] [-v|--verbose]
+\`\`\`
+
+- \`--json\` — Machine-readable JSON output
+- \`-v, --verbose\` — Show tool names for each plugin
+
+### plugin install (alias: plugin add)
+
+\`\`\`bash
+opentabs plugin install <name>
+\`\`\`
+
+Resolves shorthand names (e.g., \`slack\` → \`opentabs-plugin-slack\` or \`@opentabs-dev/opentabs-plugin-slack\`).
+
+### plugin remove (alias: plugin rm)
+
+\`\`\`bash
+opentabs plugin remove <name> [-y|--confirm]
+\`\`\`
+
+### plugin create
+
+\`\`\`bash
+opentabs plugin create [name] [--domain <domain>] [--display <name>] [--description <desc>]
+\`\`\`
+
+Scaffolds a new plugin project. Interactive mode if arguments not provided.
+
+## opentabs-plugin CLI
+
+Plugin developer CLI for building and inspecting plugins.
+
+### opentabs-plugin build
+
+\`\`\`bash
+opentabs-plugin build [--watch]
+\`\`\`
+
+- Generates \`dist/tools.json\` (tool schemas + SDK version)
+- Bundles adapter as IIFE in \`dist/adapter.iife.js\`
+- Auto-registers in \`~/.opentabs/config.json\` on first build
+- Notifies running MCP server via \`POST /reload\`
+- \`--watch\` — Rebuild on file changes
+
+### opentabs-plugin inspect
+
+\`\`\`bash
+opentabs-plugin inspect [--json]
+\`\`\`
+
+Pretty-prints the built plugin manifest: name, version, SDK version, tool count, and detailed tool schemas.
+
+## File Paths
+
+| Path | Purpose |
+|------|---------|
+| \`~/.opentabs/config.json\` | Server and plugin configuration |
+| \`~/.opentabs/extension/auth.json\` | WebSocket auth secret |
+| \`~/.opentabs/server.log\` | Server log output |
+| \`~/.opentabs/audit.log\` | Persistent audit log (NDJSON) |
+| \`~/.opentabs/server.pid\` | Background server PID |
+| \`~/.opentabs/extension/\` | Chrome extension files |
+`;
+
+const BROWSER_TOOLS_CONTENT = `# Browser Tools Reference
+
+41 built-in tools organized by category. All browser tools are always available regardless of installed plugins.
+
+## Tabs (6 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`browser_open_tab\` | Open a new browser tab with a URL. Returns the new tab ID |
+| \`browser_list_tabs\` | List all open tabs with IDs, titles, URLs, and active status |
+| \`browser_close_tab\` | Close a tab by ID |
+| \`browser_navigate_tab\` | Navigate a tab to a new URL |
+| \`browser_focus_tab\` | Focus a tab and bring its window to the foreground |
+| \`browser_get_tab_info\` | Get tab details: loading status, URL, title, favicon, incognito |
+
+## Page Interaction (7 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`browser_click_element\` | Click an element by CSS selector. Dispatches trusted mouse events via CDP |
+| \`browser_type_text\` | Type text into an input/textarea. Focuses, optionally clears, sets value, dispatches events |
+| \`browser_select_option\` | Select a \`<select>\` dropdown option by value or label |
+| \`browser_press_key\` | Press a keyboard key (Enter, Escape, Tab, arrows, Ctrl+K, etc.) via CDP |
+| \`browser_scroll\` | Scroll by selector (into view), direction (up/down/left/right), or absolute position |
+| \`browser_hover_element\` | Hover over an element to trigger dropdowns, tooltips, and hover states |
+| \`browser_handle_dialog\` | Handle JS dialogs (alert, confirm, prompt) that block page execution |
+
+## Page Inspection (10 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`browser_get_tab_content\` | Extract visible text content from a page or element |
+| \`browser_get_page_html\` | Get raw HTML (outerHTML) of a page or element |
+| \`browser_screenshot_tab\` | Capture a screenshot as base64 PNG |
+| \`browser_query_elements\` | Query elements by CSS selector, return tags, text, and attributes |
+| \`browser_execute_script\` | Execute JavaScript in a tab's MAIN world with full DOM/window access |
+| \`browser_get_console_logs\` | Get console messages (requires network capture active) |
+| \`browser_clear_console_logs\` | Clear console log buffer without disabling capture |
+| \`browser_list_resources\` | List all resources loaded by a page (scripts, CSS, images, fonts) |
+| \`browser_get_resource_content\` | Read a resource's content from browser cache |
+| \`browser_wait_for_element\` | Wait for an element to appear in the DOM (polls until found or timeout) |
+
+## Storage & Cookies (5 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`browser_get_storage\` | Read localStorage or sessionStorage entries |
+| \`browser_get_cookies\` | Get cookies for a URL (including HttpOnly) |
+| \`browser_set_cookie\` | Set or overwrite a cookie |
+| \`browser_delete_cookies\` | Delete a cookie by URL and name |
+
+**Security note:** Storage and cookie tools expose sensitive auth data. Only use when the user directly requests it.
+
+## Network (5 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`browser_enable_network_capture\` | Start capturing HTTP requests, responses, and WebSocket frames via CDP |
+| \`browser_get_network_requests\` | Get captured requests with URLs, methods, headers, bodies, timing |
+| \`browser_get_websocket_frames\` | Get captured WebSocket frames with direction, data, and timestamps |
+| \`browser_export_har\` | Export captured traffic as a HAR 1.2 JSON file |
+| \`browser_disable_network_capture\` | Stop capturing and release the CDP debugger |
+
+Use \`urlFilter\` on \`browser_enable_network_capture\` to focus on API calls (e.g., "/api") and reduce noise.
+
+**Security note:** Network capture records authorization headers and sensitive API traffic. Only use when the user directly requests it.
+
+## Extension (6 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`extension_reload\` | Reload the Chrome extension (briefly disconnects) |
+| \`extension_get_state\` | Get WebSocket status, registered plugins, active captures |
+| \`extension_get_logs\` | Get extension background script and offscreen document logs |
+| \`extension_get_side_panel\` | Get side panel React state and rendered HTML |
+| \`extension_check_adapter\` | Diagnose adapter injection for a plugin across matching tabs |
+| \`extension_force_reconnect\` | Force WebSocket disconnect and immediate reconnection |
+
+## Plugins (2 tools)
+
+| Tool | Description |
+|------|-------------|
+| \`plugin_list_tabs\` | List tabs matching a plugin's URL patterns with readiness status |
+| \`plugin_analyze_site\` | Comprehensive site analysis for plugin development: auth, APIs, frameworks, storage, tool suggestions |
+
+\`plugin_list_tabs\` reads from server-side state (no extension round-trip). Use it to discover tab IDs before targeting with \`tabId\`.
+
+\`plugin_analyze_site\` opens the URL, captures network traffic, probes for frameworks/auth/APIs/storage, and returns concrete tool suggestions with implementation approaches.
+
+## Platform Tools (always available, hidden from side panel)
+
+| Tool | Description |
+|------|-------------|
+| \`plugin_inspect\` | Retrieve a plugin's adapter source code for security review + review token |
+| \`plugin_mark_reviewed\` | Mark a plugin as reviewed and set its permission |
+
+These bypass permission checks and are used in the plugin review flow.
+`;
+
 /** URI → content for static resources that have been written */
 const CONTENT_MAP = new Map<string, string>([
   ['opentabs://guide/quick-start', QUICK_START_CONTENT],
   ['opentabs://guide/plugin-development', PLUGIN_DEVELOPMENT_CONTENT],
+  ['opentabs://guide/troubleshooting', TROUBLESHOOTING_CONTENT],
+  ['opentabs://reference/sdk-api', SDK_API_CONTENT],
+  ['opentabs://reference/cli', CLI_CONTENT],
+  ['opentabs://reference/browser-tools', BROWSER_TOOLS_CONTENT],
 ]);
 
 /** Return all resource definitions for resources/list */
