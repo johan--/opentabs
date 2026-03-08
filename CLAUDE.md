@@ -54,10 +54,7 @@ When the user says "reload the extension", "check the side panel", "send a Slack
 
 For complex tasks, use the `skill` tool to load step-by-step workflows with accumulated patterns and common gotchas:
 
-- **build-plugin**: Full plugin development workflow (7 phases: site analysis, API discovery, auth detection, scaffolding, implementation patterns, testing)
-- **plugin-icon**: Adding or updating SVG icons for plugins (pipeline, SVG requirements, dark mode)
-- **troubleshoot**: Diagnosing platform issues (extension connectivity, plugin state, permissions, timeouts, error reference)
-- **setup-plugin**: Installing and configuring plugins from npm (search, install, review, permissions)
+- **build-plugin**: Full plugin development workflow (7 phases: site analysis, API discovery, auth detection, scaffolding, implementation patterns, testing, icons, troubleshooting, setup)
 
 ### Tech Stack
 

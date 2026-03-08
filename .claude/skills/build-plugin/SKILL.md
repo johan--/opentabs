@@ -1,6 +1,6 @@
 ---
 name: build-plugin
-description: 'Full plugin development workflow for building OpenTabs plugins. Covers site analysis, API discovery, auth detection, scaffolding, implementation patterns, and testing. Triggers on: build plugin, create plugin, develop plugin, new plugin, plugin development.'
+description: 'Complete plugin development workflow: build, test, icon, troubleshoot, and setup. Use when the user wants to build a plugin, create a plugin, troubleshoot issues, add icons, or install/configure plugins. Triggers on: build plugin, create plugin, develop plugin, new plugin, plugin icon, troubleshoot, debug, setup plugin, install plugin.'
 ---
 
 **IMPORTANT: This file is a stub. The actual skill content is maintained in `__SKILL__.md` in this same directory.**
