@@ -2,6 +2,7 @@ import type { ConfigStatePlugin, PluginTabInfo, TabState, ToolPermission } from 
 import { clearAllConfirmationBadges, clearConfirmationBadge, getPendingConfirmations } from './confirmation-badge.js';
 import { buildWsUrl, SERVER_PORT_KEY, WS_CONNECTED_KEY } from './constants.js';
 import type { DisconnectReason, InternalMessage, PluginTabStateInfo } from './extension-messages.js';
+import { getLastSeenUrl, setLastSeenUrl } from './last-seen-urls.js';
 import { handleServerMessage } from './message-router.js';
 import { forwardToSidePanel, sendToServer } from './messaging.js';
 import { getAllPluginMeta, getPluginMeta } from './plugin-storage.js';
@@ -176,8 +177,17 @@ const handleBgGetFullState: MessageHandler = (_message, sendResponse) => {
       serverPluginMap.set(sp.name, sp);
     }
 
+    // Pre-compute last-seen URL availability per plugin (in-memory cache, effectively sync after first load)
+    const metaEntries = Object.values(metaIndex);
+    const lastSeenFlags = await Promise.all(metaEntries.map(async m => (await getLastSeenUrl(m.name)) !== undefined));
+    const hasLastSeenUrlMap = new Map<string, boolean>();
+    for (let i = 0; i < metaEntries.length; i++) {
+      const entry = metaEntries[i];
+      if (lastSeenFlags[i] && entry) hasLastSeenUrlMap.set(entry.name, true);
+    }
+
     // Merge each plugin from metaCache with server state and tab state
-    const plugins: ConfigStatePlugin[] = Object.values(metaIndex).map(meta => {
+    const plugins: ConfigStatePlugin[] = metaEntries.map(meta => {
       const serverPlugin = serverPluginMap.get(meta.name);
 
       // Tab state from lastKnownState cache (serialized JSON)
@@ -227,6 +237,7 @@ const handleBgGetFullState: MessageHandler = (_message, sendResponse) => {
         reviewed: serverPlugin?.reviewed ?? false,
         sdkVersion: serverPlugin?.sdkVersion,
         update: serverPlugin?.update,
+        ...(hasLastSeenUrlMap.has(meta.name) && { hasLastSeenUrl: true }),
       };
     });
 
@@ -652,12 +663,19 @@ const handleBgOpenPluginTab: MessageHandler = (message, sendResponse) => {
         if (pick.tab.windowId !== undefined) {
           await chrome.windows.update(pick.tab.windowId, { focused: true });
         }
+        if (pick.tab.url) void setLastSeenUrl(pluginName, pick.tab.url);
         return { opened: true, tabId: pick.id };
       }
     }
 
     if (meta.homepage) {
       const newTab = await chrome.tabs.create({ url: meta.homepage });
+      return { opened: true, tabId: newTab.id };
+    }
+
+    const lastUrl = await getLastSeenUrl(pluginName);
+    if (lastUrl) {
+      const newTab = await chrome.tabs.create({ url: lastUrl });
       return { opened: true, tabId: newTab.id };
     }
 

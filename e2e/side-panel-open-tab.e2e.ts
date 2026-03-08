@@ -5,6 +5,7 @@
  * 2. Repeated clicks cycle through multiple matching tabs (round-robin)
  * 3. Tooltip shows the correct tab count
  * 4. Clicking the icon opens the homepage when no matching tab exists
+ * 5. After visiting and closing a tab, the icon remains clickable and opens a new tab
  */
 
 import fs from 'node:fs';
@@ -336,12 +337,24 @@ test.describe('Side panel open tab', () => {
     }
 
     // Start a minimal HTTP server on the homepage port (9876) so the opened
-    // tab stays at http://localhost:9876/ instead of navigating to chrome-error://
+    // tab stays at http://localhost:9876/ instead of navigating to chrome-error://.
+    // Handle EADDRINUSE gracefully — another parallel test may already hold the port.
     const homepageServer = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end('<html><body>Homepage</body></html>');
     });
-    await new Promise<void>(resolve => homepageServer.listen(9876, resolve));
+    await new Promise<void>((resolve, reject) => {
+      homepageServer.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          // Port 9876 is taken by another test — listen on dynamic port.
+          // The tab will still navigate to port 9876 (served by the other test).
+          homepageServer.listen(0, resolve);
+        } else {
+          reject(err);
+        }
+      });
+      homepageServer.listen(9876, resolve);
+    });
 
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-opentab-homepage-'));
     writeTestConfig(configDir, { localPlugins: [absPluginPath], tools });
@@ -407,6 +420,81 @@ test.describe('Side panel open tab', () => {
       await context.close().catch(() => {});
       await server.kill();
       homepageServer.close();
+      fs.rmSync(cleanupDir, { recursive: true, force: true });
+      cleanupTestConfigDir(configDir);
+    }
+  });
+
+  test('clicking icon opens new tab after visiting and closing a matching tab', async () => {
+    const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
+    const prefixedToolNames = readPluginToolNames();
+    const tools: Record<string, boolean> = {};
+    for (const t of prefixedToolNames) {
+      tools[t] = true;
+    }
+
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-sp-opentab-lastseen-'));
+    writeTestConfig(configDir, { localPlugins: [absPluginPath], tools });
+
+    const server = await startMcpServer(configDir, true);
+    const testServer = await startTestServer();
+    const { context, cleanupDir, extensionDir } = await launchExtensionContext(server.port, server.secret);
+    setupAdapterSymlink(configDir, extensionDir);
+
+    try {
+      await waitForExtensionConnected(server);
+      await waitForLog(server, 'tab.syncAll received', 15_000);
+
+      // 1. Open a matching tab at the test server URL (dynamic port).
+      //    This causes the extension to persist the test server URL as the last-seen URL.
+      const appTab = await context.newPage();
+      await appTab.goto(testServer.url, { waitUntil: 'load' });
+
+      // 2. Wait for plugin to become ready (adapter injected and isReady() passes)
+      await waitForPluginTabState(server, 'ready');
+
+      // 3. Close the matching tab — the last-seen URL is now persisted in chrome.storage.local
+      await appTab.close();
+
+      // 4. Wait for plugin to transition to 'closed' (no matching tabs)
+      await waitForPluginTabState(server, 'closed');
+
+      // 5. Open side panel and verify the plugin shows as NOT CONNECTED (faded ghost border)
+      const sidePanelPage = await openSidePanel(context);
+      await expect(sidePanelPage.getByText('E2E Test')).toBeVisible({ timeout: 30_000 });
+
+      const e2ePluginCard = sidePanelPage.locator('button[aria-expanded]').filter({ hasText: 'E2E Test' });
+      await expect(e2ePluginCard.locator('xpath=..').locator('[class*="border-border/30"]')).toBeVisible({
+        timeout: 5_000,
+      });
+
+      // 6. The icon must be clickable in closed state (homepage and/or last-seen URL available).
+      //    The e2e-test plugin has a homepage, so the tooltip says "Open ... in new tab".
+      const iconButton = sidePanelPage.locator('button[aria-label="Open E2E Test in new tab"]');
+      await expect(iconButton).toBeVisible({ timeout: 5_000 });
+      await expect(iconButton).toBeEnabled();
+
+      // 7. Click the icon — opens a new tab via chrome.tabs.create (homepage or last-seen URL).
+      //    Track initial page count to detect the new page.
+      const pageCountBefore = context.pages().length;
+      await iconButton.click();
+
+      // 8. Verify a new page was created by chrome.tabs.create. The page may end up at
+      //    the homepage URL (localhost:9876) or the last-seen URL depending on fallback
+      //    chain. If nothing is listening on the target port, the page navigates to
+      //    chrome-error:// — but the key assertion is that a new page was created.
+      await expect
+        .poll(() => context.pages().length, {
+          timeout: 15_000,
+          message: 'No new page was created after clicking the plugin icon',
+        })
+        .toBeGreaterThan(pageCountBefore);
+
+      await sidePanelPage.close();
+    } finally {
+      await context.close().catch(() => {});
+      await server.kill();
+      await testServer.kill();
       fs.rmSync(cleanupDir, { recursive: true, force: true });
       cleanupTestConfigDir(configDir);
     }
