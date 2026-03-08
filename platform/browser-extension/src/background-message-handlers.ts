@@ -2,6 +2,7 @@ import type { ConfigStatePlugin, PluginTabInfo, TabState, ToolPermission } from 
 import { clearAllConfirmationBadges, clearConfirmationBadge, getPendingConfirmations } from './confirmation-badge.js';
 import { buildWsUrl, SERVER_PORT_KEY, WS_CONNECTED_KEY } from './constants.js';
 import type { DisconnectReason, InternalMessage, PluginTabStateInfo } from './extension-messages.js';
+import { getLastSeenUrl, setLastSeenUrl } from './last-seen-urls.js';
 import { handleServerMessage } from './message-router.js';
 import { forwardToSidePanel, sendToServer } from './messaging.js';
 import { getAllPluginMeta, getPluginMeta } from './plugin-storage.js';
@@ -652,12 +653,19 @@ const handleBgOpenPluginTab: MessageHandler = (message, sendResponse) => {
         if (pick.tab.windowId !== undefined) {
           await chrome.windows.update(pick.tab.windowId, { focused: true });
         }
+        if (pick.tab.url) void setLastSeenUrl(pluginName, pick.tab.url);
         return { opened: true, tabId: pick.id };
       }
     }
 
     if (meta.homepage) {
       const newTab = await chrome.tabs.create({ url: meta.homepage });
+      return { opened: true, tabId: newTab.id };
+    }
+
+    const lastUrl = await getLastSeenUrl(pluginName);
+    if (lastUrl) {
+      const newTab = await chrome.tabs.create({ url: lastUrl });
       return { opened: true, tabId: newTab.id };
     }
 

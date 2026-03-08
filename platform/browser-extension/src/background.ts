@@ -9,6 +9,7 @@ import {
 } from './constants.js';
 import type { InternalMessage } from './extension-messages.js';
 import { injectPluginsIntoTab, reinjectStoredPlugins } from './iife-injection.js';
+import { loadLastSeenUrlsFromStorage } from './last-seen-urls.js';
 import { invalidatePluginCache } from './plugin-storage.js';
 import { initSidePanelToggle } from './side-panel-toggle.js';
 import { checkTabChanged, checkTabRemoved } from './tab-state.js';
@@ -20,6 +21,9 @@ initSidePanelToggle();
 // --- WebSocket connection state ---
 
 restoreWsConnectedState();
+loadLastSeenUrlsFromStorage().catch(() => {
+  // Best-effort — storage may not be available on wake
+});
 
 // --- Offscreen document management ---
 
