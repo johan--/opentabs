@@ -1,4 +1,4 @@
-import { CallToolRequestSchema, ListResourceTemplatesRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import type { BrowserToolDefinition } from './browser-tools/definition.js';
@@ -223,7 +223,6 @@ const createMockServer = (): {
     },
     connect: () => Promise.resolve(),
     sendToolListChanged: () => Promise.resolve(),
-    sendResourceListChanged: () => Promise.resolve(),
     sendLoggingMessage: () => Promise.resolve(),
   };
   return { server, handlers };
@@ -953,27 +952,12 @@ describe('getAllToolsList — platform tools', () => {
 });
 
 describe('registerMcpHandlers — handler count', () => {
-  test('registers exactly 5 handlers: tools/list, tools/call, resources/list, resources/templates/list, resources/read', () => {
+  test('registers exactly 2 handlers: tools/list, tools/call', () => {
     const state = createState();
     const { server, handlers } = createMockServer();
     registerMcpHandlers(server, state);
 
-    expect(handlers.size).toBe(5);
-  });
-});
-
-describe('registerMcpHandlers — resources/templates/list handler', () => {
-  test('returns an empty resourceTemplates array', () => {
-    const state = createState();
-    const { server, handlers } = createMockServer();
-    registerMcpHandlers(server, state);
-
-    const handler = getHandler(handlers, ListResourceTemplatesRequestSchema);
-    const result = handler({ params: { name: '' } }, mockExtra) as {
-      resourceTemplates: unknown[];
-    };
-
-    expect(result.resourceTemplates).toEqual([]);
+    expect(handlers.size).toBe(2);
   });
 });
 

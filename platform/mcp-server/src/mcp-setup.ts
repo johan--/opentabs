@@ -21,16 +21,9 @@
  *   (dispatchToExtension, sendInvocationStart, etc.).
  */
 
-import {
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ListResourceTemplatesRequestSchema,
-  ListToolsRequestSchema,
-  ReadResourceRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { log } from './logger.js';
-import { getAllResources, resolveResource } from './mcp-resources.js';
 import type { DispatchCallbacks, RequestHandlerExtra } from './mcp-tool-dispatch.js';
 import {
   handleBrowserToolCall,
@@ -57,7 +50,6 @@ interface ServerModuleShape {
       capabilities: {
         tools: { listChanged: boolean };
         logging: Record<string, never>;
-        resources: { listChanged?: boolean; subscribe?: boolean };
       };
       instructions?: string;
     },
@@ -75,7 +67,6 @@ interface McpServerInstance {
   ) => void;
   connect: (transport: unknown) => Promise<void>;
   sendToolListChanged: () => Promise<void>;
-  sendResourceListChanged: () => Promise<void>;
   sendLoggingMessage: (params: { level: string; logger?: string; data?: unknown }) => Promise<void>;
 }
 
@@ -187,28 +178,6 @@ const registerMcpHandlers = (server: McpServerInstance, state: ServerState): voi
   server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: getAllToolsList(state),
   }));
-
-  // Handler: resources/list — return all registered resource definitions.
-  server.setRequestHandler(ListResourcesRequestSchema, () => ({
-    resources: getAllResources(state),
-  }));
-
-  // Handler: resources/templates/list — return an empty list (no parameterized
-  // resource templates). Registering this handler prevents MCP clients from
-  // receiving an unhandled-method error when they call resources/templates/list.
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, () => ({
-    resourceTemplates: [],
-  }));
-
-  // Handler: resources/read — resolve a resource by URI.
-  server.setRequestHandler(ReadResourceRequestSchema, request => {
-    const { uri } = request.params as { uri: string };
-    const resolved = resolveResource(state, uri);
-    if (!resolved) {
-      throw new Error(`Resource not found: ${uri}`);
-    }
-    return { contents: [{ uri: resolved.uri, mimeType: resolved.mimeType, text: resolved.text }] };
-  });
 
   // Handler: tools/call — dispatch to extension or handle browser tool locally.
   // Delegates to handleBrowserToolCall or handlePluginToolCall for the actual logic.
@@ -364,7 +333,6 @@ const createMcpServer = async (state: ServerState): Promise<McpServerInstance> =
       capabilities: {
         tools: { listChanged: true },
         logging: {},
-        resources: { listChanged: true },
       },
       instructions: SERVER_INSTRUCTIONS,
     },
@@ -383,20 +351,6 @@ const createMcpServer = async (state: ServerState): Promise<McpServerInstance> =
 const notifyToolListChanged = (server: McpServerInstance): void => {
   server.sendToolListChanged().catch((err: unknown) => {
     log.warn('Failed to notify tool list change:', err);
-  });
-};
-
-/**
- * Notify a connected MCP client that tools and resources have changed.
- * Used after reload events (hot reload, config reload, file watcher changes) where
- * the server's compiled resources may have been updated alongside tools.
- */
-const notifyAllListsChanged = (server: McpServerInstance): void => {
-  server.sendToolListChanged().catch((err: unknown) => {
-    log.warn('Failed to notify tool list change:', err);
-  });
-  server.sendResourceListChanged().catch((err: unknown) => {
-    log.warn('Failed to notify resource list change:', err);
   });
 };
 
@@ -500,10 +454,4 @@ export const checkToolCallable = (state: ServerState, prefixedToolName: string):
 // (tests, reload.ts) can continue importing from mcp-setup.js.
 export { sanitizeOutput } from './mcp-tool-dispatch.js';
 export type { McpServerInstance, RequestHandlerExtra };
-export {
-  createMcpServer,
-  registerMcpHandlers,
-  rebuildCachedBrowserTools,
-  notifyToolListChanged,
-  notifyAllListsChanged,
-};
+export { createMcpServer, registerMcpHandlers, rebuildCachedBrowserTools, notifyToolListChanged };

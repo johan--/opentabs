@@ -28,7 +28,6 @@ const createMockServer = () => ({
   setRequestHandler: () => {},
   connect: () => Promise.resolve(),
   sendToolListChanged: () => Promise.resolve(),
-  sendResourceListChanged: () => Promise.resolve(),
   sendLoggingMessage: () => Promise.resolve(),
 });
 
@@ -293,9 +292,8 @@ describe('performReload', () => {
 
     await performReload(state, [srv], emptyTransports(), true);
 
-    // registerMcpHandlers calls setRequestHandler 5 times:
-    // resources/list, resources/templates/list, resources/read, tools/list, tools/call
-    expect(registerCalled).toBe(5);
+    // registerMcpHandlers calls setRequestHandler 2 times: tools/list, tools/call
+    expect(registerCalled).toBe(2);
   });
 
   test('does NOT re-register MCP handlers on initial load', async () => {
@@ -337,27 +335,21 @@ describe('performReload', () => {
     expect(state.outdatedPlugins).toHaveLength(0);
   });
 
-  test('notifies MCP sessions of all list changes on hot reload', async () => {
+  test('notifies MCP sessions of tool list changes on hot reload', async () => {
     let toolNotifyCalled = 0;
-    let resourceNotifyCalled = 0;
     const srv = {
       ...createMockServer(),
       sendToolListChanged: () => {
         toolNotifyCalled++;
         return Promise.resolve();
       },
-      sendResourceListChanged: () => {
-        resourceNotifyCalled++;
-        return Promise.resolve();
-      },
     };
 
     await performReload(state, [srv], emptyTransports(), true);
 
-    // notifyAllListsChanged is called exactly once from the hot reload path
+    // notifyToolListChanged is called exactly once from the hot reload path
     // (reloadCore does not notify — each caller is responsible)
     expect(toolNotifyCalled).toBe(1);
-    expect(resourceNotifyCalled).toBe(1);
   });
 
   test('preserves skipPermissions=true across reload', async () => {
@@ -523,17 +515,12 @@ describe('performConfigReload', () => {
     expect(state.fileWatching.entries).toHaveLength(0);
   });
 
-  test('notifies all sessions of all list changes', async () => {
+  test('notifies all sessions of tool list changes', async () => {
     let toolNotifyCalled = 0;
-    let resourceNotifyCalled = 0;
     const srv = {
       ...createMockServer(),
       sendToolListChanged: () => {
         toolNotifyCalled++;
-        return Promise.resolve();
-      },
-      sendResourceListChanged: () => {
-        resourceNotifyCalled++;
         return Promise.resolve();
       },
     };
@@ -541,7 +528,6 @@ describe('performConfigReload', () => {
     await performConfigReload(state, [srv], emptyTransports());
 
     expect(toolNotifyCalled).toBeGreaterThanOrEqual(1);
-    expect(resourceNotifyCalled).toBeGreaterThanOrEqual(1);
   });
 
   test('state fields are not mutated when rebuildCachedBrowserTools throws', async () => {
