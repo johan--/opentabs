@@ -134,7 +134,7 @@ The timeline depends on web services choosing to adopt it, though, and that kind
 
 We'll be honest: we burned a *lot* of tokens trying to build Google Workspace plugins and couldn't crack it. Google did a genuinely impressive job obscuring their internal APIs — hats off to them, honestly. If you manage to figure it out and want to contribute a Google Workspace plugin back, you'd be our hero. The [build-plugin skill](.claude/skills/build-plugin/) has everything your AI agent needs to try.
 
-We also tried Chipotle and couldn't even get past the login page. If you're a burrito lover and want to take a crack at it, we'd love to see it.
+We also tried Chipotle — the plugin itself worked fine, but we couldn't test it because we had account issues and the login page requires manual sign-in. If you're a burrito lover with a working Chipotle account, we'd love to see someone finish what we started.
 
 ## How This Was Built
 
