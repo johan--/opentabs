@@ -140,6 +140,19 @@ const ClosedWithoutHomepage: Story = {
   render: () => <ClosedWithoutHomepageDemo />,
 };
 
+const ClosedWithLastSeenUrlDemo = () => {
+  const [plugins, setPlugins] = useState([
+    mockPlugin({ tabState: 'closed', tabs: undefined, homepage: undefined, hasLastSeenUrl: true }),
+  ]);
+  const plugin = plugins[0];
+  if (!plugin) return null;
+  return <PluginCard plugin={plugin} activeTools={new Set()} setPlugins={setPlugins} />;
+};
+
+const ClosedWithLastSeenUrl: Story = {
+  render: () => <ClosedWithLastSeenUrlDemo />,
+};
+
 const UnavailableWithTabsDemo = () => {
   const [plugins, setPlugins] = useState([
     mockPlugin({
@@ -788,6 +801,7 @@ export {
   ReadyMultipleTabs,
   ClosedWithHomepage,
   ClosedWithoutHomepage,
+  ClosedWithLastSeenUrl,
   UnavailableWithTabs,
   OpenTabThemePair,
   ReadyWithUpdate,

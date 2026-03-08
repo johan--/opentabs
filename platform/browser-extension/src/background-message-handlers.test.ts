@@ -49,6 +49,10 @@ const {
   mockRemovePendingPluginAllToolsUpdate,
   mockAddPendingPluginPermissionUpdate,
   mockRemovePendingPluginPermissionUpdate,
+  mockGetPluginMeta,
+  mockGetLastSeenUrl,
+  mockSetLastSeenUrl,
+  mockFindAllMatchingTabs,
   mockGetPendingConfirmations,
 } = vi.hoisted(() => ({
   mockSendToServer: vi.fn<(data: unknown) => void>(),
@@ -93,6 +97,12 @@ const {
   mockRemovePendingPluginAllToolsUpdate: vi.fn(),
   mockAddPendingPluginPermissionUpdate: vi.fn(),
   mockRemovePendingPluginPermissionUpdate: vi.fn(),
+  mockGetPluginMeta: vi.fn<(name: string) => Promise<Record<string, unknown> | undefined>>(() =>
+    Promise.resolve(undefined),
+  ),
+  mockGetLastSeenUrl: vi.fn<(name: string) => Promise<string | undefined>>(() => Promise.resolve(undefined)),
+  mockSetLastSeenUrl: vi.fn<(name: string, url: string) => Promise<void>>(() => Promise.resolve()),
+  mockFindAllMatchingTabs: vi.fn<(meta: unknown) => Promise<chrome.tabs.Tab[]>>(() => Promise.resolve([])),
   mockGetPendingConfirmations: vi.fn<() => unknown[]>(() => []),
 }));
 
@@ -124,6 +134,7 @@ vi.mock('./tool-dispatch.js', () => ({
 
 vi.mock('./plugin-storage.js', () => ({
   getAllPluginMeta: mockGetAllPluginMeta,
+  getPluginMeta: mockGetPluginMeta,
 }));
 
 vi.mock('./server-state-cache.js', () => ({
@@ -149,6 +160,15 @@ vi.mock('./server-request.js', () => ({
   rejectAllPendingServerRequests: mockRejectAllPendingServerRequests,
 }));
 
+vi.mock('./last-seen-urls.js', () => ({
+  getLastSeenUrl: mockGetLastSeenUrl,
+  setLastSeenUrl: mockSetLastSeenUrl,
+}));
+
+vi.mock('./tab-matching.js', () => ({
+  findAllMatchingTabs: mockFindAllMatchingTabs,
+}));
+
 // ---------------------------------------------------------------------------
 // Chrome API stubs
 // ---------------------------------------------------------------------------
@@ -157,6 +177,15 @@ const mockStorageSessionGet = vi.fn<() => Promise<Record<string, unknown>>>().mo
 const mockStorageSessionSet = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const mockStorageLocalGet = vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({});
 const mockRuntimeSendMessage = vi.fn(() => Promise.resolve());
+const mockTabsCreate = vi
+  .fn<(props: { url: string }) => Promise<chrome.tabs.Tab>>()
+  .mockResolvedValue({ id: 99 } as chrome.tabs.Tab);
+const mockTabsUpdate = vi
+  .fn<(tabId: number, props: { active: boolean }) => Promise<chrome.tabs.Tab>>()
+  .mockResolvedValue({} as chrome.tabs.Tab);
+const mockWindowsUpdate = vi
+  .fn<(windowId: number, props: { focused: boolean }) => Promise<chrome.windows.Window>>()
+  .mockResolvedValue({} as chrome.windows.Window);
 
 (globalThis as Record<string, unknown>).chrome = {
   storage: {
@@ -172,6 +201,13 @@ const mockRuntimeSendMessage = vi.fn(() => Promise.resolve());
     sendMessage: mockRuntimeSendMessage,
     id: 'test-extension-id',
   },
+  tabs: {
+    create: mockTabsCreate,
+    update: mockTabsUpdate,
+  },
+  windows: {
+    update: mockWindowsUpdate,
+  },
 };
 
 const {
@@ -185,6 +221,7 @@ const {
   handleBgSetAllToolsPermission,
   handleBgSearchPlugins,
   handleBgInstallPlugin,
+  handleBgOpenPluginTab,
   handleBgRemovePlugin,
   handleBgUpdatePlugin,
   initBackgroundMessageHandlers,
@@ -1974,5 +2011,60 @@ describe('EXTENSION_ONLY_TYPES security guard', () => {
 
     // Should return true (accepted and handled asynchronously)
     expect(result).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleBgOpenPluginTab
+// ---------------------------------------------------------------------------
+
+describe('handleBgOpenPluginTab', () => {
+  test('falls back to last-seen URL when no tabs and no homepage', async () => {
+    const meta = { name: 'jira', urlPatterns: ['*://*.atlassian.net/*'] };
+    mockGetPluginMeta.mockResolvedValueOnce(meta);
+    mockFindAllMatchingTabs.mockResolvedValueOnce([]);
+    mockGetLastSeenUrl.mockResolvedValueOnce('https://myteam.atlassian.net/browse/PROJ-1');
+    mockTabsCreate.mockResolvedValueOnce({ id: 42 } as chrome.tabs.Tab);
+
+    const sendResponse = vi.fn();
+    handleBgOpenPluginTab({ type: 'bg:openPluginTab', pluginName: 'jira' }, sendResponse);
+
+    // Wait for the async handler to resolve
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+    expect(mockTabsCreate).toHaveBeenCalledWith({ url: 'https://myteam.atlassian.net/browse/PROJ-1' });
+    expect(sendResponse).toHaveBeenCalledWith({ opened: true, tabId: 42 });
+  });
+
+  test('returns opened: false when no tabs, no homepage, and no last-seen URL', async () => {
+    const meta = { name: 'jira', urlPatterns: ['*://*.atlassian.net/*'] };
+    mockGetPluginMeta.mockResolvedValueOnce(meta);
+    mockFindAllMatchingTabs.mockResolvedValueOnce([]);
+    mockGetLastSeenUrl.mockResolvedValueOnce(undefined);
+
+    const sendResponse = vi.fn();
+    handleBgOpenPluginTab({ type: 'bg:openPluginTab', pluginName: 'jira' }, sendResponse);
+
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+    expect(mockTabsCreate).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({ opened: false });
+  });
+
+  test('prefers homepage over last-seen URL', async () => {
+    const meta = { name: 'slack', homepage: 'https://app.slack.com', urlPatterns: ['*://*.slack.com/*'] };
+    mockGetPluginMeta.mockResolvedValueOnce(meta);
+    mockFindAllMatchingTabs.mockResolvedValueOnce([]);
+    mockGetLastSeenUrl.mockResolvedValueOnce('https://app.slack.com/client/T123');
+    mockTabsCreate.mockResolvedValueOnce({ id: 50 } as chrome.tabs.Tab);
+
+    const sendResponse = vi.fn();
+    handleBgOpenPluginTab({ type: 'bg:openPluginTab', pluginName: 'slack' }, sendResponse);
+
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+    // Should open homepage, not last-seen URL
+    expect(mockTabsCreate).toHaveBeenCalledWith({ url: 'https://app.slack.com' });
+    expect(sendResponse).toHaveBeenCalledWith({ opened: true, tabId: 50 });
   });
 });
