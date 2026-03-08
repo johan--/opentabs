@@ -1,4 +1,12 @@
-import { ToolError, parseRetryAfterMs } from '@opentabs-dev/plugin-sdk';
+import {
+  ToolError,
+  clearAuthCache,
+  getAuthCache,
+  getCookie,
+  parseRetryAfterMs,
+  setAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
 // --- Auth ---
 
@@ -14,13 +22,13 @@ interface VercelAuth {
  * The API is same-origin at `/api/`.
  */
 const getAuth = (): VercelAuth | null => {
-  const persisted = getPersistedAuth();
+  const persisted = getAuthCache<VercelAuth>('vercel');
   if (persisted) return persisted;
 
-  if (!detectAuthentication()) return null;
+  if (getCookie('isLoggedIn') !== '1') return null;
 
   const auth: VercelAuth = { teamSlug: extractTeamSlug() };
-  setPersistedAuth(auth);
+  setAuthCache('vercel', auth);
   return auth;
 };
 
@@ -35,70 +43,15 @@ const extractTeamSlug = (): string | null => {
   return null;
 };
 
-const detectAuthentication = (): boolean => {
-  // Check the non-HttpOnly `isLoggedIn` cookie
-  if (document.cookie.includes('isLoggedIn=1')) return true;
-
-  return false;
-};
-
-// --- Token persistence on globalThis ---
-
-const getPersistedAuth = (): VercelAuth | null => {
-  try {
-    const ns = (globalThis as Record<string, unknown>).__openTabs as Record<string, unknown> | undefined;
-    const cache = ns?.tokenCache as Record<string, VercelAuth | undefined> | undefined;
-    return cache?.vercel ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const setPersistedAuth = (auth: VercelAuth): void => {
-  try {
-    const g = globalThis as Record<string, unknown>;
-    if (!g.__openTabs) g.__openTabs = {};
-    const ns = g.__openTabs as Record<string, unknown>;
-    if (!ns.tokenCache) ns.tokenCache = {};
-    const cache = ns.tokenCache as Record<string, VercelAuth | undefined>;
-    cache.vercel = auth;
-  } catch {
-    // Silently ignore
-  }
-};
-
-const clearPersistedAuth = (): void => {
-  try {
-    const ns = (globalThis as Record<string, unknown>).__openTabs as Record<string, unknown> | undefined;
-    const cache = ns?.tokenCache as Record<string, VercelAuth | undefined> | undefined;
-    if (cache) cache.vercel = undefined;
-  } catch {
-    // Silently ignore
-  }
-};
-
 // --- Public auth helpers ---
 
 export const isVercelAuthenticated = (): boolean => getAuth() !== null;
 
 export const waitForVercelAuth = (): Promise<boolean> =>
-  new Promise(resolve => {
-    let elapsed = 0;
-    const interval = 500;
-    const maxWait = 5000;
-    const timer = setInterval(() => {
-      elapsed += interval;
-      if (isVercelAuthenticated()) {
-        clearInterval(timer);
-        resolve(true);
-        return;
-      }
-      if (elapsed >= maxWait) {
-        clearInterval(timer);
-        resolve(false);
-      }
-    }, interval);
-  });
+  waitUntil(() => isVercelAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
 
 /** Get the team slug from the current URL, if present */
 export const getTeamSlug = (): string | null => {
@@ -183,7 +136,7 @@ export const vercelApi = async <T>(
       throw ToolError.rateLimited(`Rate limited: ${endpoint} — ${errorBody}`, retryMs);
     }
     if (response.status === 401 || response.status === 403) {
-      clearPersistedAuth();
+      clearAuthCache('vercel');
       throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
     }
     if (response.status === 404) {
