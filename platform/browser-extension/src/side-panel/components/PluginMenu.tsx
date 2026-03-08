@@ -1,4 +1,4 @@
-import { ArrowUpCircle, ExternalLink, FolderOpen, MoreHorizontal, Package, Trash2 } from 'lucide-react';
+import { ArrowUpCircle, FolderOpen, MoreHorizontal, Package, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { PluginState } from '../bridge';
 import { openFolder } from '../bridge';
@@ -23,7 +23,6 @@ const VersionItem = ({ plugin }: { plugin: PluginState }) => {
     return (
       <Menu.Item onSelect={() => window.open(`https://www.npmjs.com/package/${plugin.name}`, '_blank')}>
         <Package className="h-3.5 w-3.5" />v{plugin.version}
-        <ExternalLink className="ml-auto h-3 w-3 text-muted-foreground" />
       </Menu.Item>
     );
   }
@@ -31,14 +30,13 @@ const VersionItem = ({ plugin }: { plugin: PluginState }) => {
   if (sourcePath) {
     return (
       <Menu.Item onSelect={() => void openFolder(sourcePath)}>
-        <Package className="h-3.5 w-3.5" />v{plugin.version}
-        <FolderOpen className="ml-auto h-3 w-3 text-muted-foreground" />
+        <FolderOpen className="h-3.5 w-3.5" />v{plugin.version}
       </Menu.Item>
     );
   }
   return (
     <Menu.Item disabled className="text-muted-foreground">
-      <Package className="h-3.5 w-3.5" />v{plugin.version}
+      <FolderOpen className="h-3.5 w-3.5" />v{plugin.version}
     </Menu.Item>
   );
 };
@@ -76,15 +74,13 @@ const PluginMenu = ({ plugin, onUpdate, onRemove, updating, removing, muted, cla
         </Menu.Trigger>
         <Menu.Content align="end">
           <VersionItem plugin={plugin} />
-          <Menu.Separator />
           {plugin.update && (
             <Menu.Item onClick={onUpdate}>
               {updating ? <Loader size="sm" /> : <ArrowUpCircle className="h-3.5 w-3.5" />}
               Update to v{plugin.update.latestVersion}
             </Menu.Item>
           )}
-          {plugin.update && <Menu.Separator />}
-          <Menu.Item onSelect={() => setConfirmOpen(true)} variant="destructive">
+          <Menu.Item onSelect={() => setConfirmOpen(true)} variant="destructive" className="border-border border-t">
             {removing ? <Loader size="sm" /> : <Trash2 className="h-3.5 w-3.5" />}
             {removeLabel}
           </Menu.Item>

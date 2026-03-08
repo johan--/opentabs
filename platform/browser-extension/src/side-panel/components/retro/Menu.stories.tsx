@@ -60,7 +60,7 @@ const Disabled: Story = {
   ),
 };
 
-const WithSeparator: Story = {
+const WithDestructive: Story = {
   render: () => (
     <Menu>
       <Menu.Trigger asChild>
@@ -69,7 +69,6 @@ const WithSeparator: Story = {
       <Menu.Content>
         <Menu.Item>Edit</Menu.Item>
         <Menu.Item>Duplicate</Menu.Item>
-        <Menu.Separator />
         <Menu.Item variant="destructive">Delete</Menu.Item>
       </Menu.Content>
     </Menu>
@@ -92,9 +91,7 @@ const SideBySideWithSelect: Story = {
                 <Package className="h-3.5 w-3.5" />
                 v0.1.0
               </Menu.Item>
-              <Menu.Separator />
               <Menu.Item>Update to v0.2.0</Menu.Item>
-              <Menu.Separator />
               <Menu.Item variant="destructive">Uninstall</Menu.Item>
             </Menu.Content>
           </Menu>
@@ -109,4 +106,4 @@ const SideBySideWithSelect: Story = {
 };
 
 export default meta;
-export { Default, Disabled, SideBySideWithSelect, TopAligned, WithSeparator };
+export { Default, Disabled, SideBySideWithSelect, TopAligned, WithDestructive };

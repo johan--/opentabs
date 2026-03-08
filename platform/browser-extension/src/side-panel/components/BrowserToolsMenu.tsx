@@ -1,12 +1,46 @@
-import { FolderOpen, MoreHorizontal, Server } from 'lucide-react';
+import { FolderOpen, MoreHorizontal, Package } from 'lucide-react';
 import { openFolder } from '../bridge';
 import { Menu } from './retro/Menu';
+
+const SERVER_NPM_PACKAGE = '@opentabs-dev/mcp-server';
 
 interface BrowserToolsMenuProps {
   serverVersion?: string;
   serverSourcePath?: string;
   className?: string;
 }
+
+const isNpmInstall = (sourcePath: string): boolean => sourcePath.includes('node_modules');
+
+const ServerVersionItem = ({
+  serverVersion,
+  serverSourcePath,
+}: Pick<BrowserToolsMenuProps, 'serverVersion' | 'serverSourcePath'>) => {
+  const label = `Server ${serverVersion ? `v${serverVersion}` : 'unknown'}`;
+
+  if (serverSourcePath && isNpmInstall(serverSourcePath)) {
+    return (
+      <Menu.Item onSelect={() => window.open(`https://www.npmjs.com/package/${SERVER_NPM_PACKAGE}`, '_blank')}>
+        <Package className="h-3.5 w-3.5" />
+        {label}
+      </Menu.Item>
+    );
+  }
+  if (serverSourcePath) {
+    return (
+      <Menu.Item onSelect={() => void openFolder(serverSourcePath)}>
+        <FolderOpen className="h-3.5 w-3.5" />
+        {label}
+      </Menu.Item>
+    );
+  }
+  return (
+    <Menu.Item disabled className="text-muted-foreground">
+      <Package className="h-3.5 w-3.5" />
+      {label}
+    </Menu.Item>
+  );
+};
 
 const BrowserToolsMenu = ({ serverVersion, serverSourcePath, className }: BrowserToolsMenuProps) => (
   <div
@@ -26,18 +60,7 @@ const BrowserToolsMenu = ({ serverVersion, serverSourcePath, className }: Browse
         </button>
       </Menu.Trigger>
       <Menu.Content align="end">
-        {serverSourcePath ? (
-          <Menu.Item onSelect={() => void openFolder(serverSourcePath)}>
-            <Server className="h-3.5 w-3.5" />
-            Server {serverVersion ? `v${serverVersion}` : 'unknown'}
-            <FolderOpen className="ml-auto h-3 w-3 text-muted-foreground" />
-          </Menu.Item>
-        ) : (
-          <Menu.Item disabled className="text-muted-foreground">
-            <Server className="h-3.5 w-3.5" />
-            Server {serverVersion ? `v${serverVersion}` : 'unknown'}
-          </Menu.Item>
-        )}
+        <ServerVersionItem serverVersion={serverVersion} serverSourcePath={serverSourcePath} />
       </Menu.Content>
     </Menu>
   </div>
