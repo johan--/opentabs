@@ -4,24 +4,16 @@
 
 <!-- TODO: Replace with actual demo GIF once recorded -->
 <!-- <p align="center">
-  <img src=".github/assets/demo.gif" alt="Claude Code sending a Slack message through the browser via OpenTabs" width="700" />
+  <img src=".github/assets/demo.gif" alt="Claude Code performing an action through the browser via OpenTabs" width="700" />
 </p> -->
 
-Most MCP servers ask for your API keys. We thought that was a bit odd. You're already logged into Slack, GitHub, Jira, and a dozen other apps in Chrome. Why should your AI need a separate set of credentials?
+Most MCP servers ask for your API keys. We thought that was a bit odd. You're already logged into dozens of web apps in Chrome. Why should your AI need a separate set of credentials?
 
 OpenTabs is a Chrome extension and MCP server that gives your AI agent access to web apps through your existing browser sessions. No API keys. No OAuth setup. No service accounts. If you can see it in a tab, your agent can use it.
 
 ## What's Included
 
-Each plugin talks to the real web app through your authenticated session.
-
-| | | | |
-|---|---|---|---|
-| **Slack** | **GitHub** | **Discord** | **Jira** |
-| **Linear** | **Notion** | **GitLab** | **Figma** |
-| **Sentry** | **Confluence** | **Cloudflare** | **Supabase** |
-| **Vercel** | **Asana** | **Airtable** | **Reddit** |
-| **X (Twitter)** | **Teams** | **Bitbucket** | **Stack Overflow** |
+Each plugin talks to the real web app through your authenticated session. OpenTabs ships with plugins for messaging, project management, code hosting, design tools, monitoring, and more — check the [`plugins/`](plugins/) directory for the full list.
 
 Plus built-in browser tools that work on any tab — screenshots, clicking, typing, scrolling, network capture, cookies, DOM inspection, and more. No plugin needed.
 
@@ -31,7 +23,7 @@ Plus built-in browser tools that work on any tab — screenshots, clicking, typi
   <img src=".github/assets/how-it-works.svg" alt="Three-step flow: 1. Agent calls a tool, 2. Server routes it to the right tab, 3. Action runs in the page with your session" width="700" />
 </p>
 
-1. **Your AI sends a tool call** — `slack_send_message`, `github_create_issue`, whatever you need. It's just a normal MCP tool call.
+1. **Your AI sends a tool call** — send a message, create an issue, query metrics, whatever you need. It's just a normal MCP tool call.
 
 2. **OpenTabs routes it to the right tab** — The MCP server finds the matching browser tab and dispatches the call through the Chrome extension.
 
@@ -62,10 +54,10 @@ Then load the Chrome extension:
 Install a plugin and you're done:
 
 ```bash
-opentabs plugin install slack
+opentabs plugin install <plugin-name>
 ```
 
-Your AI agent can now talk to Slack. The whole thing takes about 5 minutes.
+Your AI agent can now interact with the web app. The whole thing takes about 5 minutes.
 
 ## Build Your Own Plugins
 
@@ -91,7 +83,7 @@ npm run build   # compiles, registers, notifies the running server
 npm run dev     # watch mode with hot reload
 ```
 
-Plugins are standalone npm packages. Publish them and anyone can `opentabs plugin install` them. The [Plugin Development guide](https://opentabs.ai/docs/guides/plugin-development) walks through everything.
+Plugins are standalone npm packages. Publish them and anyone can `opentabs plugin install` them. The [Plugin Development guide](https://opentabs.dev/docs/guides/plugin-development) walks through everything.
 
 ## Security
 
@@ -104,13 +96,13 @@ Look, we know you're the kind of person who sets `DANGEROUSLY_SKIP_PERMISSIONS=1
 - **Runs locally.** No cloud. No telemetry. Everything lives in `~/.opentabs/` on your machine.
 - **Full audit log.** Every tool call is logged — what ran, when, whether it succeeded.
 
-We're not going to pretend this is perfect. Browser extensions that interact with your web apps are inherently a trust decision. But we wanted the defaults to be safe and the controls to be in your hands. The [full security model](https://opentabs.ai/docs/reference/configuration) is documented, and the code is open source — read it.
+We're not going to pretend this is perfect. Browser extensions that interact with your web apps are inherently a trust decision. But we wanted the defaults to be safe and the controls to be in your hands. The [full security model](https://opentabs.dev/docs/reference/configuration) is documented, and the code is open source — read it.
 
 ## Frequently Asked Questions
 
-**Why not just use the official MCP server for Slack / GitHub / etc.?**
+**Why not just use official MCP servers?**
 
-Good question — and if an official MCP server works well for you, you should absolutely use it. We started building OpenTabs for the apps that *don't* ship official MCP support — Discord, Reddit, and many others had no MCP server at all when we began. And some probably never will — we're not holding our breath for a Domino's or Panda Express MCP server. Along the way, we also built plugins for apps that do have official servers, partly for learning, and partly because we noticed a few things: setting up a separate API key or OAuth flow for each service adds up fast when you use ten of them. Public APIs sometimes have stricter rate limits or a smaller feature set than the web app itself. And the web app is always the superset — it has access to internal APIs, real-time data, and features that never make it to the public API.
+Good question — and if an official MCP server works well for you, you should absolutely use it. We started building OpenTabs for the apps that *don't* ship official MCP support — many had no MCP server at all when we began, and some probably never will. Along the way, we also built plugins for apps that do have official servers, partly for learning, and partly because we noticed a few things: setting up a separate API key or OAuth flow for each service adds up fast when you use ten of them. Public APIs sometimes have stricter rate limits or a smaller feature set than the web app itself. And the web app is always the superset — it has access to internal APIs, real-time data, and features that never make it to the public API.
 
 We see OpenTabs and official MCP servers as complementary. Use whatever works best for your setup — or mix and match.
 
@@ -120,7 +112,7 @@ Those are great tools — we're fans. The difference is in the approach.
 
 Browser automation tools work by interacting with the page visually: snapshot the DOM, find the element, click it, wait, snapshot again. That means they work on any site out of the box, which is a real strength. The tradeoff is that the AI figures out how to navigate the site fresh every time. If a popup appears or the design changes, it has to re-figure things out. And whatever the AI learned about that site during the session is gone afterward — there's no way to share or reuse that knowledge.
 
-OpenTabs plugins call the web app's internal APIs directly, so a tool like `slack_send_message` isn't clicking a text box — it's making the same API call Slack's own frontend makes. Once a plugin is built, it's a structured, typed, reusable package that anyone can install. The knowledge accumulates: every plugin built makes the platform more useful for everyone.
+OpenTabs plugins call the web app's internal APIs directly — a send-message tool isn't clicking a text box, it's making the same API call the web app's own frontend makes. Once a plugin is built, it's a structured, typed, reusable package that anyone can install. The knowledge accumulates: every plugin built makes the platform more useful for everyone.
 
 The tradeoff is that OpenTabs needs a plugin per site. But between the pre-built plugins and your AI agent's ability to build new ones on the fly, the coverage grows fast.
 
@@ -176,18 +168,26 @@ Before committing, make sure everything passes:
 npm run check     # build + type-check + lint + knip + test
 ```
 
-See the [Development Setup guide](https://opentabs.ai/docs/contributing/dev-setup) for the full contributor workflow.
+See the [Development Setup guide](https://opentabs.dev/docs/contributing/dev-setup) for the full contributor workflow.
 
 ## Documentation
 
-**[opentabs.ai/docs](https://opentabs.ai/docs)**
+**[opentabs.dev/docs](https://opentabs.dev/docs)**
 
-- [Quick Start](https://opentabs.ai/docs/quick-start) — install to first tool call in 5 minutes
-- [Plugin Development](https://opentabs.ai/docs/guides/plugin-development) — build a plugin from scratch
-- [SDK Reference](https://opentabs.ai/docs/sdk/plugin-class) — plugin class, tools, and utilities
-- [Browser Tools](https://opentabs.ai/docs/reference/browser-tools) — built-in tools for any tab
-- [CLI Reference](https://opentabs.ai/docs/reference/cli) — every command
-- [Architecture](https://opentabs.ai/docs/contributing/architecture) — how the platform works
+- [Quick Start](https://opentabs.dev/docs/quick-start) — install to first tool call in 5 minutes
+- [Plugin Development](https://opentabs.dev/docs/guides/plugin-development) — build a plugin from scratch
+- [SDK Reference](https://opentabs.dev/docs/sdk/plugin-class) — plugin class, tools, and utilities
+- [Browser Tools](https://opentabs.dev/docs/reference/browser-tools) — built-in tools for any tab
+- [CLI Reference](https://opentabs.dev/docs/reference/cli) — every command
+- [Architecture](https://opentabs.dev/docs/contributing/architecture) — how the platform works
+
+## Disclaimer
+
+OpenTabs is an independent open-source project. It is **not affiliated with, endorsed by, or sponsored by** any of the third-party services it integrates with. All product names, logos, trademarks, and registered trademarks are the property of their respective owners. Use of these names in plugin identifiers is for identification purposes only and does not imply any association or endorsement.
+
+This software interacts with third-party web applications using your existing authenticated browser sessions. **You are responsible for ensuring your use of OpenTabs complies with the terms of service of any third-party platforms you connect to.** The authors and contributors are not responsible for any unintended actions, data loss, account restrictions, or other consequences that may result from using this tool.
+
+This software is provided "as is", without warranty of any kind. See the [MIT License](LICENSE) for the full terms.
 
 ## License
 

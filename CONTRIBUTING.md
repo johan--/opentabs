@@ -23,6 +23,19 @@ Load the Chrome extension:
 2. Enable Developer mode
 3. Click "Load unpacked" and select `~/.opentabs/extension/`
 
+## Legal
+
+By submitting a pull request, you agree that your contributions are licensed under the [MIT License](LICENSE) and that you have the right to license them. This project uses the "inbound=outbound" model: contributions are licensed under the same terms as the project itself.
+
+Please also note:
+
+- **Do not contribute code you do not have the right to license** (e.g., proprietary code from an employer without permission, or code copied from incompatibly-licensed projects).
+- **Do not include API keys, secrets, or credentials** in any contribution.
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Report unacceptable behavior to **ralph@opentabs.dev**.
+
 ## Development Workflow
 
 **Full dev mode** (recommended):
