@@ -6,6 +6,8 @@ Build a production-ready OpenTabs plugin. Each phase builds on the previous — 
 
 **Every plugin you produce must be production-ready, clean, and exemplary.** Your code is a model that other agents and developers will study and learn from. There is no "draft" or "good enough" — when you say the work is done, it is done done: fully reviewed, fully tested, and ready to ship.
 
+**Plugin self-sufficiency is non-negotiable.** A plugin adapter must be able to complete any task entirely on its own — through its own tools, using SDK utilities and the site's APIs. Browser tools (`browser_execute_script`, `browser_click_element`, etc.) are development aids for testing and debugging during the build process. They are NOT part of the plugin's runtime capabilities. Users may disable browser tools entirely during normal use, and the AI agent must still be able to accomplish every workflow using only the plugin's tools. If a workflow requires browser interaction (e.g., clicking a checkout button), the plugin must expose a tool that does it programmatically via the site's API or DOM manipulation within the adapter — not rely on the agent calling a browser tool.
+
 **Self-review is not optional and is not a separate step the user must ask for.** Before declaring a plugin complete, you must:
 
 1. **Re-read every file you wrote** — the API wrapper, schemas, every tool file, the plugin class. Read them as if you are seeing them for the first time.
@@ -186,6 +188,24 @@ Then align `package.json` with an existing plugin (e.g., `plugins/github/`):
 ---
 
 ## Phase 4: Design the Tool Set
+
+### Understand the Audience
+
+Before designing tools, identify who uses this service and what they need. A project management tool serves different workflows than a food ordering app. The tool set must reflect what real users actually do — not just what the API technically supports.
+
+- **Who is the primary user?** A developer managing repos, a marketer tracking campaigns, a customer ordering food, an analyst querying dashboards? Design tools for their daily workflows first.
+- **What are the critical paths?** The sequences of actions users perform most often. For a messaging app: read messages → send a reply. For an e-commerce site: browse → add to cart → checkout. For a project tracker: view tasks → update status → add comments. Every critical path must be completable end-to-end using only plugin tools.
+- **Prioritize accordingly.** Build the tools that serve the primary user's critical paths first, then expand to advanced/admin operations. A plugin with 10 tools covering all critical paths is better than one with 30 tools that can't complete a single workflow.
+
+### Commerce and Transactional Flows
+
+For services that involve purchases, orders, or payments (e-commerce, food delivery, subscription services, etc.):
+
+- **The plugin must support the entire flow up to (but not including) final payment.** A user should be able to say "order me a large pepperoni pizza" and the plugin must handle the complete sequence: find the item, add to cart, apply any coupons, and navigate to checkout — stopping just before the payment is submitted. The final payment confirmation is a destructive action that requires explicit human approval.
+- **Expose a `navigate_to_checkout` tool** (or equivalent) that brings the user to the payment page in their browser, where they can review and confirm. Do not silently submit payment.
+- **Only build payment submission tools if the human explicitly asks for it.** Tools like `place_order_cash` or `submit_payment` must not be built by default. If the human requests them, add a clear warning in the tool description that it will charge real money.
+
+### Tool Coverage
 
 **Exhaust the API.** Do not stop at a handful of tools. Cover every API endpoint that a normal or advanced user would need. A production plugin should have 20-40+ tools. A plugin with 5 tools is incomplete.
 
@@ -568,10 +588,13 @@ curl -s -X POST http://127.0.0.1:$PORT/mcp \
 
 **Test every tool:**
 
-1. Call every read-only tool — verify real data with correct field mappings. If a tool returns empty results when you know data exists, the response shape assumption is wrong. Use `browser_execute_script` to fetch the raw JSON and compare actual field names against your interface definitions.
+1. Call every read-only tool — verify real data with correct field mappings. If a tool returns empty results when you know data exists, the response shape assumption is wrong. Use `browser_execute_script` to debug the raw JSON and compare actual field names against your interface definitions.
 2. Call every write tool with round-trip tests (create → verify → update → delete → verify)
 3. Test error classification — call with invalid ID, verify `ToolError.notFound`
-4. Fix every failure — use `browser_execute_script` to inspect raw API responses
+4. Fix every failure — use `browser_execute_script` to debug raw API responses
+5. **Test complete workflows using only plugin tools** — for every critical user path, verify it can be completed end-to-end by calling only the plugin's tools in sequence, without any `browser_*` tool calls. Browser tools are for debugging during development — the shipped plugin must stand on its own.
+
+**Commerce flow testing:** For plugins with purchase/order workflows, test the full flow (browse → cart → checkout) but **do not trigger actual payment** unless the human explicitly asks you to test it. Stop at the `navigate_to_checkout` step and verify the cart state is correct.
 
 Remove tools you cannot verify rather than shipping them broken.
 
