@@ -153,6 +153,8 @@ export interface PendingDispatch {
   onProgress?: (progress: number, total: number, message?: string) => void;
   /** Timestamp (ms) of the last progress notification — updated by handleToolProgress for observability */
   lastProgressTs?: number;
+  /** Connection ID the dispatch was sent over — used by close handler to reject only dispatches for a disconnected connection */
+  connectionId?: string;
 }
 
 /** Resolved tool lookup entry for O(1) dispatch in tools/call */

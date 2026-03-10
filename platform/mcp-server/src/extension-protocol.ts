@@ -42,8 +42,8 @@ import {
   serializePluginForExtension,
 } from './extension-handlers.js';
 import { log } from './logger.js';
-import type { ConfirmationDecision, PendingDispatch, ServerState } from './state.js';
-import { DISPATCH_TIMEOUT_MS, getAnyConnection, getNextRequestId } from './state.js';
+import type { ConfirmationDecision, ExtensionConnection, PendingDispatch, ServerState } from './state.js';
+import { DISPATCH_TIMEOUT_MS, getAnyConnection, getConnectionForTab, getNextRequestId } from './state.js';
 
 /** Maximum incoming WebSocket message size (10MB) */
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
@@ -138,9 +138,32 @@ interface DispatchOptions {
 }
 
 /**
+ * Resolve which connection should handle a dispatch based on the params.
+ * For params with a numeric tabId, finds the connection that owns that tab.
+ * Falls back to any available connection when tabId is absent or not found
+ * (the extension may have just opened the tab and not yet reported it via tab.syncAll).
+ */
+const resolveConnection = (state: ServerState, params: Record<string, unknown>): ExtensionConnection | undefined => {
+  if (state.extensionConnections.size === 0) return undefined;
+  if (state.extensionConnections.size === 1) {
+    return state.extensionConnections.values().next().value as ExtensionConnection;
+  }
+  const tabId = typeof params.tabId === 'number' ? params.tabId : undefined;
+  if (tabId !== undefined) {
+    const conn = getConnectionForTab(state, tabId);
+    if (conn) return conn;
+  }
+  return getAnyConnection(state);
+};
+
+/**
  * Send a JSON-RPC request to the extension and return a promise for the response.
  * Unified dispatch for both browser commands (browser.*, extension.*) and
  * plugin tool dispatches (tool.dispatch).
+ *
+ * Routes to the connection that owns the target tab (if tabId is in params),
+ * falling back to any available connection when the tab isn't found or no
+ * tabId is specified.
  */
 const dispatchToExtension = (
   state: ServerState,
@@ -151,11 +174,10 @@ const dispatchToExtension = (
   // Backward-compatible: options can be a string (label) for existing callers
   const opts: DispatchOptions = typeof options === 'string' ? { label: options } : (options ?? {});
 
-  const conn = getAnyConnection(state);
+  const conn = resolveConnection(state, params);
   if (!conn) {
     return Promise.reject(new Error('Extension not connected'));
   }
-  const ws = conn.ws;
 
   const id = getNextRequestId();
 
@@ -185,13 +207,14 @@ const dispatchToExtension = (
       timerId,
       progressToken: opts.progressToken,
       onProgress: opts.onProgress,
+      connectionId: conn.connectionId,
     };
     state.pendingDispatches.set(id, pending);
 
-    log.debug('dispatch → extension:', method, 'id:', id);
+    log.debug('dispatch → extension:', method, 'id:', id, 'connection:', conn.connectionId);
 
     try {
-      ws.send(JSON.stringify(msg));
+      conn.ws.send(JSON.stringify(msg));
     } catch (err) {
       clearTimeout(timerId);
       state.pendingDispatches.delete(id);
