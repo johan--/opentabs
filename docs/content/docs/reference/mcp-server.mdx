@@ -4,6 +4,8 @@ description: HTTP endpoints, WebSocket protocol, authentication, MCP capabilitie
 lastUpdated: 2026-03-03
 ---
 
+Everything here describes the server that `opentabs start` runs on your machine. It's a single localhost HTTP process — port 9515 by default. AI clients connect to `/mcp`, the Chrome extension connects to `/ws`. No cloud, no relay, no accounts. Just a process running locally, bridging your AI agent and your browser.
+
 ## HTTP Endpoints
 
 The server runs on port 9515 by default (override with the `PORT` environment variable or `--port` flag).
