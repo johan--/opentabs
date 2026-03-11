@@ -8,9 +8,9 @@
   </a>
 </p>
 
-I reverse-engineered (okay, I asked Claude Opus to reverse-engineer) the internal APIs that web apps use — the same endpoints their own frontend calls — and exposed them as [MCP tools](https://modelcontextprotocol.io/) so your AI agent can call them directly.
+Web apps have internal APIs — the same endpoints their own frontend calls. I asked Claude to reverse-engineer them and expose them as [MCP tools](https://modelcontextprotocol.io/) so your AI agent can call them directly.
 
-No screenshots. No DOM scraping. No pixel-guessing. When your AI wants to send a Slack message, it calls `slack_send_message` — the exact same API call Slack's own web app makes, running in your browser, using your existing session. It's fast, it's cheap on tokens (tokens are money), and the knowledge gets packaged into a reusable plugin anyone can install.
+No screenshots. No DOM scraping. No pixel-guessing. Your AI calls `slack_send_message` and it hits the same backend Slack's own web app uses, running in your browser, using your existing session. Fast, cheap on tokens (tokens are money), and the knowledge gets packaged into a reusable plugin anyone can install.
 
 ## How It Works
 
