@@ -228,44 +228,45 @@ export default function Home() {
           Two ways to get plugins
         </Text>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Let AI build it */}
+          {/* Contribute */}
           <div className="border-4 border-foreground p-8">
             <div className="mb-4 flex h-12 w-12 items-center justify-center border-2 border-foreground bg-primary">
               <SparklesIcon size={24} />
             </div>
             <Text as="h3" className="mb-3 text-xl">
-              Let your AI build it
+              Contribute a plugin
             </Text>
             <p className="mb-4 text-muted-foreground text-sm leading-relaxed">
               Point your AI at any website. It analyzes the page, discovers the APIs, scaffolds a plugin, writes the
-              tools, and registers it. Every line of code is yours to review.
+              tools, and registers it. Publish it and anyone can install it — the knowledge accumulates, and every
+              plugin contributed makes the platform more useful for everyone.
             </p>
             <p className="mb-4 text-muted-foreground text-sm leading-relaxed">
-              Fun fact: many of the plugins in this repo were built by AI in minutes. The MCP server ships
-              with site analysis tools, the SDK handles the boilerplate, and a self-improving skill teaches AI agents
-              the entire process. Every time an agent builds a plugin, it writes what it learned back into the skill —
-              so the system gets better with every plugin built.
+              Most of the plugins in this repo were built by AI in minutes. The MCP server ships with site analysis
+              tools, the SDK handles the boilerplate, and a self-improving skill teaches AI agents the entire process.
+              Every time an agent builds a plugin, it writes what it learned back into the skill — so the system gets
+              better with every plugin built.
             </p>
             <p className="mb-6 text-muted-foreground text-sm leading-relaxed">
-              I think this is actually safer than installing someone else&apos;s code — your agent wrote it, you can
-              read every line, and it runs in your browser.
+              For internal tools or sensitive workflows, you can keep plugins local — they work the same way, they just
+              stay on your machine.
             </p>
             <Link href="/docs/guides/plugin-development" className="font-medium text-sm underline underline-offset-4">
               Learn more
             </Link>
           </div>
 
-          {/* Install pre-built */}
+          {/* Install */}
           <div className="border-4 border-foreground p-8">
             <div className="mb-4 flex h-12 w-12 items-center justify-center border-2 border-foreground bg-primary">
               <PackageIcon size={24} />
             </div>
             <Text as="h3" className="mb-3 text-xl">
-              Install pre-built
+              Install community plugins
             </Text>
             <p className="mb-6 text-muted-foreground text-sm leading-relaxed">
-              100+ plugins ready to go. Install globally and they&apos;re auto-discovered by the server. Or
-              build your own by hand with the Plugin SDK and publish to npm.
+              100+ plugins ready to go — built and shared by other users. Install globally and they&apos;re
+              auto-discovered by the server.
             </p>
             <div className="mb-6 border-2 border-foreground bg-card p-3 font-mono text-sm">
               <span className="text-muted-foreground">$</span> opentabs plugin install slack
