@@ -52,17 +52,15 @@ opentabs plugin install <plugin-name>
 
 That's it. Your AI agent can now talk to the web app. Five minutes, start to finish.
 
-**My honest recommendation:** build your own plugins instead of installing third-party ones. Plugins run in your browser with your logged-in sessions — you should know what the code does. Building a plugin is surprisingly easy (your AI can do it in minutes), and you get to read every line. More on that next.
-
-## Build Your Own Plugins
+## Contributing Plugins
 
 This is the part I'm most excited about.
 
-Point your AI agent at any website and it'll build a plugin for you — analyze the page, discover the APIs, scaffold the code, register it. Your agent wrote it, you can read every line, and it runs in your browser with your session. That's a pretty good trust model.
+Most of the plugins in this repo were built by AI in minutes. Point your AI agent at any website and it'll build a plugin — analyze the page, discover the APIs, scaffold the code, register it. The MCP server ships with site analysis tools, the SDK handles the boilerplate, and there's a [build-plugin skill](.claude/skills/build-plugin/) that walks AI agents through the whole process — API discovery, auth extraction, error handling, schema design, testing, and a growing collection of patterns learned from building every plugin in this repo.
 
-Most of the plugins in this repo were built by AI in minutes. The MCP server ships with site analysis tools, the SDK handles the boilerplate, and there's a [build-plugin skill](.claude/skills/build-plugin/) that walks AI agents through the whole process — API discovery, auth extraction, error handling, schema design, testing, and a growing collection of patterns learned from building every plugin in this repo.
+Here's what makes it interesting: **every time an AI builds a plugin, it writes what it learned back into the skill.** New auth patterns, new API quirks, new edge cases — they all get folded in. The skill that teaches AI to build plugins gets better with every plugin built. Publish yours and anyone can `opentabs plugin install` it — the knowledge accumulates, and every plugin contributed makes the platform more useful for everyone. I'd love your help. If your agent discovers something new, contribute it back.
 
-Here's what makes it interesting: **every time an AI builds a plugin, it writes what it learned back into the skill.** New auth patterns, new API quirks, new edge cases — they all get folded in. The skill that teaches AI to build plugins gets better with every plugin built. I'd love your help making it even better. If your agent discovers something new, contribute it back.
+For internal tools, niche workflows, or anything involving sensitive data, you can keep plugins local — they work the same way, they just stay on your machine. The [Plugin Development guide](https://opentabs.dev/docs/guides/plugin-development) covers both paths.
 
 If you prefer to build by hand:
 
@@ -77,8 +75,6 @@ Write your tools, build, and the server picks them up:
 npm run build   # compiles, registers, notifies the running server
 npm run dev     # watch mode with hot reload
 ```
-
-Plugins are standalone npm packages. Publish yours and anyone can `opentabs plugin install` it. The [Plugin Development guide](https://opentabs.dev/docs/guides/plugin-development) covers everything.
 
 ## Security
 
