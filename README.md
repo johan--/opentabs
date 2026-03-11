@@ -54,7 +54,7 @@ That's it. Your AI agent can now talk to the web app. Five minutes, start to fin
 
 ## Contributing Plugins
 
-This is the part I'm most excited about.
+Now that you're set up, this is the part I'm most excited about.
 
 Most of the plugins in this repo were built by AI in minutes. Point your AI agent at any website and it'll build a plugin — analyze the page, discover the APIs, scaffold the code, register it. The MCP server ships with site analysis tools, the SDK handles the boilerplate, and there's a [build-plugin skill](.claude/skills/build-plugin/) that walks AI agents through the whole process — API discovery, auth extraction, error handling, schema design, testing, and a growing collection of patterns learned from building every plugin in this repo.
 
@@ -142,7 +142,7 @@ Six packages:
 
 The UI across the side panel and docs site is built with [RetroUI](https://github.com/Logging-Studio/RetroUI), a NeoBrutalism component library that I really like.
 
-## Contributing
+## Contributing to the Platform
 
 I'd love your help. You need [Node.js](https://nodejs.org/) 22+ and Chrome.
 

@@ -265,7 +265,7 @@ export default function Home() {
               Install community plugins
             </Text>
             <p className="mb-6 text-muted-foreground text-sm leading-relaxed">
-              100+ plugins ready to go — built and shared by other users. Install globally and they&apos;re
+              100+ plugins ready to go — built and shared by the community. Install globally and they&apos;re
               auto-discovered by the server.
             </p>
             <div className="mb-6 border-2 border-foreground bg-card p-3 font-mono text-sm">
