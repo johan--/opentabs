@@ -1,4 +1,4 @@
-import { SiGithub } from '@icons-pack/react-simple-icons';
+import { SiDiscord, SiGithub } from '@icons-pack/react-simple-icons';
 import {
   BotIcon,
   CloudIcon,
@@ -26,6 +26,7 @@ import Link from 'next/link';
 import Footer from '@/components/footer';
 import { Button, Text } from '@/components/retroui';
 
+const DISCORD_URL = 'https://discord.com/channels/1477900943524888789';
 const GITHUB_URL = 'https://github.com/opentabs-dev/opentabs';
 
 interface PluginShowcase {
@@ -119,6 +120,12 @@ export default function Home() {
               <Button variant="outline">
                 <SiGithub size={16} className="mr-2" />
                 GitHub
+              </Button>
+            </Link>
+            <Link href={DISCORD_URL} target="_blank" passHref>
+              <Button variant="outline">
+                <SiDiscord size={16} className="mr-2" />
+                Discord
               </Button>
             </Link>
           </div>
@@ -378,6 +385,12 @@ export default function Home() {
               <Button className="bg-background" variant="outline">
                 <SiGithub size={16} className="mr-2" />
                 View on GitHub
+              </Button>
+            </Link>
+            <Link href={DISCORD_URL} target="_blank" passHref>
+              <Button className="bg-background" variant="outline">
+                <SiDiscord size={16} className="mr-2" />
+                Join Discord
               </Button>
             </Link>
           </div>

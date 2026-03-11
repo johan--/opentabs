@@ -17,6 +17,7 @@ const developers = [
 ];
 
 const community = [
+  { name: 'Discord', href: 'https://discord.com/channels/1477900943524888789' },
   { name: 'GitHub', href: 'https://github.com/opentabs-dev/opentabs' },
   { name: 'PRDs', href: 'https://github.com/opentabs-dev/opentabs-prds' },
   { name: 'Contributing', href: '/docs/contributing/dev-setup' },

@@ -1,6 +1,6 @@
 'use client';
 
-import { SiGithub } from '@icons-pack/react-simple-icons';
+import { SiDiscord, SiGithub } from '@icons-pack/react-simple-icons';
 import { MoonIcon, SunIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -41,6 +41,13 @@ export default function TopNav() {
               {isDarkMode ? <SunIcon size={20} /> : <MoonIcon size={20} />}
             </button>
             <Link
+              href="https://discord.com/channels/1477900943524888789"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Discord">
+              <SiDiscord size={24} />
+            </Link>
+            <Link
               href="https://github.com/opentabs-dev/opentabs"
               target="_blank"
               rel="noopener noreferrer"
@@ -51,6 +58,11 @@ export default function TopNav() {
           </div>
 
           <div className="hidden items-center space-x-3 lg:flex">
+            <Link href="https://discord.com/channels/1477900943524888789" target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary" size="icon" aria-label="Discord">
+                <SiDiscord size={14} />
+              </Button>
+            </Link>
             <Link href="https://github.com/opentabs-dev/opentabs" target="_blank" rel="noopener noreferrer">
               <Button variant="secondary" size="icon" aria-label="GitHub">
                 <SiGithub size={14} />
