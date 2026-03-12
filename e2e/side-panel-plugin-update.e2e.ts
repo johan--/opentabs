@@ -176,6 +176,72 @@ test.describe('Side panel — plugin update indicator', () => {
   });
 });
 
+test.describe('Side panel — plugin update after reload', () => {
+  test('POST /reload preserves update dot when plugin has a pending update', async () => {
+    const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
+    const { name: pkgName, version: currentVersion } = getPluginPackageInfo();
+
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opentabs-e2e-update-'));
+    writeTestConfig(configDir, {
+      localPlugins: [absPluginPath],
+      permissions: { 'e2e-test': { permission: 'auto' } },
+    });
+
+    const server = await startMcpServer(configDir, true);
+    const testServer = await startTestServer();
+    const { context, cleanupDir, extensionDir } = await launchExtensionContext(server.port, server.secret);
+    setupAdapterSymlink(configDir, extensionDir);
+
+    try {
+      await waitForExtensionConnected(server);
+      await waitForLog(server, 'tab.syncAll received', 15_000);
+
+      await openTestAppTab(context, testServer.url, server, testServer);
+      const sidePanelPage = await openSidePanel(context);
+      await expect(sidePanelPage.getByText('E2E Test')).toBeVisible({ timeout: 30_000 });
+
+      const secret = server.secret;
+      expect(secret).toBeTruthy();
+      if (!secret) throw new Error('Server secret is required');
+
+      // Inject fake outdated data and verify the update dot appears
+      await setOutdatedPlugins(server.port, secret, [
+        {
+          name: pkgName,
+          currentVersion,
+          latestVersion: '99.0.0',
+          updateCommand: `npm update -g ${pkgName}`,
+        },
+      ]);
+
+      const menuButton = sidePanelPage.locator('[aria-label="Plugin options"]');
+      const updateDot = menuButton.locator('div.rounded-full');
+      await expect(updateDot).toBeVisible({ timeout: 10_000 });
+
+      // Trigger POST /reload — this now runs checkForUpdates (US-001 fix).
+      // The server sends sync.full (with the outdated data) followed by a
+      // plugins.changed notification if outdated plugins still exist after
+      // the version check.
+      const reloadRes = await fetch(`http://localhost:${server.port}/reload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+      expect(reloadRes.ok).toBe(true);
+
+      // After reload completes, the update dot should still be visible.
+      // The new checkForUpdates + plugins.changed path in performConfigReload
+      // ensures the extension's update state stays in sync with the server.
+      await expect(updateDot).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await context.close();
+      await server.kill();
+      await testServer.kill();
+      cleanupTestConfigDir(configDir);
+      if (cleanupDir) fs.rmSync(cleanupDir, { recursive: true, force: true });
+    }
+  });
+});
+
 test.describe('Side panel — plugin update flow', () => {
   test('clicking Update on a local plugin shows error alert on failure', async () => {
     const absPluginPath = path.resolve(E2E_TEST_PLUGIN_DIR);
