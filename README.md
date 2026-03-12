@@ -2,7 +2,7 @@
 
 **Your browser is already logged in. Let your AI use it.**
 
-Here's Claude checking a Robinhood portfolio, ordering Panda Express on DoorDash, and sending a Discord message — all through the browser, in one shot:
+Here's Claude checking a Robinhood portfolio, ordering from Panda Express, and sending a Discord message — all through the browser, in one shot:
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=PBvUXDAGVM8">
