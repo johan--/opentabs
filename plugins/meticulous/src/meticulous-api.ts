@@ -334,9 +334,9 @@ export const queries = {
   `,
 
   GET_TEST_RUN_TEST_CASES: `
-    query GetTestRunTestCaseResults($testRunId: String!, $limit: Int!, $offset: Int!) {
+    query GetTestRunTestCaseResults($testRunId: String!, $limit: Int!, $offset: Int!, $excludePasses: Boolean!) {
       testRun(id: $testRunId) {
-        testCaseResults(excludePasses: true, limit: $limit, offset: $offset) {
+        testCaseResults(excludePasses: $excludePasses, limit: $limit, offset: $offset) {
           headReplay {
             id status isAccurate
             parameters { appUrl }
@@ -410,11 +410,29 @@ export const queries = {
   `,
 
   GET_COMPARE_REPLAYS: `
-    query GetCompareReplays($headReplayId: String!, $baseReplayId: String!) {
-      compareReplays(input: { headReplayId: $headReplayId, baseReplayId: $baseReplayId }) {
-        timeline
+    query GetTestRunForCompareReplaysPage($testRunId: String!, $baseReplayId: String!) {
+      testRun(id: $testRunId) {
+        id
+        replayDiff(baseReplayId: $baseReplayId) {
+          id divergences
+          headReplay {
+            id status isAccurate
+            parameters { appUrl }
+            screenshotsData { ...ScreenshotsDataFragment }
+          }
+          baseReplay {
+            id status isAccurate
+            parameters { appUrl }
+            screenshotsData { ...ScreenshotsDataFragment }
+          }
+          screenshotDiffResults {
+            ...ScreenshotDiffResultFragment
+          }
+        }
       }
     }
+    ${SCREENSHOTS_DATA_FRAGMENT}
+    ${SCREENSHOT_DIFF_RESULT_FRAGMENT}
   `,
 
   GET_SESSIONS_FOR_PROJECT: `
