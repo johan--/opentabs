@@ -1,11 +1,18 @@
 import { isAuthenticated, waitForAuth } from './reddit-api.js';
+import { deleteThing } from './tools/delete-thing.js';
+import { editText } from './tools/edit-text.js';
+import { getCommentThread } from './tools/get-comment-thread.js';
 import { getMe } from './tools/get-me.js';
 import { getPost } from './tools/get-post.js';
 import { getSubreddit } from './tools/get-subreddit.js';
 import { getUser } from './tools/get-user.js';
+import { hide } from './tools/hide.js';
+import { listPopularSubreddits } from './tools/list-popular-subreddits.js';
 import { listPosts } from './tools/list-posts.js';
 import { listSubscriptions } from './tools/list-subscriptions.js';
+import { listUserContent } from './tools/list-user-content.js';
 import { readInbox } from './tools/read-inbox.js';
+import { report } from './tools/report.js';
 import { save } from './tools/save.js';
 import { searchPosts } from './tools/search-posts.js';
 import { searchSubreddits } from './tools/search-subreddits.js';
@@ -30,11 +37,18 @@ class RedditPlugin extends OpenTabsPlugin {
     searchPosts,
     submitPost,
     submitComment,
+    getCommentThread,
+    editText,
+    deleteThing,
     vote,
     save,
+    hide,
+    report,
+    listUserContent,
     getSubreddit,
     searchSubreddits,
     listSubscriptions,
+    listPopularSubreddits,
     subscribe,
     getUser,
     sendMessage,
