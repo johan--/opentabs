@@ -1,6 +1,6 @@
 {
   "name": "@opentabs-dev/opentabs-plugin-slack",
-  "description": "OpenTabs plugin for Slack",
+  "description": "OpenTabs plugin for Slack (standard workspaces). For Enterprise Grid, use slack-enterprise.",
   "publishConfig": {
     "access": "public"
   },
@@ -18,7 +18,7 @@
   ],
   "opentabs": {
     "displayName": "Slack",
-    "description": "OpenTabs plugin for Slack",
+    "description": "OpenTabs plugin for Slack (standard workspaces). For Enterprise Grid, use slack-enterprise.",
     "urlPatterns": [
       "*://*.slack.com/*"
     ],

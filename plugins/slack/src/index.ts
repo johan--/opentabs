@@ -26,7 +26,7 @@ import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
 
 class SlackPlugin extends OpenTabsPlugin {
   readonly name = 'slack';
-  readonly description = 'OpenTabs plugin for Slack';
+  readonly description = 'OpenTabs plugin for Slack (standard workspaces). For Enterprise Grid, use slack-enterprise.';
   override readonly displayName = 'Slack';
   readonly urlPatterns = ['*://*.slack.com/*'];
   override readonly homepage = 'https://app.slack.com';
