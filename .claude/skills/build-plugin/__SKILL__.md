@@ -510,58 +510,19 @@ export const mapMessage = (m: RawMessage) => ({
 
 ## Phase 6: README
 
-Replace the scaffolded `README.md` with a user-facing README that shows what the plugin does, how to install it, and every tool it provides. The README is the npm package page — it must be useful to someone deciding whether to install the plugin, not to someone developing it.
+After building the plugin, run `opentabs-plugin readme` to generate the README:
 
-**The README must follow this exact structure:**
-
-```markdown
-# <DisplayName>
-
-<One-line description> — gives AI agents access to <DisplayName> through your authenticated browser session.
-
-## Install
-
-\`\`\`bash
-opentabs plugin install <name>
-\`\`\`
-
-Or install globally via npm:
-
-\`\`\`bash
-npm install -g @opentabs-dev/opentabs-plugin-<name>
-\`\`\`
-
-## Setup
-
-1. Open [<domain>](https://<domain>) in Chrome and log in
-2. Open the OpenTabs side panel — the <DisplayName> plugin should appear as **ready**
-
-## Tools (<total count>)
-
-### <Group Name> (<count>)
-
-| Tool | Description | Type |
-|---|---|---|
-| `<tool_name>` | <summary from defineTool> | Read or Write |
-
-(repeat for every group)
-
-## How It Works
-
-This plugin runs inside your <DisplayName> tab through the [OpenTabs](https://opentabs.dev) Chrome extension. It uses your existing browser session — no API tokens or OAuth apps required. All operations happen as you, with your permissions.
-
-<Optional: 1-2 sentences about anything unique to this plugin's auth or architecture — e.g., "Enterprise Grid workspaces store both an organization-level token and workspace-level tokens. This plugin automatically selects the correct token for each API call.">
-
-## License
-
-MIT
+```bash
+opentabs-plugin readme
 ```
 
-**Rules:**
-- **Every tool must appear in the table.** The table is generated from the implemented tools — do not list planned or removed tools.
-- **Group tools by their `group` field** from `defineTool`. Use the group name as the section heading with the count in parentheses.
-- **Classify each tool as Read or Write.** Read tools fetch data without side effects (list, get, search). Write tools mutate state (create, update, delete, send, archive, pin, star, react, invite, kick, join, leave, upload).
-- **Use the `summary` field** from `defineTool` as the Description column — it's already a concise one-liner.
+This reads `dist/tools.json` and `package.json` to auto-generate the standard README sections: plugin title and description, Install (`opentabs plugin install` + `npm install -g`), Setup (domain from urlPatterns, homepage link), Tools (grouped by `group` field, classified as Read/Write by name prefix, using `summary` field), How It Works, and License.
+
+**Custom sections:** After running the command, append any plugin-specific sections that cannot be auto-generated — ordering flows, authentication quirks, known limitations, or multi-account notes. These sections must be re-added manually each time you regenerate the README.
+
+**Keeping the README in sync:** Whenever tools are added, removed, or modified, re-run `opentabs-plugin readme` to keep the README current. Use `opentabs-plugin readme --dry-run` to preview the output without writing, and `opentabs-plugin readme --check` to verify the README is up to date.
+
+**Rules for custom sections:**
 - **No developer content.** No project structure, no code examples, no authentication patterns, no "Adding Tools" section, no shared schemas. Users don't need to know how the plugin is built.
 - **No personal information.** No organization names, workspace names, or account details. Use generic examples.
 
