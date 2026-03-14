@@ -31,6 +31,7 @@ import {
   searchNpmPlugins,
   updatePlugin,
 } from './plugin-management.js';
+import { resolvePluginSettings } from './settings-resolver.js';
 import type { ExtensionConnection, RegisteredPlugin, ServerState, TabMapping } from './state.js';
 import {
   DISPATCH_TIMEOUT_MS,
@@ -50,6 +51,7 @@ const VALID_PERMISSIONS = new Set<string>(['off', 'ask', 'auto']);
 interface McpCallbacks {
   onToolConfigChanged: () => void;
   onPluginPermissionsPersist: () => void;
+  onPluginSettingsPersist: () => void;
   onPluginLog: (entry: PluginLogEntry) => void;
   onReload: () => Promise<{ plugins: number; durationMs: number }>;
   /** Send a JSON-RPC request to the extension and return the response (with timeout). */
@@ -350,12 +352,17 @@ const buildConfigStatePayload = (state: ServerState): ConfigStateResult => {
     .map(p => {
       const tabInfo = mergedTabs.get(p.name);
       const update = p.npmPackageName ? outdatedByPkg.get(p.npmPackageName) : undefined;
+      const userSettings = state.pluginSettings[p.name];
+      const { resolvedValues } = resolvePluginSettings(p.name, p.urlPatterns, p.homepage, p.configSchema, userSettings);
+      const hasResolvedSettings = Object.keys(resolvedValues).length > 0;
       return {
         ...serializePluginForExtension(state, p),
         source: p.source,
         tabState: tabInfo?.state ?? 'closed',
         ...(p.sdkVersion ? { sdkVersion: p.sdkVersion } : {}),
         ...(update ? { update } : {}),
+        ...(p.configSchema ? { configSchema: p.configSchema } : {}),
+        ...(hasResolvedSettings ? { resolvedSettings: resolvedValues } : {}),
       };
     });
 
@@ -580,6 +587,112 @@ const handleConfigSetSkipPermissions = (
   });
 
   callbacks.onToolConfigChanged();
+
+  sendToExtension(state, {
+    jsonrpc: '2.0',
+    result: { ok: true },
+    id,
+  });
+};
+
+/**
+ * Handle config.setPluginSettings: save user-provided settings for a plugin.
+ * Validates values against the plugin's configSchema (type checking, required fields).
+ * After persisting, triggers a reload so URL patterns are re-derived from url-type settings.
+ */
+const handleConfigSetPluginSettings = async (
+  state: ServerState,
+  params: Record<string, unknown> | undefined,
+  id: string | number,
+  callbacks: McpCallbacks,
+): Promise<void> => {
+  if (!params) {
+    sendJsonRpcError(state, id, -32602, 'Missing params');
+    return;
+  }
+
+  const pluginName = params.plugin;
+  const settings = params.settings;
+
+  if (typeof pluginName !== 'string' || pluginName.length === 0) {
+    sendJsonRpcError(state, id, -32602, 'Invalid params: plugin must be a non-empty string');
+    return;
+  }
+
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    sendJsonRpcError(state, id, -32602, 'Invalid params: settings must be an object');
+    return;
+  }
+
+  const settingsObj = settings as Record<string, unknown>;
+
+  // Validate settings against the plugin's configSchema if the plugin is loaded
+  const plugin = state.registry.plugins.get(pluginName);
+  if (plugin?.configSchema) {
+    const schema = plugin.configSchema;
+    const errors: string[] = [];
+
+    for (const [key, definition] of Object.entries(schema)) {
+      const value = settingsObj[key];
+
+      // Check required fields
+      if (definition.required && (value === undefined || value === null || value === '')) {
+        errors.push(`Setting "${key}" is required`);
+        continue;
+      }
+
+      if (value === undefined || value === null) continue;
+
+      // Type-check against schema
+      switch (definition.type) {
+        case 'url':
+        case 'string':
+          if (typeof value !== 'string') {
+            errors.push(`Setting "${key}" must be a string`);
+          }
+          break;
+        case 'number':
+          if (typeof value !== 'number') {
+            errors.push(`Setting "${key}" must be a number`);
+          }
+          break;
+        case 'boolean':
+          if (typeof value !== 'boolean') {
+            errors.push(`Setting "${key}" must be a boolean`);
+          }
+          break;
+        case 'select':
+          if (typeof value !== 'string') {
+            errors.push(`Setting "${key}" must be a string`);
+          } else if (definition.options && !definition.options.includes(value)) {
+            errors.push(`Setting "${key}" must be one of: ${definition.options.join(', ')}`);
+          }
+          break;
+      }
+    }
+
+    if (errors.length > 0) {
+      sendJsonRpcError(state, id, -32602, `Settings validation failed: ${errors.join('; ')}`);
+      return;
+    }
+  }
+
+  // Store settings in state (lenient — store even if plugin isn't loaded yet)
+  state.pluginSettings[pluginName] = settingsObj;
+  callbacks.onPluginSettingsPersist();
+
+  // Reload to re-derive URL patterns from url-type settings
+  try {
+    await callbacks.onReload();
+  } catch (err) {
+    log.warn('Reload after settings change failed:', err);
+  }
+
+  sendToExtension(state, {
+    jsonrpc: '2.0',
+    method: 'plugins.changed',
+    params: { ...buildConfigStatePayload(state) },
+  });
 
   sendToExtension(state, {
     jsonrpc: '2.0',
@@ -923,6 +1036,7 @@ export {
   handleConfigSetToolPermission,
   handleConfigSetPluginPermission,
   handleConfigSetSkipPermissions,
+  handleConfigSetPluginSettings,
   handlePluginSearch,
   handlePluginInstall,
   handlePluginUpdateFromRegistry,

@@ -3,6 +3,7 @@ import type { McpCallbacks } from './extension-handlers.js';
 import {
   handleConfigGetState,
   handleConfigSetPluginPermission,
+  handleConfigSetPluginSettings,
   handleConfigSetToolPermission,
   handleConfirmationResponse,
   handlePluginLog,
@@ -51,6 +52,7 @@ const createPendingConfirmation = (
 const noopCallbacks: McpCallbacks = {
   onToolConfigChanged: () => {},
   onPluginPermissionsPersist: () => {},
+  onPluginSettingsPersist: () => {},
   onPluginLog: () => {},
   onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
   queryExtension: () => Promise.resolve(undefined),
@@ -1704,5 +1706,217 @@ describe('multi-connection — handleTabStateChanged scopes per-connection', () 
     // Connection B's state untouched
     expect(connB.tabMapping.get('slack')?.state).toBe('ready');
     expect(connB.tabMapping.get('slack')?.tabs[0]?.tabId).toBe(20);
+  });
+});
+
+describe('handleConfigSetPluginSettings', () => {
+  const createMockWs = (): { ws: { send: (msg: string) => void; close: () => void }; messages: string[] } => {
+    const messages: string[] = [];
+    return { ws: { send: msg => messages.push(msg), close: () => {} }, messages };
+  };
+
+  const makePlugin = (name: string, configSchema?: Record<string, unknown>): RegisteredPlugin => ({
+    name,
+    version: '1.0.0',
+    displayName: name,
+    urlPatterns: ['https://example.com/*'],
+    excludePatterns: [],
+    iife: '',
+    tools: [
+      {
+        name: 'tool_a',
+        displayName: 'Tool A',
+        description: 'A tool',
+        icon: 'activity',
+        input_schema: {},
+        output_schema: {},
+      },
+    ],
+    source: 'local',
+    ...(configSchema ? { configSchema: configSchema as RegisteredPlugin['configSchema'] } : {}),
+  });
+
+  test('stores settings and broadcasts plugins.changed', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+    const plugin = makePlugin('my-plugin');
+    state.registry = {
+      ...state.registry,
+      plugins: new Map([['my-plugin', plugin]]) as ReadonlyMap<string, RegisteredPlugin>,
+    };
+
+    let settingsPersisted = false;
+    const callbacks: McpCallbacks = {
+      ...noopCallbacks,
+      onPluginSettingsPersist: () => {
+        settingsPersisted = true;
+      },
+    };
+
+    await handleConfigSetPluginSettings(
+      state,
+      { plugin: 'my-plugin', settings: { url: 'https://example.com' } },
+      'req-1',
+      callbacks,
+    );
+
+    expect(state.pluginSettings['my-plugin']).toEqual({ url: 'https://example.com' });
+    expect(settingsPersisted).toBe(true);
+    // plugins.changed notification + ok response
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+    const notification = JSON.parse(messages[0] as string) as { method: string };
+    expect(notification.method).toBe('plugins.changed');
+    const response = JSON.parse(messages[messages.length - 1] as string) as { result: { ok: boolean }; id: string };
+    expect(response.result).toEqual({ ok: true });
+    expect(response.id).toBe('req-1');
+  });
+
+  test('validates required fields against configSchema', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+    const plugin = makePlugin('my-plugin', {
+      instanceUrl: { type: 'url', label: 'Instance URL', required: true },
+    });
+    state.registry = {
+      ...state.registry,
+      plugins: new Map([['my-plugin', plugin]]) as ReadonlyMap<string, RegisteredPlugin>,
+    };
+
+    await handleConfigSetPluginSettings(state, { plugin: 'my-plugin', settings: {} }, 'req-2', noopCallbacks);
+
+    expect(messages).toHaveLength(1);
+    const error = JSON.parse(messages[0] as string) as { error: { message: string } };
+    expect(error.error.message).toContain('required');
+  });
+
+  test('validates type mismatch against configSchema', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+    const plugin = makePlugin('my-plugin', {
+      count: { type: 'number', label: 'Count' },
+    });
+    state.registry = {
+      ...state.registry,
+      plugins: new Map([['my-plugin', plugin]]) as ReadonlyMap<string, RegisteredPlugin>,
+    };
+
+    await handleConfigSetPluginSettings(
+      state,
+      { plugin: 'my-plugin', settings: { count: 'not-a-number' } },
+      'req-3',
+      noopCallbacks,
+    );
+
+    expect(messages).toHaveLength(1);
+    const error = JSON.parse(messages[0] as string) as { error: { message: string } };
+    expect(error.error.message).toContain('must be a number');
+  });
+
+  test('validates select options against configSchema', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+    const plugin = makePlugin('my-plugin', {
+      theme: { type: 'select', label: 'Theme', options: ['light', 'dark'] },
+    });
+    state.registry = {
+      ...state.registry,
+      plugins: new Map([['my-plugin', plugin]]) as ReadonlyMap<string, RegisteredPlugin>,
+    };
+
+    await handleConfigSetPluginSettings(
+      state,
+      { plugin: 'my-plugin', settings: { theme: 'neon' } },
+      'req-4',
+      noopCallbacks,
+    );
+
+    expect(messages).toHaveLength(1);
+    const error = JSON.parse(messages[0] as string) as { error: { message: string } };
+    expect(error.error.message).toContain('must be one of');
+  });
+
+  test('rejects missing params', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+
+    await handleConfigSetPluginSettings(state, undefined, 'req-5', noopCallbacks);
+
+    expect(messages).toHaveLength(1);
+    const error = JSON.parse(messages[0] as string) as { error: { message: string } };
+    expect(error.error.message).toBe('Missing params');
+  });
+
+  test('rejects non-object settings', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+
+    await handleConfigSetPluginSettings(
+      state,
+      { plugin: 'my-plugin', settings: 'not-an-object' },
+      'req-6',
+      noopCallbacks,
+    );
+
+    expect(messages).toHaveLength(1);
+    const error = JSON.parse(messages[0] as string) as { error: { message: string } };
+    expect(error.error.message).toContain('settings must be an object');
+  });
+
+  test('stores settings for unloaded plugins (lenient mode)', async () => {
+    const state = createState();
+    const { ws, messages } = createMockWs();
+    state.extensionConnections.set('test-conn', {
+      ws,
+      connectionId: 'test-conn',
+      tabMapping: new Map(),
+      activeNetworkCaptures: new Set(),
+    });
+
+    await handleConfigSetPluginSettings(
+      state,
+      { plugin: 'not-loaded', settings: { key: 'value' } },
+      'req-7',
+      noopCallbacks,
+    );
+
+    expect(state.pluginSettings['not-loaded']).toEqual({ key: 'value' });
+    const response = JSON.parse(messages[messages.length - 1] as string) as { result: { ok: boolean } };
+    expect(response.result).toEqual({ ok: true });
   });
 });

@@ -17,7 +17,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { WsHandle } from '@opentabs-dev/shared';
 import { toErrorMessage } from '@opentabs-dev/shared';
-import { savePluginPermissions } from './config.js';
+import { savePluginPermissions, savePluginSettings } from './config.js';
 import { isDev } from './dev-mode.js';
 import { buildConfigStatePayload, sendToExtension } from './extension-handlers.js';
 import type { McpCallbacks } from './extension-protocol.js';
@@ -63,6 +63,11 @@ const createMcpCallbacks = (
   },
   onPluginPermissionsPersist: () => {
     savePluginPermissions(state, { ...state.pluginPermissions }).catch(() => {
+      // Best-effort persistence — errors are non-fatal for in-memory state
+    });
+  },
+  onPluginSettingsPersist: () => {
+    savePluginSettings(state, { ...state.pluginSettings }).catch(() => {
       // Best-effort persistence — errors are non-fatal for in-memory state
     });
   },
@@ -430,6 +435,45 @@ const handleExtensionReload = (req: Request, state: ServerState): Response => {
   return Response.json({ ok: true, message: 'Reload signal sent to extension' });
 };
 
+/** Plugin settings endpoint (POST /plugin-settings) — used by the CLI */
+const handlePluginSettings = async (
+  req: Request,
+  state: ServerState,
+  sessionServers: McpServerInstance[],
+  transports: Map<string, WebStandardStreamableHTTPServerTransport>,
+): Promise<Response> => {
+  const authError = checkBearerAuth(req, state.wsSecret);
+  if (authError) return authError;
+  if (!checkEndpointRateLimit(state, '/plugin-settings', 10)) {
+    return new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '60' } });
+  }
+
+  const body = (await req.json().catch(() => null)) as { plugin?: string; settings?: Record<string, unknown> } | null;
+  if (!body || typeof body.plugin !== 'string' || body.plugin.length === 0) {
+    return Response.json({ ok: false, error: 'Missing or invalid "plugin" field' }, { status: 400 });
+  }
+  if (!body.settings || typeof body.settings !== 'object' || Array.isArray(body.settings)) {
+    return Response.json({ ok: false, error: 'Missing or invalid "settings" field' }, { status: 400 });
+  }
+
+  state.pluginSettings[body.plugin] = body.settings;
+  savePluginSettings(state, { ...state.pluginSettings }).catch(() => {});
+
+  try {
+    await performConfigReload(state, sessionServers, transports);
+  } catch (err) {
+    log.warn('Reload after settings change failed:', err);
+  }
+
+  sendToExtension(state, {
+    jsonrpc: '2.0',
+    method: 'plugins.changed',
+    params: { ...buildConfigStatePayload(state) },
+  });
+
+  return Response.json({ ok: true });
+};
+
 /** MCP Streamable HTTP transport (/mcp — POST/GET/DELETE) */
 const handleMcp = async (
   req: Request,
@@ -639,6 +683,8 @@ const createHandleFetch =
     if (url.pathname === '/reload' && req.method === 'POST')
       return handleReload(req, state, sessionServers, transports);
     if (url.pathname === '/extension/reload' && req.method === 'POST') return handleExtensionReload(req, state);
+    if (url.pathname === '/plugin-settings' && req.method === 'POST')
+      return handlePluginSettings(req, state, sessionServers, transports);
     if (url.pathname === '/__test/set-outdated' && req.method === 'POST') return handleTestSetOutdated(req, state);
     if (url.pathname === '/__test/simulate-update' && req.method === 'POST')
       return handleTestSimulateUpdate(req, state);

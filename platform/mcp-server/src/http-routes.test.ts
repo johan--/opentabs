@@ -598,6 +598,55 @@ describe('POST /reload endpoint', () => {
   });
 });
 
+describe('POST /plugin-settings endpoint', () => {
+  test('returns 401 without bearer auth', async () => {
+    const { handlers, state } = createTestHandlers();
+    state.wsSecret = 'test-secret';
+
+    const req = new Request('http://localhost:9876/plugin-settings', {
+      method: 'POST',
+      headers: { Host: 'localhost:9876', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plugin: 'test', settings: { key: 'val' } }),
+    });
+    const res = await handlers.fetch(req, mockServer);
+
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(401);
+  });
+
+  test('returns 400 when plugin field is missing', async () => {
+    const { handlers } = createTestHandlers();
+
+    const req = new Request('http://localhost:9876/plugin-settings', {
+      method: 'POST',
+      headers: { Host: 'localhost:9876', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { key: 'val' } }),
+    });
+    const res = await handlers.fetch(req, mockServer);
+
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(400);
+    const body = (await (res as Response).json()) as { error: string };
+    expect(body.error).toContain('plugin');
+  });
+
+  test('returns 400 when settings field is missing', async () => {
+    const { handlers } = createTestHandlers();
+
+    const req = new Request('http://localhost:9876/plugin-settings', {
+      method: 'POST',
+      headers: { Host: 'localhost:9876', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plugin: 'test' }),
+    });
+    const res = await handlers.fetch(req, mockServer);
+
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(400);
+    const body = (await (res as Response).json()) as { error: string };
+    expect(body.error).toContain('settings');
+  });
+});
+
 /** Create a simple mock WsHandle for WebSocket lifecycle tests */
 const createMockWsHandle = (): WsHandle & { sent: string[]; closed: boolean } => ({
   sent: [] as string[],

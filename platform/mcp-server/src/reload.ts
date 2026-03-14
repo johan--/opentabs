@@ -264,6 +264,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     // This ensures an atomic swap: if any step throws, state retains its previous values.
     const newRegistry = registry;
     const newPluginPermissions = { ...config.permissions };
+    const newPluginSettings = { ...config.settings };
     const newPluginPaths = [...config.localPlugins];
     const newDiscoveryErrors = errors;
     // Preserve the runtime skipPermissions value — it may have been toggled
@@ -292,6 +293,7 @@ const reloadCore = async ({ state, sessionServers, transports }: ReloadCoreArgs)
     // All preparation succeeded — swap all state fields atomically.
     state.registry = newRegistry;
     state.pluginPermissions = newPluginPermissions;
+    state.pluginSettings = newPluginSettings;
     state.pluginPaths = newPluginPaths;
     state.discoveryErrors = newDiscoveryErrors;
     state.skipPermissions = newSkipPermissions;

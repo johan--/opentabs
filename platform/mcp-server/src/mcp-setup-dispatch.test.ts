@@ -25,6 +25,7 @@ import { createState } from './state.js';
 const noopCallbacks = {
   onToolConfigChanged: () => {},
   onPluginPermissionsPersist: () => {},
+  onPluginSettingsPersist: () => {},
   onPluginLog: () => {},
   onReload: () => Promise.resolve({ plugins: 0, durationMs: 0 }),
   queryExtension: () => Promise.resolve(undefined),

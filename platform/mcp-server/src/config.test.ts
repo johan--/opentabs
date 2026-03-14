@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import type { OpentabsConfig } from './config.js';
-import { loadConfig, saveConfig, savePluginPermissions, writeAuthFile } from './config.js';
+import { loadConfig, saveConfig, savePluginPermissions, savePluginSettings, writeAuthFile } from './config.js';
 
 // Override OPENTABS_CONFIG_DIR for test isolation.
 // Config functions read this env var lazily on each call.
@@ -256,6 +256,53 @@ describe('savePluginPermissions round-trip', () => {
       sqlpad: { instanceUrl: 'https://sqlpad.example.com' },
     });
     expect(loaded.permissions).toEqual({ slack: { permission: 'auto' } });
+  });
+});
+
+describe('savePluginSettings round-trip', () => {
+  beforeEach(async () => {
+    process.env.OPENTABS_CONFIG_DIR = TEST_BASE_DIR;
+    await removeConfig();
+  });
+
+  test('persists plugin settings without overwriting localPlugins or permissions', async () => {
+    const initial: OpentabsConfig = {
+      localPlugins: ['/my/plugin'],
+      permissions: { slack: { permission: 'auto' } },
+      settings: {},
+    };
+    await saveConfigWrapped(initial);
+
+    const state = { configWriteMutex: Promise.resolve() };
+    await savePluginSettings(state, {
+      sqlpad: { instanceUrl: 'https://sqlpad.example.com' },
+    });
+
+    const loaded = await loadConfig();
+    expect(loaded.localPlugins).toEqual(['/my/plugin']);
+    expect(loaded.permissions).toEqual({ slack: { permission: 'auto' } });
+    expect(loaded.settings).toEqual({
+      sqlpad: { instanceUrl: 'https://sqlpad.example.com' },
+    });
+  });
+
+  test('overwrites previous settings completely', async () => {
+    const initial: OpentabsConfig = {
+      localPlugins: [],
+      permissions: {},
+      settings: { old_plugin: { key: 'old-value' } },
+    };
+    await saveConfigWrapped(initial);
+
+    const state = { configWriteMutex: Promise.resolve() };
+    await savePluginSettings(state, {
+      new_plugin: { url: 'https://new.example.com' },
+    });
+
+    const loaded = await loadConfig();
+    expect(loaded.settings).toEqual({
+      new_plugin: { url: 'https://new.example.com' },
+    });
   });
 });
 

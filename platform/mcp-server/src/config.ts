@@ -281,6 +281,44 @@ const savePluginPermissions = async (
 };
 
 /**
+ * Persist plugin settings to config.json.
+ *
+ * Reads the current config from disk, updates only the `settings` field,
+ * and writes it back atomically. This prevents stale in-memory plugin
+ * paths or permissions from overwriting externally-added values.
+ *
+ * The read-modify-write is serialized via state.configWriteMutex.
+ */
+const savePluginSettings = async (
+  state: { configWriteMutex: Promise<void> },
+  settings: Record<string, Record<string, unknown>>,
+): Promise<void> => {
+  const configDir = getConfigDir();
+  const configPath = getConfigPath();
+  const prev = state.configWriteMutex;
+  const writePromise = (async () => {
+    await prev;
+    await mkdir(configDir, { recursive: true, mode: 0o700 });
+
+    const record = await readConfigWithRetry(configPath, 2, 50);
+    if (!record) {
+      log.warn('Cannot persist plugin settings — config file unreadable');
+      return;
+    }
+
+    const current = parseConfigRecord(record);
+    const updated: OpentabsConfig = {
+      localPlugins: current.localPlugins,
+      permissions: current.permissions,
+      settings,
+    };
+    await atomicWriteConfig(configPath, `${JSON.stringify(updated, null, 2)}\n`);
+  })();
+  state.configWriteMutex = writePromise.catch(() => {});
+  await writePromise;
+};
+
+/**
  * Write auth.json to the managed extension directory so the Chrome extension
  * can bootstrap the shared secret without an unauthenticated HTTP request.
  * auth.json contains only the secret — port configuration lives in chrome.storage.local.
@@ -334,6 +372,7 @@ export {
   loadSecret,
   saveConfig,
   savePluginPermissions,
+  savePluginSettings,
   writeAuthFile,
   generateSecret,
   getConfigDir,

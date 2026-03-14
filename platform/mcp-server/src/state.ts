@@ -313,6 +313,8 @@ export interface ServerState {
 
   /** Per-plugin permission configuration from config.json */
   pluginPermissions: Record<string, PluginPermissionConfig>;
+  /** Per-plugin user settings: plugin name → { settingKey: value } */
+  pluginSettings: Record<string, Record<string, unknown>>;
   /** Pending confirmation requests awaiting human approval in the side panel */
   pendingConfirmations: Map<string, PendingConfirmation>;
   /** Whether an extension reload is pending (set when extension files are updated but extension is not connected) */
@@ -328,7 +330,7 @@ export interface ServerState {
 }
 
 /** Increment when changing the type of an existing ServerState field */
-export const STATE_SCHEMA_VERSION = 6;
+export const STATE_SCHEMA_VERSION = 7;
 
 /** Frozen empty registry for initializing ServerState */
 export const EMPTY_REGISTRY: PluginRegistry = Object.freeze({
@@ -373,6 +375,7 @@ export const createState = (): ServerState => ({
   skipPermissions: process.env.OPENTABS_DANGEROUSLY_SKIP_PERMISSIONS === '1',
 
   pluginPermissions: {},
+  pluginSettings: {},
   pendingConfirmations: new Map(),
   pendingExtensionReload: false,
   endpointCallTimestamps: new Map(),
