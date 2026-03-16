@@ -67,7 +67,7 @@ const steps = [
     step: 3,
     title: 'It runs on the real web app',
     description:
-      'The plugin adapter executes the action in the page using your logged-in session. Results flow back to the agent.',
+      'The plugin calls the same internal API the frontend calls, using your logged-in session. Results flow back to the agent.',
   },
 ];
 
@@ -76,7 +76,7 @@ const securityPoints = [
     icon: LockIcon,
     title: 'Everything starts off',
     description:
-      "Every plugin's tools are disabled by default — even the ones I ship. What if my account gets compromised? You shouldn't have to trust me blindly either.",
+      "Every plugin's tools are disabled by default — even the ones I ship. You shouldn't have to trust me blindly.",
   },
   {
     icon: EyeIcon,
@@ -92,7 +92,7 @@ const securityPoints = [
   {
     icon: FileTextIcon,
     title: 'Full audit log',
-    description: 'Every tool call is logged — what ran, when, whether it succeeded. On disk and in memory.',
+    description: 'Every tool call is logged — what ran, when, whether it succeeded.',
   },
 ];
 
@@ -107,21 +107,17 @@ export default function Home() {
             <br />
             is an API
           </Text>
-          <p className="mx-auto mb-4 max-w-xl font-bold text-foreground text-base">
-            This is not another Playwright wrapper.
-          </p>
           <p className="mx-auto mb-10 max-w-xl text-muted-foreground text-sm leading-relaxed">
-            Chrome&apos;s{' '}
+            Web apps already have internal APIs — the same ones their frontends use. OpenTabs reverse-engineered them and
+            exposed them as{' '}
             <Link
-              href="https://developer.chrome.com/blog/webmcp-epp"
+              href="https://modelcontextprotocol.io/"
               target="_blank"
               className="underline underline-offset-4">
-              WebMCP
+              MCP tools
             </Link>{' '}
-            wants websites to expose structured tools to AI agents, but that requires every service to opt in — and it
-            will take years. OpenTabs doesn&apos;t wait. We reverse-engineered the internal APIs that web apps already
-            use and exposed them as MCP tools today. Your AI calls the same backend the frontend calls — through your
-            browser, using your existing session. No screenshots. No DOM. No guessing.
+            today. Your AI calls the same backend the frontend calls — through your browser, using your existing session.
+            No screenshots. No DOM. No guessing.
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link href="/docs/quick-start" passHref>
@@ -233,37 +229,37 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Two Ways to Get Plugins ───────────────────────── */}
+      {/* ── Build or Install ──────────────────────────────── */}
       <section className="container mx-auto max-w-6xl border-foreground border-t-2 px-4 py-20 lg:px-0">
         <Text as="h2" className="mb-12 text-3xl">
-          Two ways to get plugins
+          Get plugins
         </Text>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Contribute */}
+          {/* Build */}
           <div className="border-4 border-foreground p-8">
             <div className="mb-4 flex h-12 w-12 items-center justify-center border-2 border-foreground bg-primary">
               <SparklesIcon size={24} />
             </div>
             <Text as="h3" className="mb-3 text-xl">
-              Contribute a plugin
+              Point your AI at any website
             </Text>
             <p className="mb-4 text-muted-foreground text-sm leading-relaxed">
-              Point your AI at any website. It analyzes the page, discovers the APIs, scaffolds a plugin, writes the
-              tools, and registers it. Publish it and anyone can install it — the knowledge accumulates, and every
-              plugin contributed makes OpenTabs more useful for everyone.
-            </p>
-            <p className="mb-4 text-muted-foreground text-sm leading-relaxed">
-              Most of the plugins in this repo were built by AI in minutes. The MCP server ships with site analysis
-              tools, the SDK handles the boilerplate, and a self-improving skill teaches AI agents the entire process.
-              Every time an agent builds a plugin, it writes what it learned back into the skill — so the system gets
-              better with every plugin built.
+              It analyzes the page, discovers the APIs, scaffolds the code, and registers the plugin. Most of the
+              plugins in this repo were built by AI in minutes.
             </p>
             <p className="mb-6 text-muted-foreground text-sm leading-relaxed">
-              For internal tools or sensitive workflows, you can keep plugins local — they work the same way, they just
-              stay on your machine.
+              A{' '}
+              <Link
+                href={`${GITHUB_URL}/tree/main/.claude/skills/build-plugin`}
+                target="_blank"
+                className="underline underline-offset-4">
+                self-improving skill
+              </Link>{' '}
+              teaches AI agents the process — and gets better with every plugin built. Publish yours or keep it local
+              for internal tools.
             </p>
             <Link href="/docs/guides/plugin-development" className="font-medium text-sm underline underline-offset-4">
-              Learn more
+              Plugin development guide
             </Link>
           </div>
 
@@ -273,11 +269,10 @@ export default function Home() {
               <PackageIcon size={24} />
             </div>
             <Text as="h3" className="mb-3 text-xl">
-              Install community plugins
+              Install from npm
             </Text>
             <p className="mb-6 text-muted-foreground text-sm leading-relaxed">
-              100+ plugins ready to go — built and shared by the community. Install globally and they&apos;re
-              auto-discovered by the server.
+              100+ plugins ready to go. Install globally and the server picks them up automatically.
             </p>
             <div className="mb-6 border-2 border-foreground bg-card p-3 font-mono text-sm">
               <span className="text-muted-foreground">$</span> opentabs plugin install slack
@@ -293,13 +288,11 @@ export default function Home() {
       <section className="container mx-auto max-w-6xl border-foreground border-t-2 px-4 py-20 lg:px-0">
         <div className="mb-12 max-w-xl">
           <Text as="h2" className="mb-4 text-3xl">
-            Permissions and defaults
+            Safe by default
           </Text>
           <p className="text-muted-foreground">
-            I know you&apos;re the kind of person who sets{' '}
-            <code className="bg-inline-code-bg px-1.5 py-0.5 text-sm">DANGEROUSLY_SKIP_PERMISSIONS=1</code> the moment
-            something asks for confirmation. I respect that. But your browser sessions are precious, so I wanted the
-            defaults to be thoughtful — even for the fearless.
+            Your browser sessions are precious. Everything is off until you turn it on — and you control exactly how much
+            trust to give each plugin.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -316,7 +309,7 @@ export default function Home() {
           ))}
         </div>
         <p className="mt-8 text-muted-foreground text-sm">
-          Everything runs locally. No cloud. No telemetry. The code is open source —{' '}
+          Runs locally. No cloud. No telemetry. The code is open source —{' '}
           <Link href={GITHUB_URL} target="_blank" className="underline underline-offset-4">
             read it
           </Link>
@@ -327,34 +320,19 @@ export default function Home() {
       {/* ── FAQ ──────────────────────────────────────────── */}
       <section className="container mx-auto max-w-6xl border-foreground border-t-2 px-4 py-20 lg:px-0">
         <Text as="h2" className="mb-12 text-3xl">
-          Questions you&apos;re probably thinking
+          FAQ
         </Text>
         <div className="space-y-10">
-          <div>
-            <p className="mb-3 font-bold text-foreground">Why not just use official MCP servers?</p>
-            <p className="max-w-3xl text-muted-foreground text-sm leading-relaxed">
-              If an official MCP server works well for you, use it. I started building OpenTabs for the apps that
-              don&apos;t have MCP support — many had none when I began, and some probably never will. Along the way, I
-              also built plugins for apps that do have official servers, partly for learning, partly because I noticed a
-              few things: setting up separate API keys or OAuth flows for each service adds up when you use a dozen of
-              them. Public APIs sometimes have stricter rate limits or a smaller feature set than the web app. And the
-              web app is always the superset — internal APIs, real-time data, features that never make it to the public
-              API. I see OpenTabs and official servers as complementary — use whatever fits, or mix and match.
-            </p>
-          </div>
           <div>
             <p className="mb-3 font-bold text-foreground">
               How is this different from browser automation (Playwright, Stagehand, Browser-Use)?
             </p>
             <p className="max-w-3xl text-muted-foreground text-sm leading-relaxed">
-              Those are great tools. Both approaches have real strengths, and I want to be honest about the tradeoffs.
-              Browser automation simulates what a human would do — click, type, read the screen. It works on any site
-              out of the box, and that&apos;s a real advantage. The cost is speed, tokens, and the knowledge stays
-              trapped in that one session. If a popup appears or the layout changes, the AI figures it out again from
-              scratch. OpenTabs plugins call the web app&apos;s internal APIs directly. A send-message tool isn&apos;t
-              clicking a text box — it&apos;s making the same API call the web app&apos;s frontend makes. Fast, cheap on
-              tokens, and the knowledge is packaged into a reusable plugin. The downside is you need a plugin per site,
-              and internal APIs can change. If a plugin breaks, open a PR — I want to keep everything working.
+              Browser automation simulates what a human would do — click, type, read the screen. Works on any site out of
+              the box, but the cost is speed, tokens, and the knowledge stays trapped in that one session. OpenTabs
+              plugins call the web app&apos;s internal APIs directly. A send-message tool isn&apos;t clicking a text box —
+              it&apos;s making the same API call the frontend makes. Fast, cheap on tokens, and the knowledge is packaged
+              into a reusable plugin. The tradeoff is you need a plugin per site, and internal APIs can change.
             </p>
           </div>
           <div>
@@ -364,14 +342,20 @@ export default function Home() {
                 href="https://developer.chrome.com/blog/webmcp-epp"
                 target="_blank"
                 className="underline underline-offset-4">
-                Chrome&apos;s WebMCP
+                WebMCP
               </Link>{' '}
-              is the reactive version of the same idea — websites opt in and expose structured tools to AI agents
-              natively. I think it&apos;s the right long-term direction. But adoption depends on every web service
-              choosing to participate, deciding which features to expose, and rolling it out. That takes years, and even
-              then you&apos;re limited to what each service decides to surface. OpenTabs is the proactive version.
-              Instead of waiting, we reverse-engineer the APIs and expose them today. If WebMCP becomes widespread,
-              OpenTabs plugins can evolve to use it — but you don&apos;t have to wait.
+              is the right long-term direction — websites opt in and expose tools to AI agents natively. But adoption
+              depends on every service choosing to participate, and that takes years. OpenTabs is the proactive version:
+              reverse-engineer the APIs and expose them today. If WebMCP becomes widespread, plugins can evolve to use it.
+            </p>
+          </div>
+          <div>
+            <p className="mb-3 font-bold text-foreground">Why not just use official MCP servers?</p>
+            <p className="max-w-3xl text-muted-foreground text-sm leading-relaxed">
+              If one works well for you, use it. OpenTabs started for apps that don&apos;t have MCP support. Along the
+              way, I noticed: setting up separate API keys for each service adds up, public APIs sometimes have stricter
+              rate limits, and the web app is always the superset. I see OpenTabs and official servers as complementary —
+              mix and match.
             </p>
           </div>
         </div>

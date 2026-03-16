@@ -2,9 +2,7 @@
 
 **This is not another Playwright wrapper.**
 
-Every web app has internal APIs — the same endpoints its own frontend calls. Chrome's [WebMCP](https://developer.chrome.com/blog/webmcp-epp) wants websites to expose these to AI agents, but that requires every service to opt in, and it will take years. OpenTabs doesn't wait. We reverse-engineered those APIs and exposed them as [MCP tools](https://modelcontextprotocol.io/) today. Your AI calls the same backend the web app's own frontend calls — through your browser, using your existing session. No screenshots. No DOM scraping. No pixel-guessing.
-
-Here's Claude checking a Robinhood portfolio, ordering from Panda Express, and sending a Discord message — all through the browser, in one shot:
+Every web app has internal APIs — the same endpoints its own frontend calls. OpenTabs reverse-engineered them and exposed them as [MCP tools](https://modelcontextprotocol.io/) today. Your AI calls the same backend the web app calls — through your browser, using your existing session. No screenshots. No DOM scraping. No pixel-guessing.
 
 <p align="center">
   <img src="assets/demo-hero.gif" alt="Demo: AI checks stocks, orders food, and sends a Discord message — all through the browser" />
@@ -12,20 +10,18 @@ Here's Claude checking a Robinhood portfolio, ordering from Panda Express, and s
 
 [Watch the full video on YouTube](https://www.youtube.com/watch?v=PBvUXDAGVM8)
 
-`discord_send_message` hits Discord's real backend — fast, deterministic, cheap on tokens, and the knowledge gets packaged into a reusable plugin anyone can install.
+`discord_send_message` hits Discord's real backend — fast, deterministic, cheap on tokens. The knowledge gets packaged into a reusable plugin anyone can install.
 
 ## How It Works
 
-Those internal APIs need to run inside your browser — that's where your sessions live. So OpenTabs is two pieces:
+OpenTabs is two pieces:
 
 1. **An MCP server** that your AI talks to
 2. **A Chrome extension** that bridges the gap to your open tabs
 
-When your AI calls a tool, the server routes it to the right tab, the plugin makes the API call using your session, and the result flows back. That's the whole loop.
+Your AI calls a tool → the server routes it to the right tab → the plugin makes the API call using your session → the result flows back. That's the whole loop.
 
-There are 100+ plugins covering ~2,000 tools across Slack, Discord, GitHub, Jira, Notion, Figma, AWS, Stripe, Robinhood, DoorDash, Airbnb, Netflix — and a bunch more. Check the [`plugins/`](plugins/) directory. I built every one of them with strict end-to-end testing as a must-pass requirement in the [build-plugin skill](.claude/skills/build-plugin/). The ones I use daily — Slack, GitHub, Discord, Todoist, Robinhood — I've personally verified and they work. For the rest (Tinder and OnlyFans, for example — Claude suggested I build those so this project would go viral), I relied fully on Claude to do the end-to-end testing. I'll be honest — I could use your help testing those. If something's broken, point your AI at it and open a PR. My AI will review what your AI wrote, and we'll merge it together. That's kind of the whole idea.
-
-There are also built-in browser tools (screenshots, clicking, typing, network capture, DOM inspection) that work on any tab without a plugin.
+100+ plugins covering ~2,000 tools across Slack, Discord, GitHub, Jira, Notion, Figma, AWS, Stripe, Robinhood, DoorDash, Airbnb, and [a lot more](plugins/). Plus built-in browser tools (screenshots, clicking, typing, network capture, DOM inspection) that work on any tab without a plugin.
 
 Works with [Claude Code](https://github.com/anthropics/claude-code), Cursor, Windsurf, [OpenCode](https://github.com/anomalyco/opencode), and any MCP client that supports Streamable HTTP.
 
@@ -52,7 +48,7 @@ Install a plugin:
 opentabs plugin install <plugin-name>
 ```
 
-That's it. Your AI agent can now talk to the web app. Five minutes, start to finish. You can also install plugins from the side panel:
+Five minutes, start to finish.
 
 <p align="center">
   <img src="assets/demo-quick-start-install-uninstall.gif" alt="Demo: Install a plugin and uninstall another — full plugin lifecycle driven by AI" />
@@ -60,28 +56,20 @@ That's it. Your AI agent can now talk to the web app. Five minutes, start to fin
 
 [Watch the full video on YouTube](https://youtu.be/MoBD7DhnEY0)
 
-## Contributing Plugins
+## Build a Plugin
 
-Now that you're set up, this is the part I'm most excited about.
+Point your AI at any website. It builds the plugin — analyzes the page, discovers the APIs, scaffolds the code, registers it. Most of the plugins in this repo were built by AI in minutes.
 
-Most of the plugins in this repo were built by AI in minutes. Point your AI agent at any website and it'll build a plugin — analyze the page, discover the APIs, scaffold the code, register it. The MCP server ships with site analysis tools, the SDK handles the boilerplate, and there's a [build-plugin skill](.claude/skills/build-plugin/) that walks AI agents through the whole process — API discovery, auth extraction, error handling, schema design, testing, and a growing collection of patterns learned from building every plugin in this repo.
+The MCP server ships with site analysis tools, the SDK handles the boilerplate, and a [self-improving skill](.claude/skills/build-plugin/) teaches AI agents the whole process. **Every time an AI builds a plugin, it writes what it learned back into the skill** — new auth patterns, API quirks, edge cases. The system gets better with every plugin built.
 
-Here's what makes it interesting: **every time an AI builds a plugin, it writes what it learned back into the skill.** New auth patterns, new API quirks, new edge cases — they all get folded in. The skill that teaches AI to build plugins gets better with every plugin built. Publish yours and anyone can `opentabs plugin install` it — the knowledge accumulates, and every plugin contributed makes OpenTabs more useful for everyone. I'd love your help. If your agent discovers something new, contribute it back.
+Publish yours and anyone can `opentabs plugin install` it. Keep it local for internal tools. The [Plugin Development guide](https://opentabs.dev/docs/guides/plugin-development) covers both paths.
 
-For internal tools, niche workflows, or anything involving sensitive data, you can keep plugins local — they work the same way, they just stay on your machine. The [Plugin Development guide](https://opentabs.dev/docs/guides/plugin-development) covers both paths.
-
-If you prefer to build by hand:
+Or build by hand:
 
 ```bash
 opentabs plugin create my-app --domain .example.com
 cd my-app && npm install
-```
-
-Write your tools, build, and the server picks them up:
-
-```bash
 npm run build   # compiles, registers, notifies the running server
-npm run dev     # watch mode with hot reload
 ```
 
 ## Security
@@ -95,7 +83,7 @@ I know you're the kind of person who sets `DANGEROUSLY_SKIP_PERMISSIONS=1` the m
 - **Runs locally.** No cloud. No telemetry. Everything lives in `~/.opentabs/` on your machine.
 - **Full audit log.** Every tool call is logged — what ran, when, whether it succeeded.
 
-I won't pretend this is bulletproof. Browser extensions that interact with your web apps are inherently a trust decision. But the defaults are safe, the controls are in your hands, and the code is open source — [read it](https://opentabs.dev/docs/reference/configuration). Here's what the permission flow looks like in practice:
+The defaults are safe, the controls are in your hands, and the code is open source — [read it](https://opentabs.dev/docs/reference/configuration).
 
 <p align="center">
   <img src="assets/demo-todoist-permissions.gif" alt="Demo: Permission dialog asking for approval before a tool call executes" />
@@ -105,39 +93,25 @@ I won't pretend this is bulletproof. Browser extensions that interact with your 
 
 ## FAQ
 
-**Why not just use official MCP servers?**
-
-If an official MCP server works well for you, use it. I started building OpenTabs for the apps that *don't* have MCP support — many had none when I began, and some probably never will. Along the way, I also built plugins for apps that do have official servers, partly for learning, partly because I noticed a few things: setting up separate API keys or OAuth flows for each service adds up when you use a dozen of them. Public APIs sometimes have stricter rate limits or a smaller feature set than the web app. And the web app is always the superset — internal APIs, real-time data, features that never make it to the public API.
-
-I see OpenTabs and official servers as complementary. Use whatever fits — or mix and match.
-
 **How is this different from browser automation (Playwright, Stagehand, Browser-Use)?**
 
-Those are great tools. Both approaches have real strengths, and I want to be honest about the tradeoffs.
+Browser automation simulates what a human would do — click, type, read the screen. Works on any site out of the box. The cost is speed, tokens, and the knowledge stays trapped in that one session.
 
-Browser automation simulates what a human would do — click, type, read the screen. It works on any site out of the box, and that's a real advantage. The cost is speed, tokens, and the knowledge stays trapped in that one session. If a popup appears or the layout changes, the AI figures it out again from scratch.
-
-OpenTabs plugins call the web app's internal APIs directly. A send-message tool isn't clicking a text box — it's making the same API call the web app's frontend makes. Fast, cheap on tokens, and the knowledge is packaged into a reusable plugin. The downside is you need a plugin per site, and internal APIs can change. Some web services are really good at obscuring them (Google Docs, I'm looking at you). If a plugin breaks, open a PR — I want to keep everything working.
+OpenTabs plugins call the web app's internal APIs directly. A send-message tool isn't clicking a text box — it's making the same API call the frontend makes. Fast, cheap on tokens, and the knowledge is packaged into a reusable plugin. The downside is you need a plugin per site, and internal APIs can change. If a plugin breaks, open a PR.
 
 **What about Chrome's WebMCP?**
 
-[Chrome's WebMCP](https://developer.chrome.com/blog/webmcp-epp) is the reactive version of the same idea — websites opt in and expose structured tools to AI agents natively. I think it's the right long-term direction. But adoption depends on every web service choosing to participate, deciding which features to expose, and rolling it out. That takes years, and even then you're limited to what each service decides to surface.
+[Chrome's WebMCP](https://developer.chrome.com/blog/webmcp-epp) is the right long-term direction — websites opt in and expose tools to AI agents natively. But adoption depends on every service choosing to participate, and that takes years.
 
-OpenTabs is the proactive version. Instead of waiting for websites to expose their APIs, we reverse-engineer them and expose them today. If WebMCP becomes widespread, OpenTabs plugins can evolve to use it — but you don't have to wait.
+OpenTabs is the proactive version. Instead of waiting, we reverse-engineer the APIs and expose them today. If WebMCP becomes widespread, plugins can evolve to use it — but you don't have to wait.
 
-## How This Was Built
+**Why not just use official MCP servers?**
 
-This might sound a little wild: OpenTabs was built entirely by AI agents. Zero hand-written application code.
+If one works well for you, use it. I started building OpenTabs for apps that don't have MCP support — many had none when I began, and some probably never will. Along the way, I noticed: setting up separate API keys or OAuth flows for each service adds up. Public APIs sometimes have stricter rate limits or a smaller feature set. The web app is always the superset.
 
-I wrote structured PRDs — hundreds of them — and used [Ralph](https://github.com/snarktank/ralph), an autonomous agent loop based on [Geoffrey Huntley's pattern](https://ghuntley.com/loop/), to execute them with [Claude Code](https://github.com/anthropics/claude-code). Multiple workers ran in parallel, each claiming a PRD by pushing a "running" marker to a shared repo — if the push failed, another worker already grabbed it. Just optimistic locking with `git push`. Nothing fancy, but it works.
-
-I open-sourced every single PRD. If you're curious about the process, or doing AI-driven development yourself, the specs might be useful:
-
-**[opentabs-dev/opentabs-prds](https://github.com/opentabs-dev/opentabs-prds)** — the almost complete development record (early work predates the PRD process).
+I see OpenTabs and official servers as complementary. Use whatever fits — or mix and match.
 
 ## Architecture
-
-Six packages:
 
 | Package | What it does |
 |---------|-------------|
@@ -148,9 +122,23 @@ Six packages:
 | **CLI** | User-facing CLI (`opentabs start`, `opentabs plugin install`, etc.) |
 | **Create Plugin** | Scaffolding CLI for new plugin projects |
 
-The UI across the side panel and docs site is built with [RetroUI](https://github.com/Logging-Studio/RetroUI), a NeoBrutalism component library that I really like.
+See [Architecture docs](https://opentabs.dev/docs/contributing/architecture) for the full picture.
 
-## Contributing to the Platform
+## How This Was Built
+
+OpenTabs was built entirely by AI agents. Zero hand-written application code.
+
+I wrote structured PRDs — hundreds of them — and used [Ralph](https://github.com/snarktank/ralph), an autonomous agent loop, to execute them with [Claude Code](https://github.com/anthropics/claude-code). Multiple workers ran in parallel, each claiming a PRD via optimistic locking with `git push`. Every PRD is open-sourced: **[opentabs-dev/opentabs-prds](https://github.com/opentabs-dev/opentabs-prds)**.
+
+I also asked Claude to talk to Gemini about what makes ChatGPT good. Just two AIs being professionals:
+
+<p align="center">
+  <img src="assets/demo-claude-gemini-chatgpt.gif" alt="Claude talking to Gemini about ChatGPT through OpenTabs" />
+</p>
+
+[Watch the full video on YouTube](https://youtu.be/WRrCeRfiVaI)
+
+## Contributing
 
 I'd love your help. You need [Node.js](https://nodejs.org/) 22+ and Chrome.
 
@@ -182,16 +170,6 @@ See the [Development Setup guide](https://opentabs.dev/docs/contributing/dev-set
 - [Architecture](https://opentabs.dev/docs/contributing/architecture) — how it all fits together
 
 This project wouldn't exist without [Claude Code](https://github.com/anthropics/claude-code), [OpenCode](https://github.com/anomalyco/opencode), [Ralph](https://github.com/snarktank/ralph), and [RetroUI](https://github.com/Logging-Studio/RetroUI). Genuinely grateful for all of them.
-
-## One More Thing
-
-I asked Claude to talk to Gemini about what makes ChatGPT good. Three rounds, no scripting. Just two AIs being professionals.
-
-<p align="center">
-  <img src="assets/demo-claude-gemini-chatgpt.gif" alt="Claude talking to Gemini about ChatGPT through OpenTabs" />
-</p>
-
-[Watch the full video on YouTube](https://youtu.be/WRrCeRfiVaI)
 
 ## Disclaimer
 
